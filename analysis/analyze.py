@@ -16,7 +16,7 @@ import ResolvedStellarPops as rsp
 from astropy.io import ascii
 from IPython import parallel
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions
-from ..plotting.plotting import model_cmd_withasts
+from ..plotting.plotting import compare_to_gal
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..TPAGBparams import snap_src
 
@@ -194,8 +194,8 @@ def gather_results(sgal, target, optfilter1, ast_cor=False, narratio_dict=None,
         optfilt1, optfilt2, nirfilt1, nirfilt2 = [optfilter1, optfilter2,
                                                   nirfilter1, nirfilter2]
 
-    lf_line = tpagb_lf(sgal, narratio_dict, optfilt1, optfilt2, nirfilt1, nirfilt2,
-                       lf_line=lf_line)
+    lf_line = tpagb_lf(sgal, narratio_dict, optfilt1, optfilt2, nirfilt1,
+                       nirfilt2, lf_line=lf_line)
 
     optrgb = narratio_dict['optsim_rgb']
     optagb = narratio_dict['optsim_agb']
@@ -300,73 +300,7 @@ def load_table(filename, target, optfilter1=None):
 
     return tbl[ioptndx], tbl[inirndx]
     
-
-def main(argv):
-
-    parser = argparse.ArgumentParser(description="Cull useful info from \
-                                                  trilegal catalog")
-
-    parser.add_argument('-a', '--ast_cor', action='store_true',
-                        help='use ast corrected mags')
-    
-    parser.add_argument('-c', '--colorlimits', type=str, default=None,
-                        help='comma separated color min, color max, opt then nir')
-
-    parser.add_argument('-d', '--directory', action='store_true',
-                        help='opperate on *_???.dat files in a directory')
-
-    parser.add_argument('-e', '--trgbexclude', type=str, default='0.1,0.2',
-                        help='comma separated regions around trgb to exclude')
-
-    parser.add_argument('-f', '--optfilter1', type=str,
-                        help='optical V filter')
-
-    parser.add_argument('-z', '--cut_heb', action='store_true',
-                        help='cut HeB files from analysis')
-
-    parser.add_argument('-m', '--maglimits', type=str, default=None,
-                        help='comma separated mag faint, mag bright, opt then nir')
-
-    parser.add_argument('-o', '--trgboffsets', type=str, default=None,
-                        help='comma separated trgb offsets')
-
-    parser.add_argument('-t', '--target', type=str, help='target name')
-    
-    parser.add_argument('-p', '--table', type=str,
-                        help='read colorlimits, completness mags from a prepared table')
-
-    parser.add_argument('name', type=str, nargs='*',
-                        help='trilegal catalog(s) or directory if -d flag')
-
-    args = parser.parse_args(argv)
-
-    if not args.target:   
-        if args.directory:
-            target = os.path.split(args.name[0])[1]
-        else:
-            target = args.name[0].split('_')[1]
-    else:
-        target = args.target
-
-    if args.directory:
-        tricats = rsp.fileio.get_files(args.name[0], '*_???.dat')
-        outfile_loc = args.name[0]
-    else:
-        tricats = args.name
-        outfile_loc = os.path.split(args.name[0])[0]  
-
-    # set up logging
-    logfile = os.path.join(outfile_loc, '{}_analyze.log'.format(target))
-    handler = logging.FileHandler(logfile)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-
-    logger.info('command: {}'.format(' '.join(argv)))
-    logger.info('logfile: {}'.format(logfile))
-    logger.debug('working on target: {}'.format(target))
-
+def parse_regions(args):
     # need the following in opt and nir
     if args.trgboffsets is not None:
         opt_offset, nir_offset = map(float, args.trgboffsets.split(','))
@@ -374,10 +308,10 @@ def main(argv):
         opt_offset, nir_offset = None, None
     
     opt_trgbexclude, nir_trgbexclude = map(float, args.trgbexclude.split(','))
-    opt_trgb, nir_trgb = get_trgb(target, optfilter1=args.optfilter1)
-
+    opt_trgb, nir_trgb = get_trgb(args.target, optfilter1=args.optfilter1)
+    
     if args.table is not None:
-        optrow, nirrow = load_table(args.table, target, optfilter1=args.optfilter1)
+        optrow, nirrow = load_table(args.table, args.target, optfilter1=args.optfilter1)
         if opt_offset is None or optrow['mag_by_eye'] != 0:
             logger.info('optical mags to norm to rgb are set by eye from table')
             opt_magbright = optrow['magbright']
@@ -438,10 +372,81 @@ def main(argv):
                      'col_max': nir_colmax,
                      'mag_bright': nir_magbright,
                      'mag_faint': nir_magfaint}
+    return optregions_kw, nirregions_kw
+
+
+def main(argv):
+
+    parser = argparse.ArgumentParser(description="Cull useful info from \
+                                                  trilegal catalog")
+
+    parser.add_argument('-a', '--ast_cor', action='store_true',
+                        help='use ast corrected mags')
+    
+    parser.add_argument('-c', '--colorlimits', type=str, default=None,
+                        help='comma separated color min, color max, opt then nir')
+
+    parser.add_argument('-d', '--directory', action='store_true',
+                        help='opperate on *_???.dat files in a directory')
+
+    parser.add_argument('-e', '--trgbexclude', type=str, default='0.1,0.2',
+                        help='comma separated regions around trgb to exclude')
+
+    parser.add_argument('-f', '--optfilter1', type=str,
+                        help='optical V filter')
+
+    parser.add_argument('-z', '--cut_heb', action='store_true',
+                        help='cut HeB files from analysis')
+
+    parser.add_argument('-m', '--maglimits', type=str, default=None,
+                        help='comma separated mag faint, mag bright, opt then nir')
+
+    parser.add_argument('-o', '--trgboffsets', type=str, default=None,
+                        help='comma separated trgb offsets')
+
+    parser.add_argument('-t', '--target', type=str, help='target name')
+    
+    parser.add_argument('-r', '--table', type=str,
+                        help='read colorlimits, completness mags from a prepared table')
+
+    parser.add_argument('-p', '--lfplot', action='store_true',
+                        help='plot the resulting scaled lf function against data')
+
+    parser.add_argument('name', type=str, nargs='*',
+                        help='trilegal catalog(s) or directory if -d flag')
+
+    args = parser.parse_args(argv)
+
+    if not args.target:   
+        if args.directory:
+            args.target = os.path.split(args.name[0])[1]
+        else:
+            args.target = args.name[0].split('_')[1]
+
+    if args.directory:
+        tricats = rsp.fileio.get_files(args.name[0], '*_???.dat')
+        outfile_loc = args.name[0]
+    else:
+        tricats = args.name
+        outfile_loc = os.path.split(args.name[0])[0]  
+
+    # set up logging
+    logfile = os.path.join(outfile_loc, '{}_analyze.log'.format(args.target))
+    handler = logging.FileHandler(logfile)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+    logger.info('command: {}'.format(' '.join(argv)))
+    logger.info('logfile: {}'.format(logfile))
+    logger.debug('working on target: {}'.format(args.target))
+
+    optregions_kw, nirregions_kw = parse_regions(args)
     
     norm_kws = {'cut_heb': args.cut_heb, 'ast_cor': args.ast_cor}
     
-    optgal, nirgal = load_obs(target, optfilter1=args.optfilter1)
+    optgal, nirgal = load_obs(args.target, optfilter1=args.optfilter1)
 
     optgal_rgb, optgal_agb = rgb_agb_regions(optgal.data['MAG2_ACS'],
                                              mag1=optgal.data['MAG1_ACS'],
@@ -476,20 +481,34 @@ def main(argv):
 
         narratio_dict = dict(optnorm_dict.items() + nirnorm_dict.items())
         
-        lf_line, narratio_line = gather_results(sgal, target, args.optfilter1,
+        lf_line, narratio_line = gather_results(sgal, args.target, args.optfilter1,
                                                 narratio_dict=narratio_dict,
                                                 lf_line=lf_line,
+                                                ast_cor=args.ast_cor,
                                                 narratio_line=narratio_line)
-    
+    if args.ast_cor:
+        extra_str = '_ast_cor'
+    else:
+        extra_str = ''
     result_dict = {'lf_line': lf_line, 'narratio_line': narratio_line}
     #result_dict['contam_line'] = contamination_by_phases(sgal, sgal_rgb,
     #                                                     sgal_agb, filter2)
     
     # write the output files
-    file_dict = write_results(result_dict, target, outfile_loc,
-                              args.optfilter1)
-    print file_dict
-    # plot?
+    file_dict = write_results(result_dict, args.target, outfile_loc, 
+                              args.optfilter1, extra_str=extra_str)
+    if args.lfplot:
+        ast_cor = file_dict['lf_file']
+        optfake, nirfake = find_fakes(args.target)
+        compare_to_gal(optfake=optfake, nirfake=nirfake,
+                       optfilter1=args.optfilter1,
+                       target=args.target, lf_file=file_dict['lf_file'],
+                       narratio_file=file_dict['narratio_file'], ast_cor=ast_cor,
+                       agb_mod=None, optregions_kw=optregions_kw,
+                       nirregions_kw=nirregions_kw, mplt_kw={}, dplot_kw={},
+                       draw_lines=True, xlim=None, ylim=None)
+    else:
+        print file_dict
     return
 
 
