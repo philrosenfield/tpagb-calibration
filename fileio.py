@@ -1,4 +1,6 @@
 import ResolvedStellarPops as rsp
+from TPAGBparams import snap_src
+data_loc = os.path.join(snap_src, 'data', 'galaxies')
 
 def load_obs(target, optfilter1=''):
     """load in NIR and OPT galaxy as StarPop objects"""
