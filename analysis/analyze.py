@@ -190,6 +190,9 @@ def gather_results(sgal, target, optfilter1, ast_cor=False, narratio_dict=None,
                                                                optfilter2,
                                                                nirfilter1,
                                                                nirfilter2])
+    else:
+        optfilt1, optfilt2, nirfilt1, nirfilt2 = [optfilter1, optfilter2,
+                                                  nirfilter1, nirfilter2])
 
     lf_line = tpagb_lf(sgal, narratio_dict, optfilt1, optfilt2, nirfilt1, nirfilt2,
                        lf_line=lf_line)
