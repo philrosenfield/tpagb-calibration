@@ -19,6 +19,7 @@ from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions
 from ..plotting.plotting import compare_to_gal
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..TPAGBparams import snap_src
+from ..fileio import load_obs
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -267,19 +268,6 @@ def get_trgb(target, optfilter1=None):
 
     nir_trgb = angst_data.get_snap_trgb_av_dmod(target.upper())[0]
     return opt_trgb, nir_trgb
-
-
-def load_obs(target, optfilter1=''):
-    """load in NIR and OPT galaxy as StarPop objects"""
-    from astropy.io import fits
-    nirgalname, = rsp.fileio.get_files(data_loc, '*{}*fits'.format(target.upper()))
-    optgalname, = rsp.fileio.get_files(data_loc, ('*{}*{}*fits'.format(target, optfilter1).lower()))
-    nirgal = rsp.StarPop()
-    nirgal.data = fits.getdata(nirgalname)
-
-    optgal = rsp.StarPop()
-    optgal.data = fits.getdata(optgalname)
-    return optgal, nirgal
 
 
 def load_table(filename, target, optfilter1=None):

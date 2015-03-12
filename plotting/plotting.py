@@ -9,7 +9,7 @@ import ResolvedStellarPops as rsp
 import sys
 from ..sfhs import star_formation_histories
 from ..pop_synth import stellar_pops
-from fileio import load_obs
+from ..fileio import load_obs
 
 
 # where the matchfake files live
