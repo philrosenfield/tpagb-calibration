@@ -69,10 +69,7 @@ def check_astcor(filters):
             filters[i] = f + '_cor'
     return filters
 
-
-def do_normalization(opt=True, ast_cor=True, optfilter1=None, sgal=None,
-                     tricat=None, nrgbs=None, cut_heb=False, regions_kw={}):
-    '''Do the normalization: call rgb_agb_regions and normalize_simulations.'''
+def select_filters(opt=True, ast_cor=True):
     if opt:
         filter1 = optfilter1
         filter2 = optfilter2
@@ -82,6 +79,13 @@ def do_normalization(opt=True, ast_cor=True, optfilter1=None, sgal=None,
 
     if ast_cor:
         filter1, filter2 = check_astcor([filter1, filter2])
+    return filter1, filter2
+
+def do_normalization(opt=True, ast_cor=False, optfilter1=None, sgal=None,
+                     tricat=None, nrgbs=None, cut_heb=False, regions_kw={}):
+    '''Do the normalization: call rgb_agb_regions and normalize_simulations.'''
+
+    filter1, filter2 = select_filters(opt=opt, ast_cor=ast_cor)
 
     if sgal is None:
         sgal = rsp.SimGalaxy(tricat)
@@ -114,7 +118,7 @@ def do_normalization(opt=True, ast_cor=True, optfilter1=None, sgal=None,
     return sgal, norm_dict
 
 
-def makelf(trilegal_catalogs, target, heb=True, norm=True, ast_cor=True,
+def makelf(trilegal_catalogs, target, heb=True, norm=True, ast_cor=False,
            completeness=True, data=True, norm_kw={}, lf_line=''):
     pass
 
@@ -178,7 +182,7 @@ def narratio(target, optnrgb, optnagb, nirnrgb, nirnagb, optfilt2, nirfilt2,
     return narratio_line
 
 
-def gather_results(sgal, target, optfilter1, ast_cor=True, narratio_dict=None,
+def gather_results(sgal, target, optfilter1, ast_cor=False, narratio_dict=None,
                    lf_line='', narratio_line=''):
     '''gather results into strings: call tpagb_lf and narratio'''
     if ast_cor:
