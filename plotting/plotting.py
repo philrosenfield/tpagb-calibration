@@ -9,7 +9,7 @@ import ResolvedStellarPops as rsp
 import sys
 from ..sfhs import star_formation_histories
 from ..pop_synth import stellar_pops
-from ..analysis.analyze import parse_regions, load_obs
+from ..analysis.analyze import load_obs
 
 
 # where the matchfake files live
@@ -828,6 +828,7 @@ def find_fakes(target):
     return optfake, nirfake
 
 def main(argv):
+    from ..analysis.analyze import parse_regions
     parser = argparse.ArgumentParser(description="Plot LFs against galaxy data")
     
     parser.add_argument('-c', '--colorlimits', type=str, default=None,
