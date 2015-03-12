@@ -51,7 +51,7 @@ def load_sim_masses(target):
         mass = 1.0e+09
     else:
         logger.warning('no info on object mass for {}, assuming 1e8Msun'.format(target))
-        mass = 1.0e+08
+        mass = 5.0e+08
     return mass
 
 

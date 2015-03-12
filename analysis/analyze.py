@@ -13,6 +13,7 @@ import time
 import matplotlib.pylab as plt
 import ResolvedStellarPops as rsp
 
+from astropy.io import ascii
 from IPython import parallel
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions
 from ..plotting.plotting import model_cmd_withasts
@@ -23,14 +24,11 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 optfilter2 = 'F814W'
+# optfilter1 varies from F475W, F555W, F606W
 nirfilter2 = 'F160W'
 nirfilter1 = 'F110W'
 
 data_loc = os.path.join(snap_src, 'data', 'galaxies')
-
-def load_trilegal_catalog(trilegal_catalog):
-    '''read a table into a SimGalaxy object'''
-    return rsp.SimGalaxy(trilegal_catalog)
 
 
 def cutheb(sgal):
@@ -75,7 +73,6 @@ def check_astcor(filters):
 def do_normalization(opt=True, ast_cor=True, optfilter1=None, sgal=None,
                      tricat=None, nrgbs=None, cut_heb=False, regions_kw={}):
     '''Do the normalization: call rgb_agb_regions and normalize_simulations.'''
-
     if opt:
         filter1 = optfilter1
         filter2 = optfilter2
@@ -87,7 +84,7 @@ def do_normalization(opt=True, ast_cor=True, optfilter1=None, sgal=None,
         filter1, filter2 = check_astcor([filter1, filter2])
 
     if sgal is None:
-        sgal = load_trilegal_catalog(tricat)
+        sgal = rsp.SimGalaxy(tricat)
 
     if cut_heb:
         sgal = cutheb(sgal)
@@ -103,19 +100,16 @@ def do_normalization(opt=True, ast_cor=True, optfilter1=None, sgal=None,
                                                             sgal_agb)
 
     if opt:
-        norm_dict = {'optnorm': norm,
-                     'optsim_rgb': sim_rgb,
-                     'optsim_agb': sim_agb,
-                     'optsgal_rgb': sgal_rgb,
-                     'optsgal_agb': sgal_agb,
-                     'optidx_norm': idx_norm}
+        fil = 'opt'
     else:
-        norm_dict = {'nirnorm': norm,
-                     'nirsim_rgb': sim_rgb,
-                     'nirsim_agb': sim_agb,
-                     'nirsgal_rgb': sgal_rgb,
-                     'nirsgal_agb': sgal_agb,
-                     'niridx_norm': idx_norm}
+        fil = 'nir'
+
+    norm_dict = {'{}norm'.format(fil): norm,
+                 '{}sim_rgb'.format(fil): sim_rgb,
+                 '{}sim_agb'.format(fil): sim_agb,
+                 '{}sgal_rgb'.format(fil): sgal_rgb,
+                 '{}sgal_agb'.format(fil): sgal_agb,
+                 '{}idx_norm'.format(fil): idx_norm}
         
     return sgal, norm_dict
 
@@ -268,7 +262,7 @@ def get_trgb(target, optfilter1=None):
     return opt_trgb, nir_trgb
 
 
-def laad_obs(target, optfilter1=''):
+def load_obs(target, optfilter1=''):
     """load in NIR and OPT galaxy as StarPop objects"""
     from astropy.io import fits
     nirgalname, = rsp.fileio.get_files(data_loc, '*{}*fits'.format(target.upper()))
@@ -281,7 +275,27 @@ def laad_obs(target, optfilter1=''):
     return optgal, nirgal
 
 
+def load_table(filename, target, optfilter1=None):
+    tbl = ascii.read(filename)
+    
+    ifilts = list(np.nonzero((tbl['filter1'] == optfilter1))[0])
+    itargs = [i for i in range(len(tbl['target'])) if target.upper() in tbl['target'][i]]
+    ioptndx = list(set(ifilts) & set(itargs))
+    if len(ioptndx) == 0:
+        logger.error('{}, {} not found in table'.format(target, optfilter1))
+    
+    ifilts = list(np.nonzero((tbl['filter1'] == nirfilter1))[0])
+    itargs = [i for i in range(len(tbl['target'])) if target.upper() in tbl['target'][i]]
+    inirndx = list(set(ifilts) & set(itargs))
+    
+    if len(inirndx) == 0:
+        logger.error('{}, {} not found in table'.format(target, nirfilter1))
+
+    return tbl[ioptndx], tbl[inirndx]
+    
+
 def main(argv):
+
     parser = argparse.ArgumentParser(description="Cull useful info from \
                                                   trilegal catalog")
 
@@ -292,7 +306,7 @@ def main(argv):
                         help='comma separated color min, color max, opt then nir')
 
     parser.add_argument('-d', '--directory', action='store_true',
-                        help='opperate on *hdf5 files in a directory')
+                        help='opperate on *_???.dat files in a directory')
 
     parser.add_argument('-e', '--trgbexclude', type=str, default='0.1,0.2',
                         help='comma separated regions around trgb to exclude')
@@ -306,19 +320,18 @@ def main(argv):
     parser.add_argument('-m', '--maglimits', type=str, default=None,
                         help='comma separated mag faint, mag bright, opt then nir')
 
-    parser.add_argument('-o', '--trgboffsets', type=str, default='2.0,1.5',
+    parser.add_argument('-o', '--trgboffsets', type=str, default=None,
                         help='comma separated trgb offsets')
 
     parser.add_argument('-t', '--target', type=str, help='target name')
     
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='verbose mode')
-    
+    parser.add_argument('-p', '--table', type=str,
+                        help='read colorlimits, completness mags from a prepared table')
+
     parser.add_argument('name', type=str, nargs='*',
                         help='trilegal catalog(s) or directory if -d flag')
 
     args = parser.parse_args(argv)
-
 
     if not args.target:   
         if args.directory:
@@ -329,23 +342,20 @@ def main(argv):
         target = args.target
 
     if args.directory:
-        tricats = rsp.fileio.get_files(args.name[0], '*_???.hdf5')
+        tricats = rsp.fileio.get_files(args.name[0], '*_???.dat')
         outfile_loc = args.name[0]
     else:
         tricats = args.name
-        outfile_loc = os.path.split(args.name[0])[0]
-        
+        outfile_loc = os.path.split(args.name[0])[0]  
+
     # set up logging
     logfile = os.path.join(outfile_loc, '{}_analyze.log'.format(target))
     handler = logging.FileHandler(logfile)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    if args.verbose:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.INFO)    
-    
+    logger.setLevel(logging.DEBUG)
+
     logger.info('command: {}'.format(' '.join(argv)))
     logger.info('logfile: {}'.format(logfile))
     logger.debug('working on target: {}'.format(target))
@@ -356,24 +366,56 @@ def main(argv):
     else:
         opt_offset, nir_offset = None, None
     
-    if args.colorlimits is not None:
-        opt_colmin, opt_colmax, nir_colmin, nir_colmax = \
-            map(float, args.colorlimits.split(','))
-    else:
-        opt_colmin, opt_colmax, nir_colmin, nir_colmax = None, None, None, None
-
-    if args.maglimits is not None:
-        opt_magfaint, opt_magbright, nir_magfaint, nir_magbright = \
-            map(float, args.colorlimits.split(','))
-    else:
-        opt_magfaint, opt_magbright, nir_magfaint, nir_magbright = None, None, None, None
-
     opt_trgbexclude, nir_trgbexclude = map(float, args.trgbexclude.split(','))
-
-    # get the number of rgb and agb stars from the observations
     opt_trgb, nir_trgb = get_trgb(target, optfilter1=args.optfilter1)
-    optgal, nirgal = laad_obs(target, optfilter1=args.optfilter1)
 
+    if args.table is not None:
+        optrow, nirrow = load_table(args.table, target, optfilter1=args.optfilter1)
+        if opt_offset is None or optrow['mag_by_eye'] != 0:
+            logger.info('optical mags to norm to rgb are set by eye from table')
+            opt_magbright = optrow['magbright']
+            opt_magfaint = optrow['magfaint']
+        else:
+            opt_magbright = opt_trgb + opt_trgbexclude
+            if optrow['comp90mag2'] < opt_trgb + opt_offset:
+                msg = '0.9 completeness fraction'
+                opt_magfaint = optrow['comp90mag2']
+            else:
+                msg = 'opt_trgb + opt_offset'
+                opt_magfaint = opt_trgb + opt_offset
+            logger.info('faint opt mag limit for rgb norm set to {}'.format(msg))
+
+        if nir_offset is None or nirrow['mag_by_eye'] != 0:
+            logger.info('nir mags to norm to rgb are by eye from table')
+            nir_magbright = nirrow['magbright']
+            nir_magfaint = nirrow['magfaint']
+        else:
+            nir_magbright = nir_trgb + nir_trgbexclude
+            if nirrow['comp90mag2'] < nir_trgb + nir_offset:
+                msg = '0.9 completeness fraction'
+                nir_magfaint = nirrow['comp90mag2']
+            else:
+                msg = 'nir_trgb + nir_offset'
+                nir_magfaint = nir_trgb + nir_offset
+            logger.info('faint nir mag limit for rgb norm set to {}'.format(msg))
+
+        opt_colmin = optrow['colmin']
+        opt_colmax = optrow['colmax']
+        nir_colmin = nirrow['colmin']
+        nir_colmax = nirrow['colmax']
+    else:
+        if args.colorlimits is not None:
+            opt_colmin, opt_colmax, nir_colmin, nir_colmax = \
+                map(float, args.colorlimits.split(','))
+        else:
+            opt_colmin, opt_colmax, nir_colmin, nir_colmax = None, None, None, None
+
+        if args.maglimits is not None:
+            opt_magfaint, opt_magbright, nir_magfaint, nir_magbright = \
+                map(float, args.colorlimits.split(','))
+        else:
+            opt_magfaint, opt_magbright, nir_magfaint, nir_magbright = None, None, None, None
+    
     optregions_kw = {'offset': opt_offset,
                      'trgb_exclude': opt_trgbexclude,
                      'trgb': opt_trgb,
@@ -389,6 +431,10 @@ def main(argv):
                      'col_max': nir_colmax,
                      'mag_bright': nir_magbright,
                      'mag_faint': nir_magfaint}
+    
+    norm_kws = {'cut_heb': args.cut_heb, 'ast_cor': args.ast_cor}
+    
+    optgal, nirgal = load_obs(target, optfilter1=args.optfilter1)
 
     optgal_rgb, optgal_agb = rgb_agb_regions(optgal.data['MAG2_ACS'],
                                              mag1=optgal.data['MAG1_ACS'],
@@ -406,8 +452,7 @@ def main(argv):
     narratio_line = narratio('data', obs_optnrgbs, obs_optnagbs, obs_nirnrgbs,
                              obs_nirnagbs, optfilter2, nirfilter2)
 
-    # normalize each trilegal catalog    
-    norm_kws = {'cut_heb': args.cut_heb, 'ast_cor': args.ast_cor}
+    # normalize each trilegal catalog
     lf_line = ''
     for tricat in tricats:
         logger.debug('normalizing: {}'.format(tricat))
