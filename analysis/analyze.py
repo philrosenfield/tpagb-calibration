@@ -18,7 +18,6 @@ from IPython import parallel
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions
 from ..plotting.plotting import compare_to_gal
 from ..sfhs.star_formation_histories import StarFormationHistories
-from ..TPAGBparams import snap_src
 from ..fileio import load_obs
 
 logging.basicConfig(level=logging.DEBUG)
@@ -29,7 +28,6 @@ optfilter2 = 'F814W'
 nirfilter2 = 'F160W'
 nirfilter1 = 'F110W'
 
-data_loc = os.path.join(snap_src, 'data', 'galaxies')
 
 
 def cutheb(sgal):
@@ -474,6 +472,7 @@ def main(argv):
                                                 lf_line=lf_line,
                                                 ast_cor=args.ast_cor,
                                                 narratio_line=narratio_line)
+        del sgal
     if args.ast_cor:
         extra_str = '_ast_cor'
     else:
