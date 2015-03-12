@@ -69,7 +69,7 @@ def check_astcor(filters):
             filters[i] = f + '_cor'
     return filters
 
-def select_filters(opt=True, ast_cor=True):
+def select_filters(optfilter1, opt=True, ast_cor=True):
     if opt:
         filter1 = optfilter1
         filter2 = optfilter2
@@ -85,7 +85,7 @@ def do_normalization(opt=True, ast_cor=False, optfilter1=None, sgal=None,
                      tricat=None, nrgbs=None, cut_heb=False, regions_kw={}):
     '''Do the normalization: call rgb_agb_regions and normalize_simulations.'''
 
-    filter1, filter2 = select_filters(opt=opt, ast_cor=ast_cor)
+    filter1, filter2 = select_filters(optfilter1, opt=opt, ast_cor=ast_cor)
 
     if sgal is None:
         sgal = rsp.SimGalaxy(tricat)
