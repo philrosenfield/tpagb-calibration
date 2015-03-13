@@ -119,9 +119,15 @@ def ast_corrections_plot(mag1, mag2, mag1_cor, mag2_cor, ymag='I'):
 
 def load_lf_file(lf_file):
     header = open(lf_file).readline().replace('#', '').split()
-    header[header.index('F814W')] = 'optfilter2'
-    header[header.index('F110W')] = 'nirfilter1'
-    header[header.index('F160W')] = 'nirfilter2'
+    try:
+        header[header.index('F814W')] = 'optfilter2'
+        header[header.index('F110W')] = 'nirfilter1'
+        header[header.index('F160W')] = 'nirfilter2'
+    except:
+        header[header.index('F814W_cor')] = 'optfilter2'
+        header[header.index('F110W_cor')] = 'nirfilter1'
+        header[header.index('F160W_cor')] = 'nirfilter2'
+
     filt1, = [h for h in header if h.upper().startswith('F')]
     header[header.index(filt1)] = 'optfilter1'
     
