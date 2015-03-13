@@ -2,7 +2,7 @@ import argparse
 import sys
 import os
 import matplotlib as mpl
-#mpl.use('Agg')
+mpl.use('Agg')
 import matplotlib.pylab as plt
 import numpy as np
 import ResolvedStellarPops as rsp
@@ -841,7 +841,7 @@ def main(argv):
     parser.add_argument('-o', '--trgboffsets', type=str, default=None,
                         help='comma separated trgb offsets')
     
-    parser.add_argument('-p', '--table', type=str,
+    parser.add_argument('-r', '--table', type=str,
                         help='read colorlimits, completness mags from a prepared table')
     
     parser.add_argument('-n', '--narratio_file', type=str, help='model narratio file')
