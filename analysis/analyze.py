@@ -233,8 +233,8 @@ def write_results(res_dict, target, outfile_loc, optfilter1, extra_str=''):
         file and path to file
         ex: lf_file: <path_to_lf_file>
     '''
-    narratio_header = '# target optnrgb optnagb optar_ratio optar_ratio_err '
-    narratio_header += 'nirnrgb nirnagb nirar_ratio nirar_ratio_err \n'
+    narratio_header = '# target optfilter2 optnrgb optnagb optar_ratio optar_ratio_err '
+    narratio_header += 'nirfilter2 nirnrgb nirnagb nirar_ratio nirar_ratio_err \n'
 
     fdict = {}
     for key, line in res_dict.items():
