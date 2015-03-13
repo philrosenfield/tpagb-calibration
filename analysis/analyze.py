@@ -494,7 +494,7 @@ def main(argv):
         ast_cor = 'ast' in file_dict['lf_file']
         optfake, nirfake = find_fakes(args.target)
         compare_to_gal(optfake=optfake, nirfake=nirfake,
-                       optfilter1=args.optfilter1,
+                       optfilter1=args.optfilter1, extra_str=extra_str,
                        target=args.target, lf_file=file_dict['lf_file'],
                        narratio_file=file_dict['narratio_file'], ast_cor=ast_cor,
                        agb_mod=None, optregions_kw=optregions_kw,
