@@ -473,10 +473,15 @@ def main(argv):
                                                 ast_cor=args.ast_cor,
                                                 narratio_line=narratio_line)
         del sgal
+    
     if args.ast_cor:
         extra_str = '_ast_cor'
     else:
         extra_str = ''
+    
+    if args.cut_heb:
+        extra_str += '_cut_heb'
+
     result_dict = {'lf_line': lf_line, 'narratio_line': narratio_line}
     #result_dict['contam_line'] = contamination_by_phases(sgal, sgal_rgb,
     #                                                     sgal_agb, filter2)
@@ -485,7 +490,7 @@ def main(argv):
     file_dict = write_results(result_dict, args.target, outfile_loc, 
                               args.optfilter1, extra_str=extra_str)
     if args.lfplot:
-        ast_cor = file_dict['lf_file']
+        ast_cor = 'ast' in file_dict['lf_file']
         optfake, nirfake = find_fakes(args.target)
         compare_to_gal(optfake=optfake, nirfake=nirfake,
                        optfilter1=args.optfilter1,
