@@ -18,7 +18,7 @@ from IPython import parallel
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions
 from ..plotting.plotting import compare_to_gal
 from ..sfhs.star_formation_histories import StarFormationHistories
-from ..fileio import load_obs
+from ..fileio import load_obs, find_fakes
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

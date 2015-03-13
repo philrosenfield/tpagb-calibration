@@ -9,12 +9,12 @@ import ResolvedStellarPops as rsp
 import sys
 from ..sfhs import star_formation_histories
 from ..pop_synth import stellar_pops
-from ..fileio import load_obs
+from ..fileio import load_obs, find_fakes
 
 
 # where the matchfake files live
 from ..TPAGBparams import snap_src
-matchfake_loc = os.path.join(snap_src, 'data', 'galaxies')
+
 
 optfilter2 = 'F814W'
 # optfilter1 varies from F475W, F555W, F606W
@@ -820,12 +820,7 @@ def trilegal_metals(chi2_location='draft_run', band='opt', dry_run=False,
         print '%.4f %.4f %.4f %s ' % (np.min(zs[i]), np.median(zs[i]),
                                       np.max(zs[i]), target)
 
-def find_fakes(target):
-    search_str = '*{}*.matchfake'.format(target.upper())
-    fakes = rsp.fileio.get_files(matchfake_loc, search_str)
-    nirfake, = [f for f in fakes if 'IR' in f]
-    optfake, = [f for f in fakes if not 'IR' in f]
-    return optfake, nirfake
+
 
 def main(argv):
     from ..analysis.analyze import parse_regions
