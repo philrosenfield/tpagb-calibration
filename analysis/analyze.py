@@ -45,6 +45,7 @@ def cutheb(sgal):
     To do:
     Add mbol or logl limit on where to apply this correction
     """
+    logger.info('cutting out all HeB stars from analysis')
     # HeB, RHeB, BHeB
     sgal.iheb, = np.nonzero((sgal.data['stage'] >= 4) & \
                             (sgal.data['stage'] <= 6))
