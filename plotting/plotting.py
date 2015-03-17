@@ -355,26 +355,57 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB', opt=True):
 
 def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
                plt_kw={}, maglimit=None, agb_mod=None):
-    '''needs work, but: plot the lf files.'''
-    # set up the plot
+    '''plot lf files
+    Parameters
+    ----------
+    mag2s: list or array of arrays
+        mag2 values from lf file
+
+    bins: array
+        bins used to make histogram of mag2s
+
+    norms: list or array of floats
+        normalize the histogram, will be overriden by inorm
+
+    inorm: list or array of arrays
+        indices of mag2 that sample the data distribution
+
+    mag_limit:
+        if specified will only plot mag <= maglimit
+
+    agb_mod:
+        if set, will add as legend label
+
+    plt_kw:
+        kwargs sent to ax.plot
+
+    ax: axes instance
+        if axes instance supplied, will not create new one
+    
+    Returns
+    -------
+    ax: axes instance
+    '''
+    
     plt_kw = dict({'linestyle': 'steps-mid', 'color': 'black',
                    'alpha': 0.2}.items() + plt_kw.items())
+    
     if agb_mod is not None:
         label = r'$%s$' % agb_mod.split('_')[-1]
         plt_kw_lab = dict(plt_kw.items() + {'label': label}.items())
     else:
         plt_kw_lab = plt_kw
+    
     if ax is None:
         fig, (ax) = plt.subplots(figsize=(12, 6))
-        #plt.subplots_adjust(right=0.95, left=0.05)
-
+        
     for i in range(len(mag2s)):
         if inorm is not None:
-            import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
             mag2 = mag2s[i][inorm[i]]
             norm = 1.
         else:
-            mag2 = mag2s[i][inds]
+            mag2 = mag2s[i]
             norm = norms[i]
 
         if maglimit is not None:
@@ -383,11 +414,12 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
             inds = np.arange(len(mag2))
 
         hist = np.histogram(mag2[inds], bins=bins)[0]
+        # only write legend once
         if i != 0:
             kw = plt_kw
         else:
             kw = plt_kw_lab
-            pass
+
         ax.plot(bins[1:], hist * norm, **kw)
     return ax
 

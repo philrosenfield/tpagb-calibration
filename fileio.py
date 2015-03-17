@@ -1,7 +1,11 @@
+import logging
 import os
 
 import ResolvedStellarPops as rsp
 from TPAGBparams import snap_src
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 data_loc = os.path.join(snap_src, 'data', 'galaxies')
 match_run_loc = os.path.join(snap_src, 'match')
@@ -25,8 +29,17 @@ def find_fakes(target):
     optfake, = [f for f in fakes if not 'IR' in f]
     return optfake, nirfake
 
-def find_match_param(target):
-    search_str = '*.param'
+def find_match_param(target, optfilter1=''):
+    search_str = '*{}*.param'.format(optfilter1)
     loc = os.path.join(match_run_loc, target)
-    mparam, = rsp.fileio.get_files(loc, search_str)
+    if not os.path.isdir(loc):
+        logger.error('{} directory not found!'.format(loc))
+        sys.exit(2)
+    try:
+        mparam, = rsp.fileio.get_files(loc, search_str)
+    except ValueError:
+        if optfilter1 == '':
+            raise ValueError, 'Need to pass optfilter1'
+        else:
+            raise ValueError
     return mparam

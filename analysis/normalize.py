@@ -42,8 +42,8 @@ def select_filters(optfilter1, opt=True, ast_cor=True):
         filter1, filter2 = check_astcor([filter1, filter2])
     return filter1, filter2
 
-def call_exclude_gates(target, mag1, mag2):
-    match_param = find_match_param(target)
+def call_exclude_gates(target, mag1, mag2, optfilter1=''):
+    match_param = find_match_param(target, optfilter1=optfilter1)
     inds = exclude_gate_inds(mag1, mag2, match_param=match_param)
     if False in np.isfinite(inds):
         inds = np.arange(len(mag1))
@@ -64,7 +64,7 @@ def do_normalization(opt=True, ast_cor=False, optfilter1=None, sgal=None,
 
     if use_exclude_gates:
         inds = call_exclude_gates(sgal.name.split('_')[1], sgal.data[filter1],
-                                  sgal.data[filter2])
+                                  sgal.data[filter2], optfilter1=optfilter1)
     else:
         inds = np.arange(len(sgal.data[filter2]))
 
@@ -99,7 +99,7 @@ def tpagb_lf(sgal, narratio_dict, optfilt1, optfilt2, nirfilt1, nirfilt2,
     optrgb = narratio_dict['optsim_rgb']
     optagb = narratio_dict['optsim_agb']
     nirrgb = narratio_dict['nirsim_rgb']
-    niragb = narratio_dict['optsim_agb']
+    niragb = narratio_dict['nirsim_agb']
 
     header = '# {} {} {} {} '.format(optfilt1, optfilt2, nirfilt1,
                                      nirfilt2)
@@ -122,7 +122,7 @@ def tpagb_lf(sgal, narratio_dict, optfilt1, optfilt2, nirfilt1, nirfilt2,
                           ' '.join(['%i' % m for m in nirrgb]),
                           ' '.join(['%i' % m for m in niragb]),
                           ' '.join(['%i' % m for m in narratio_dict['nirsgal_rgb']]),
-                          ' '.join(['%i' % m for m in narratio_dict['nirsgal_rgb']]),
+                          ' '.join(['%i' % m for m in narratio_dict['nirsgal_agb']]),
                           ' '.join(['%i' % m for m in narratio_dict['niridx_norm']]),
                           '%.4f' % narratio_dict['nirnorm']])
     return lf_line
@@ -170,7 +170,7 @@ def gather_results(sgal, target, optfilter1, ast_cor=False, narratio_dict=None,
     optrgb = narratio_dict['optsim_rgb']
     optagb = narratio_dict['optsim_agb']
     nirrgb = narratio_dict['nirsim_rgb']
-    niragb = narratio_dict['optsim_agb']
+    niragb = narratio_dict['nirsim_agb']
     
     optnrgb = float(len(optrgb))
     optnagb = float(len(optagb))
@@ -420,7 +420,8 @@ def main(argv):
 
     extra_str = ''
     if args.use_exclude:
-        inds = call_exclude_gates(args.target, optmag1, optmag2)
+        inds = call_exclude_gates(os.path.split(tricats[0])[1].split('_')[1],
+                                  optmag1, optmag2, optfilter1=args.optfilter1)
         if np.sum(np.diff(inds, 2)) != 0:
             extra_str += '_exg'
     else:
@@ -451,6 +452,7 @@ def main(argv):
                                               **norm_kws)
 
         sgal, nirnorm_dict = do_normalization(opt=False, sgal=sgal,
+                                              optfilter1=args.optfilter1,
                                               nrgbs=obs_nirnrgbs,
                                               regions_kw=nirregions_kw,
                                               **norm_kws)
