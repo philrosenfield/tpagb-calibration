@@ -370,6 +370,7 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
 
     for i in range(len(mag2s)):
         if inorm is not None:
+            import pdb; pdb.set_trace()
             mag2 = mag2s[i][inorm[i]]
             norm = 1.
         else:
