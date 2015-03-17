@@ -373,7 +373,7 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
             mag2 = mag2s[i][inorm[i]]
             norm = 1.
         else:
-            mag2 = mag2s[i]
+            mag2 = mag2s[i][inds]
             norm = norms[i]
 
         if maglimit is not None:
@@ -423,7 +423,7 @@ def plot_models(lf_file, bins, opt=True, maglimit=None, ax=None, plt_kw=None,
     else:
         mag2s = nir_lfd['nirfilter2']
         inorm = nir_lfd['niridx_norm']
-        
+
     ax = plot_model(mag2s=mag2s, bins=bins, inorm=inorm,
                     maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod=agb_mod)
     return ax
@@ -454,7 +454,7 @@ def compare_to_gal(optfake=None, nirfake=None, optfilter1=None, target=None,
         if opt:
             maglimit = optfilter2_limit
             fake_file = optfake
-            extra_str = '_opt'
+            extra_str += '_opt'
             regions_kw = optregions_kw
             try:   
                 mag2 = optgal.data['MAG2_ACS']
@@ -465,12 +465,13 @@ def compare_to_gal(optfake=None, nirfake=None, optfilter1=None, target=None,
             maglimit = nirfilter2_limit
             fake_file = nirfake
             mag2 = nirgal.data['MAG2_IR']
-            extra_str = '_nir'
+            extra_str = extra_str.replace('opt', 'nir')
             regions_kw = nirregions_kw
             filter2 = nirfilter2
 
         if ast_cor:
-            extra_str += '_ast_cor'
+            if not '_ast_cor' in extra_str:
+                extra_str += '_ast_cor'
 
         bins = np.arange(16, 27, 0.1)
         ax = plot_models(lf_file, bins, opt=opt, maglimit=maglimit, plt_kw=mplt_kw)
@@ -829,7 +830,7 @@ def trilegal_metals(chi2_location='draft_run', band='opt', dry_run=False,
 
 
 def main(argv):
-    from ..analysis.analyze import parse_regions
+    from ..analysis.normalize import parse_regions
     parser = argparse.ArgumentParser(description="Plot LFs against galaxy data")
     
     parser.add_argument('-c', '--colorlimits', type=str, default=None,
@@ -850,6 +851,9 @@ def main(argv):
     parser.add_argument('-r', '--table', type=str,
                         help='read colorlimits, completness mags from a prepared table')
     
+    parser.add_argument('-u', '--use_exclude', action='store_true',
+                        help='decontaminate LF by excluding stars within exclude_gates')
+    
     parser.add_argument('-n', '--narratio_file', type=str, help='model narratio file')
 
     parser.add_argument('target', type=str, help='target name')
@@ -867,7 +871,7 @@ def main(argv):
                    target=args.target, lf_file=args.lf_file, 
                    narratio_file=args.narratio_file, ast_cor=ast_cor, agb_mod=None,
                    optregions_kw=optregions_kw, nirregions_kw=nirregions_kw,
-                   mplt_kw={}, dplot_kw={}, 
+                   mplt_kw={}, dplot_kw={},
                    optfilter2_limit=None,
                    nirfilter2_limit=None,
                    draw_lines=True, xlim=None, ylim=None)

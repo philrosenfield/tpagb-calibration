@@ -3,6 +3,7 @@ import os
 import numpy as np
 from ResolvedStellarPops.galaxies.starpop import stars_in_region
 from ResolvedStellarPops.galaxies.asts import ASTs
+from ResolvedStellarPops.utils import points_inside_poly
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -109,3 +110,44 @@ def completeness_corrections(fakefile, mag_bins, mag2=True):
         ast_c = ast.fcomp1(mag_bins)
 
     return ast_c
+
+def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
+                      ms_color_cut=False):
+    """
+    return an array of all points outside the exclude gates region if
+    find_ms_color_cut is set, will include all points bluer than the median
+    exclude gates color.
+    """
+    if exclude_gates is None:
+        exclude_gates = get_exclude_gates(match_param)
+        if False in np.isfinite(exclude_gates):
+            return exclude_gates
+        
+    color = mag1 - mag2
+    mag = mag1
+    points = np.column_stack((color, mag))
+    inds, = np.nonzero(points_inside_poly(points, exclude_gates))
+    
+    decontam = np.arange(len(mag))
+    decontam = np.delete(decontam, inds)
+    
+    if ms_color_cut:
+        color_cut = np.median(color[inds])
+        blue = np.nonzero(color[decontam] < color_cut)
+        decontam = np.delete(decontam, blue)
+    
+    return decontam
+
+
+def get_exclude_gates(match_param):
+    exg = np.ndarray(shape=(10,)) * np.nan
+    ex_line = open(match_param, 'r').readlines()[7]
+    nexgs = np.int(ex_line[0])
+    if nexgs == 0:
+        logger.warning('no exclude gates')
+    elif nexgs > 1:
+        logger.error('get_exclude_gates only works on 1 gate... code!')
+    else:
+        exg = np.array(ex_line.split()[1:-1], dtype=float)
+        exg = np.append(exg, exg[:2])
+    return exg.reshape(5, 2)

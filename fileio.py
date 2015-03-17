@@ -4,6 +4,7 @@ import ResolvedStellarPops as rsp
 from TPAGBparams import snap_src
 
 data_loc = os.path.join(snap_src, 'data', 'galaxies')
+match_run_loc = os.path.join(snap_src, 'match')
 
 def load_obs(target, optfilter1=''):
     """load in NIR and OPT galaxy as StarPop objects"""
@@ -23,3 +24,9 @@ def find_fakes(target):
     nirfake, = [f for f in fakes if 'IR' in f]
     optfake, = [f for f in fakes if not 'IR' in f]
     return optfake, nirfake
+
+def find_match_param(target):
+    search_str = '*.param'
+    loc = os.path.join(match_run_loc, target)
+    mparam, = rsp.fileio.get_files(loc, search_str)
+    return mparam

@@ -71,7 +71,7 @@ class VarySFHs(SFH):
         if inp_obj is not None:
             indict = inp_obj.__dict__
 
-        self.initialize_inputs()
+        self.initialize_inputs(indict)
 
         if self.nsfhs > 1:
             # load in hmc data to self.data
@@ -80,7 +80,7 @@ class VarySFHs(SFH):
         # setup file formats
         self.trilegal_file_fmt()
 
-    def initialize_inputs(self):
+    def initialize_inputs(self, indict):
         """load input parameters needed for vary_sfh"""
         # parameters needed
         inputs = ['file_origin', 'filter1', 'filter2', 'galaxy_input',
