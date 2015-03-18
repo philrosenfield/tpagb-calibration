@@ -62,10 +62,12 @@ def do_normalization(opt=True, ast_cor=False, optfilter1=None, sgal=None,
     if cut_heb:
         sgal = cutheb(sgal)
 
-    if use_exclude_gates:
+    if use_exclude_gates and opt:
         inds = call_exclude_gates(sgal.name.split('_')[1], sgal.data[filter1],
                                   sgal.data[filter2], optfilter1=optfilter1)
     else:
+        if use_exclude_gates:
+            logger.warning('nothing excluded in the nir LF but excluded in opt!! code!!')
         inds = np.arange(len(sgal.data[filter2]))
 
     # select rgb and agb regions
@@ -478,7 +480,7 @@ def main(argv):
                               args.optfilter1, extra_str=extra_str)
     if args.lfplot:
         ast_cor = 'ast' in file_dict['lf_file']
-        optfake, nirfake = find_fakes(args.target)
+        optfake, nirfake = find_fakes(args.target, optfilter1=args.optfilter1)
         compare_to_gal(optfake=optfake, nirfake=nirfake,
                        optfilter1=args.optfilter1, extra_str=extra_str,
                        target=args.target, lf_file=file_dict['lf_file'],

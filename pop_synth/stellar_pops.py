@@ -11,23 +11,70 @@ logger = logging.getLogger(__name__)
 def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None,
                     col_max=None, mag1=None, mag_bright=None,
                     mag_faint=None):
-    """the indices of mag in rgb and agb regions"""
+    """
+    Return indices of mag in rgb and agb regions
+
+    Parameters
+    ----------
+    mag : array
+        (probably should be filter2) list of magnitudes
+    
+    offset : float
+        magnitude offset below the trgb to include as rgb stars
+    
+    trgb_exclude : float
+        +/- magnitude around the trgb to exclude from rgb and agb star
+        determination
+    
+    trgb : float
+        magnitude (same filter as mag) of the rgb tip
+    
+    col_min : float
+        blue color cut (need mag1)
+    
+    col_max : float
+        red color cut (need mag1)
+    
+    mag1 : array
+        filter1 magnitude list
+    
+    mag_bright : float
+        brightest mag to include as rgb (agb is set to mag=10)
+    
+    mag_faint : float
+        faintest mag to include as rgb
+        
+    Returns
+    -------
+    srgb, sagb : array, array
+        indices of stars in rgb region and agb region
+
+    Note
+    ----
+    if both (offset, trgb, trbg_exclude) and (mag_faint, mag_bright) are
+    passed, will default to the former for rgb retions
+
+    """
     # define RGB regions
-    if mag_bright is not None:
-        low = mag_faint
-        mid = mag_bright
-    else:
-        assert offset is not None, \
-            'rgb_agb_regions: need either offset or mag limits'
+    if offset is not None:
         low = trgb + offset
         mid = trgb + trgb_exclude
+    else:
+        assert mag_bright is not None, \
+            'rgb_agb_regions: need either offset or mag limits'
+        low = mag_faint
+        mid = mag_bright
 
     # Recovered stars in simulated RGB region.
     srgb = stars_in_region(mag, low, mid, col_min=col_min, col_max=col_max,
                            mag1=mag1)
-
+    if len(srgb) == 0:
+        import pdb; pdb.set_trace()
     # define AGB regions
-    mid = trgb - trgb_exclude
+    if offset is not None:
+        mid = trgb - trgb_exclude
+    else:
+        mid = mag_bright
     high = 10
 
     # Recovered stars in simulated AGB region.
@@ -37,11 +84,37 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
 
 
 def normalize_simulation(mag, nrgb, srgb, sagb):
-    """normalization factor, all indices of a random sample of the distribution
-       random sample of the rgb and agb"""
+    """
+    scale simulation to have the same number of nrgb (data) as srgb (from mag)
+    
+    Parameters
+    ----------
+    mag : array
+        magnitude list (model)
+    nrgb : float
+        number of rgb stars in the data
+    srgb : array
+        indices of mag that are rgb
+    sagb :
+        indices of mag that are agb
+
+    Returns
+    -------
+    norm : float
+        normalization factor
+    ind : array
+        random sample of mag scaled to nrgb
+    rgb : array
+        random sample of srgb scaled to nrgb
+    agb : array
+        random sample of sagb scaled to nrgb
+    
+    """
     norm = nrgb / float(len(srgb))
 
     logger.info('Normalization: %f' % norm)
+    if norm >= 0.5:
+        logger.warning('Not many simulated stars, need larger region or larger simulation')
 
     # random sample the data distribution
     rands = np.random.random(len(mag))

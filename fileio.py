@@ -22,11 +22,16 @@ def load_obs(target, optfilter1=''):
     optgal.data = fits.getdata(optgalname)
     return optgal, nirgal
 
-def find_fakes(target):
+def find_fakes(target, optfilter1=''):
     search_str = '*{}*.matchfake'.format(target.upper())
     fakes = rsp.fileio.get_files(data_loc, search_str)
     nirfake, = [f for f in fakes if 'IR' in f]
-    optfake, = [f for f in fakes if not 'IR' in f]
+    optfake = [f for f in fakes if not 'IR' in f]
+    if len(optfake) > 1:
+        optfake, = [o for o in optfake if optfilter1 in o]
+    elif len(optfake) == 1:
+        optfake, = optfake
+
     return optfake, nirfake
 
 def find_match_param(target, optfilter1=''):
