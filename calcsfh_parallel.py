@@ -38,6 +38,7 @@ def uniform_filenames(prefs, dry_run=False):
     for pref in prefs:
         dirname, p = os.path.split(pref)
         filters = '_'.join(p.split('_')[1:])
+        print dirname, p, filters
         fake, = glob1(dirname, '*{}*fake'.format(filters))
         match, = glob1(dirname, '*{}*match'.format(filters))
         param, = glob1(dirname, '*{}*param'.format(filters))
@@ -45,11 +46,13 @@ def uniform_filenames(prefs, dry_run=False):
         umatch = '_'.join(match.split('_')[1:]).lower()
         uparam = param.lower()
         for old, new in zip([fake, match, param],[ufake, umatch, uparam]):
-            print 'mv {} {}'.format(old, new)
+            cmd = 'mv {dir}/{old} {dir}/{new}'.format(dir=dirname, old=old, new=new)
+            logger.info(cmd)
+            if not dry_run:
+                os.system(cmd)
 
 def calcsfh_existing_files(pref, optfilter1=''):
     """file formats for param match and matchfake"""
-    pref = pref.strip()
     param = pref + '.param'
     match = pref + '.match'
     fake = pref + '.matchfake'
@@ -58,7 +61,6 @@ def calcsfh_existing_files(pref, optfilter1=''):
 
 def calcsfh_new_files(pref):
     """file formats for match grid, sdout, and sfh file"""
-    pref = pref.strip()
     out =  pref + '.out'
     scrn = pref + '.scrn'
     sfh = pref + '.sfh'
@@ -67,7 +69,6 @@ def calcsfh_new_files(pref):
 
 def hybridmc_existing_files(pref):
     """file formats for the HMC, based off of calcsfh_new_files"""
-    pref = pref.strip()    
     mcin = pref + '.out.dat'
     return mcin
 
@@ -108,12 +109,12 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
         iset = iset[iset < len(prefs)]
         
         # run calcsfh
-        rdict = {}
         procs = []
         for i in iset:
             if run_calcsfh:
                 rdict['param'], rdict['match'], rdict['fake'] = calcsfh_existing_files(prefs[i])
-                rdict['out'], rdict['scrn'], rdict['sfh'] = calcsfh_new_files(prefs[i]
+                rdict['out'], rdict['scrn'], rdict['sfh'] = calcsfh_new_files(prefs[i])
+                cmd = cmd1.format(**rdict)
             else:
                 rdict['mcin'] = hybridmc_existing_files(prefs[i])
                 rdict['mcmc'], rdict['mcscrn'], rdict['mczc'] = hybridmc_new_files(prefs[i])
@@ -171,7 +172,7 @@ def main(argv):
                         help="list of prefixs to run on. E.g., ls */*.match | sed 's/.match//' > pref_list")
 
     args = parser.parse_args(argv)
-    prefs = args.pref_list.readlines()
+    prefs = [l.strip() for l in args.pref_list.readlines()]
     
     handler = logging.FileHandler(args.logfile)
     if args.verbose:
