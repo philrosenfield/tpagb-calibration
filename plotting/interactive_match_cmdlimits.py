@@ -209,6 +209,9 @@ def match_limits(color_only=False, data_file='snap_galaxies.dat',
 
     print new_lines
     
+    
+    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Find color mag limits of CMDs interactively")
 
@@ -246,3 +249,4 @@ if __name__ == "__main__":
         find_normalization_limits(args.target, optfilter1='')
     else:
         match_limits(color_only=color_only, data_file=args.data_file, target=args.target)
+    # add this!! match_diagnostic(param, phot)

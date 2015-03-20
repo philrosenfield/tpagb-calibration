@@ -1,6 +1,7 @@
 from __future__ import print_function
 import logging
 import os
+import sys
 
 import matplotlib.pylab as plt
 import numpy as np
@@ -13,10 +14,13 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['StarFormationHistories', 'parse_sfh_data']
 
-def parse_sfh_data(filename, file_origin, frac=0.2):
+def parse_sfh_data(sfh_file, hmc_file=None):
     '''
     parse match sfh into a np.recarray
-    ARGS:
+    
+    if hmc_file is given, use the SFR errors from there.
+    Parameters
+    ----------
     filename: a match sfh file to parse, needs to have at least:
               dtype = [('lagei', '<f8'),
                        ('lagef', '<f8'),
@@ -27,48 +31,34 @@ def parse_sfh_data(filename, file_origin, frac=0.2):
                        ('mh_errp', '<f8'),
                        ('mh_errm', '<f8'),
                        ('mh_disp', '<f8')]
-    file_origin: 'match' or 'match-grid'
-        if 'match': reads the binned sfh as takes sfr_errs as is
-        if 'match-grid': will overwrite sfr_errs.
-            if sfr = 0: sfr_errp = min(sfr) * frac
-            if sfr != 0: sfr_errp = sfr_errm = sfr * frac
-    frac: multiplicitve factor to set sfr_err, only used if file_origin
-        is set to match-grid.
-    RETURNS:
-    np.recarray of the sfh file
-
-    use file_origin='match' only if Hybrid MonteCarlo has been run.
+    Returns
+    -------
+    np.recarray of the sfh file with hmc_file uncertainties overwritten.
     '''
-    if 'match-grid' == file_origin.lower() or 'match-hmc' == file_origin.lower():
-        data = rsp.match.utils.read_binned_sfh(filename)
-    elif 'match-old' == file_origin.lower():
-        data = rsp.match.utils.read_match_old(filename)
-    else:
+    try:   
+        data = rsp.match.utils.read_binned_sfh(sfh_file)
+    except:
         logger.error('please add a new data reader')
+        sys.exit(2)
 
-    if 'grid' in file_origin.lower():
-        logger.warning('CONSTANT %f SFR ERROR' % frac)
-        # at least have a uniform error that is 20% the smallest sfr.
-        data.sfr_errp = np.min(data.sfr[data.sfr > 0]) * frac
-        # now take 10% as nominal error in each sfr bin.
-        data.sfr_errp[data.sfr > 0] = data.sfr[data.sfr > 0] * frac
-        data.sfr_errm[data.sfr > 0] = data.sfr[data.sfr > 0] * frac
+    if hmc_file is not None:
+        hmc_data = rsp.match.utils.read_binned_sfh(hmc_file)
+        data.sfr_errp = hmc_data.sfr_errp
+        data.sfr_errm = hmc_data.sfr_errm
     return data
 
 
 class StarFormationHistories(object):
     '''Make TRILEGAL star formation history files from MATCH'''
-    def __init__(self, sfh_file, file_origin, sfr_files=None, sfr_file_loc=None,
-                 sfr_file_search_fmt=None, sfh_ext='.sfh'):
+    def __init__(self, sfh_file, hmc_file=None, sfr_files=None,
+                 sfr_file_loc=None, search_fmt=None, sfh_ext='.sfh'):
         self.base, self.name = os.path.split(sfh_file)
-        self.data = parse_sfh_data(sfh_file, file_origin)
-        self.file_origin = file_origin
+        self.data = parse_sfh_data(sfh_file, hmc_file=hmc_file)
+        self.file_origin = 'match-hmc'
         self.sfr_files = sfr_files
         self.sfh_ext = sfh_ext
-        if sfr_file_loc is not None:
-            if sfr_file_search_fmt is not None:
-                self.sfr_files = rsp.fileIO.get_files(sfr_file_loc,
-                                                      sfr_file_search_fmt)
+        if sfr_file_loc is not None and search_fmt is not None:
+            self.sfr_files = rsp.fileIO.get_files(sfr_file_loc, search_fmt)
 
     def random_draw_within_uncertainty(self, attr, npoints=2e5):
         '''
@@ -267,7 +257,8 @@ class StarFormationHistories(object):
             val_arr *= 1e3
             errm_arr *= 1e3
             errp_arr *= 1e3
-            plot_random_arrays_kw['moffset'] = 1e3
+            if len(plot_random_arrays_kw) > 0:
+                plot_random_arrays_kw['moffset'] = 1e3
         elif 'm' in attr_str:
             ylab = '${\\rm [M/H]}$'
         elif 'fe' in attr_str:
@@ -295,9 +286,9 @@ class StarFormationHistories(object):
                     plot_random_arrays_kw['attr_str'] = attr_str
                 self.plot_random_arrays(ax=ax, **plot_random_arrays_kw)
             ax.set_ylabel(ylab, fontsize=20)
-            ax.set_xlim(7.9, 10.13)
+            ax.set_xlim(6.3, 10.2)
 
-        target = self.name.split('.')[0].upper().replace('-', '\!-\!')
+        target = self.name.split('.')[0].upper().replace('-', '\!-\!').replace('_', '\_')
         if twoplots is True:
             ax = axs[1]
             # lower plot limit doesn't need to be 1e-15...
@@ -356,16 +347,15 @@ class StarFormationHistories(object):
 
         return outfiles
 
-    def compare_tri_match(self, trilegal_catalog, filter1, filter2,
+    def compare_tri_match(self, trilegal_catalog,
                           outfig=None):
         '''
         Two plots, one M/H vs Age for match and trilegal, the other
         sfr for match vs age and number of stars of a given age for trilegal.
         '''
-        sgal = rsp.Galaxies.simgalaxy(trilegal_catalog, filter1=filter1,
-                                  filter2=filter2)
-        sgal.lage = sgal.data.get_col('logAge')
-        sgal.mh = sgal.data.get_col('[M/H]')
+        sgal = rsp.SimGalaxy(trilegal_catalog)
+        sgal.lage = sgal.data['logAge']
+        sgal.mh = sgal.data['MH']
         issfr, = np.nonzero(self.sfr > 0)
         age_bins = np.digitize(sgal.lage, self.lagef[issfr])
         mean_mh= [np.mean(sgal.mh[age_bins==i]) for i in range(len(issfr))]

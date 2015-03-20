@@ -52,8 +52,11 @@ class VarySFHs(SFH):
                 name of observation target for file name conventions
         
             hmc_file : str
-                path to the SFH file
-        
+                path to the Hybrid MCMC file
+            
+            sfh_file : str
+                path to the MATCH SFH file
+                
             cmd_input_file : str
                 path to the cmd input file to run TRILEGAL
         
@@ -75,7 +78,7 @@ class VarySFHs(SFH):
 
         if self.nsfhs > 1:
             # load in hmc data to self.data
-            SFH.__init__(self, self.hmc_file, self.file_origin)
+            SFH.__init__(self, hmc_file=self.hmc_file, sfh_file=self.sfh_file)
 
         # setup file formats
         self.trilegal_file_fmt()
@@ -85,7 +88,7 @@ class VarySFHs(SFH):
         # parameters needed
         inputs = ['file_origin', 'filter1', 'filter2', 'galaxy_input',
                   'outfile_loc', 'target', 'hmc_file', 'cmd_input_file',
-                  'object_mass', 'nsfhs']
+                  'object_mass', 'nsfhs', 'sfh_file']
 
         needed = [k for k in inputs if not k in indict.keys()]
         if len(needed) > 0:

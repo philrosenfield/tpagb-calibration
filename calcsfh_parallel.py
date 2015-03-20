@@ -34,6 +34,11 @@ def test_files(prefs, run_calcsfh=True):
     return
 
 def uniform_filenames(prefs, dry_run=False):
+    """
+    make all fake match and par files in a directory follow the format
+    target_filter1_filter2.gst.suffix all lower case
+    use dry_run to print the mv command, or will call os.system.
+    """
     from glob import glob1
     for pref in prefs:
         dirname, p = os.path.split(pref)
@@ -42,11 +47,13 @@ def uniform_filenames(prefs, dry_run=False):
         fake, = glob1(dirname, '*{}*fake'.format(filters))
         match, = glob1(dirname, '*{}*match'.format(filters))
         param, = glob1(dirname, '*{}*param'.format(filters))
-        ufake = '_'.join(fake.split('_')[1:]).replace('_gst.fake1', '.gst').lower()
+        ufake = '_'.join(fake.split('_')[1:]).replace('_gst.fake1',
+                                                      '.gst').lower()
         umatch = '_'.join(match.split('_')[1:]).lower()
-        uparam = param.lower()
+        uparam = param.replace('.param', '.gst.param').lower()
         for old, new in zip([fake, match, param],[ufake, umatch, uparam]):
-            cmd = 'mv {dir}/{old} {dir}/{new}'.format(dir=dirname, old=old, new=new)
+            cmd = 'mv {dir}/{old} {dir}/{new}'.format(dir=dirname, old=old,
+                                                      new=new)
             logger.info(cmd)
             if not dry_run:
                 os.system(cmd)

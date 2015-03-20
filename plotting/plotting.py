@@ -1,20 +1,22 @@
 import argparse
-import sys
+import logging
 import os
+import sys
+
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pylab as plt
 import numpy as np
 import ResolvedStellarPops as rsp
-import sys
-from ..sfhs import star_formation_histories
+
+from ..fileio import load_obs, find_fakes, find_match_param
 from ..pop_synth import stellar_pops
-from ..fileio import load_obs, find_fakes
-
-
+from ..sfhs import star_formation_histories
 # where the matchfake files live
 from ..TPAGBparams import snap_src
 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 optfilter2 = 'F814W'
 # optfilter1 varies from F475W, F555W, F606W
@@ -51,6 +53,7 @@ def norm_lf_file(opt_hists, opt_binss, ir_hists, ir_binss, opt_trgb, ir_trgb,
     opt_norms = nopt_rgb /nopt_rgbs
     ir_norms = nir_rgb / nir_rgbs
     return opt_norms, ir_norms
+
 
 def plot_lf_file(opt_lf_file, ir_lf_file, axs=None, plt_kw=None,
                  opt_limit=None, ir_limit=None, agb_mod=None,
@@ -95,6 +98,7 @@ def plot_lf_file(opt_lf_file, ir_lf_file, axs=None, plt_kw=None,
                 axs[i].plot(bins, hist * norm, **plt_kw)
 
     return axs, opt_binss[0], ir_binss[0]
+
 
 def ast_corrections_plot(mag1, mag2, mag1_cor, mag2_cor, ymag='I'):
     fig, ax = plt.subplots(figsize=(8, 8))
@@ -196,106 +200,6 @@ class Plotting(object):
             ratio_data['n%s_rgb' % band] = nrgb
             ratio_data['n%s_agb'% band] = nagb
         return ratio_data
-
-    def plot_by_stage(self, ax1, ax2, add_stage_lfs='default', stage_lf_kw=None,
-                      cols=None, trilegal_output=None, hist_it_up=False,
-                      narratio=True):
-
-        if add_stage_lfs == 'all':
-            add_stage_lfs = ['MS', 'RGB', 'HEB', 'RHEB',
-                             'BHEB', 'EAGB', 'TPAGB']
-        if add_stage_lfs == 'default':
-            add_stage_lfs = ['RGB', 'EAGB', 'TPAGB']
-
-        nstages = len(add_stage_lfs)
-        stage_lf_kw = stage_lf_kw or {}
-        stage_lf_kw = dict({'linestyle': 'steps', 'lw': 2}.items() +
-                           stage_lf_kw.items())
-        if hasattr(stage_lf_kw, 'label'):
-            stage_lf_kw['olabel'] = stage_lf_kw['label']
-
-        # load the trilegal catalog if it is given, if it is given,
-        # no LF scaling... need to save this info better. Currently only
-        # in log files.
-        if trilegal_output is not None:
-            self.files.read_trilegal_catalog(trilegal_output,
-                                             filter1=get_filter1(self.target))
-            self.files.load_trilegal_data()
-            self.opt_norm = 1.
-            self.ir_norm = 1.
-
-        self.files.load_data_for_normalization(target=self.target, ags=self.ags)
-        assert hasattr(self.files, 'opt_mag'), \
-            'Need opt_mag or trilegal_output'
-
-        for ax, mag, norm, sinds, bins in \
-            zip([ax1, ax2],
-                [self.files.sgal.data.get_col('F814W')-self.files.opt_moffset,
-                 self.files.sgal.data.get_col('F160W')-self.files.ir_moffset],
-                [self.opt_norm, self.ir_norm],
-                [self.files.opt_color_cut, self.files.ir_color_cut],
-                [self.files.opt_bins, self.files.ir_bins]):
-
-            #self.files.sgal.make_lf(mag, stages=add_stage_lfs, bins=bins,
-            #                        inds=sinds, hist_it_up=hist_it_up)
-            self.files.sgal.make_lf(mag, stages=add_stage_lfs, bins=bins,
-                                    hist_it_up=hist_it_up)
-            #import pdb
-            #pdb.set_trace()
-            k = 0
-            for i in range(nstages):
-                istage = add_stage_lfs[i].lower()
-                try:
-                    hist = self.files.sgal.__getattribute__('i%s_lfhist' %
-                                                            istage)
-                except AttributeError:
-                    continue
-                # combine all HeB stages into one for a cleaner plot.
-                if istage == 'heb':
-                    hist = \
-                    np.sum([self.files.sgal.__getattribute__('i%s_lfhist' %
-                                                             jstage.lower())
-                            for jstage in add_stage_lfs
-                            if 'heb' in jstage.lower()], axis=0)
-                elif 'heb' in istage:
-                    continue
-
-                bins = \
-                self.files.sgal.__getattribute__('i%s_lfbins' %
-                                                 istage)
-                stage_lf_kw['color'] = cols[k]
-                k += 1
-                stage_lf_kw['label'] = '$%s$' % istage.upper().replace('PA', 'P\!-\!A')
-                norm_hist = hist # * norm
-                norm_hist[norm_hist < 3] = 3
-                ax.plot(bins[:-1], norm_hist, **stage_lf_kw)
-
-        sopt_hist, sopt_bins = self.files.sgal.make_lf(self.files.opt_mag,
-                                                      bins=self.files.opt_bins,
-                                                      hist_it_up=hist_it_up)
-        sir_hist, sir_bins = self.files.sgal.make_lf(self.files.ir_mag,
-                                                     bins=self.files.ir_bins,
-                                                     hist_it_up=hist_it_up)
-        # 3 is the plot limit...
-        sopt_hist[sopt_hist < 3] = 3
-        sir_hist[sir_hist < 3] = 3
-        stage_lf_kw['color'] = 'black'
-
-        if narratio is False:
-            if not hasattr(stage_lf_kw, 'olabel'):
-                lab = '$Total$'
-                #if hasattr(self, 'agb_mod'):
-                #    model = self.agb_mod.split('_')[-1]
-                #    lab = model_plots.translate_model_name(model, small=True)
-                stage_lf_kw['label'] = lab
-            else:
-                stage_lf_kw['label'] = stage_lf_kw['olabel']
-        ax1.plot(sopt_bins[:-1], sopt_hist, **stage_lf_kw)
-        ax2.plot(sir_bins[:-1], sir_hist, **stage_lf_kw)
-        return ax1, ax2
-
-    def compare_to_gal(self):
-        compare_to_gal(**self.__dict__)
 
 
 def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB', opt=True):
@@ -542,8 +446,11 @@ def compare_to_gal(optfake=None, nirfake=None, optfilter1=None, target=None,
         print 'wrote {}'.format(outfile)
     return
 
+
 def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None, trgb=None,
-                      trgb_exclude=None, **kwargs):
+                      trgb_exclude=None, lf=True, col_min=None, col_max=None,
+                      **kwargs):
+    
     if mag_bright is not None:
         low = mag_faint
         mid = mag_bright
@@ -554,17 +461,34 @@ def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None, trgb=Non
         mid = trgb + trgb_exclude
     
     yarr = np.linspace(*ax.get_ylim())
-    
-    # vertical lines around the trgb exclude region
-    ax.fill_betweenx(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
-                     color='black', alpha=0.1)
-    ax.vlines(trgb, *ax.get_ylim(), color='black', linestyle='--')
-    
-    ax.vlines(low, *ax.get_ylim(), color='black', linestyle='--')
-    #ax.fill_betweenx(yarr, mid, low, color='black', alpha=0.1)
-    #if mag_limit_val is not None:
-    #    ax.fill_betweenx(yarr, mag_limit_val, ax.get_xlim()[-1],
-    #                     color='black', alpha=0.5)
+    if lf:
+        
+        # vertical lines around the trgb exclude region
+        ax.fill_betweenx(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
+                         color='black', alpha=0.1)
+        ax.vlines(trgb, *ax.get_ylim(), color='black', linestyle='--')
+        
+        ax.vlines(low, *ax.get_ylim(), color='black', linestyle='--')
+        #ax.fill_betweenx(yarr, mid, low, color='black', alpha=0.1)
+        #if mag_limit_val is not None:
+        #    ax.fill_betweenx(yarr, mag_limit_val, ax.get_xlim()[-1],
+        #                     color='black', alpha=0.5)
+    else:
+        xarr = np.linspace(*ax.get_xlim())
+        
+        # vertical lines around the trgb exclude region
+        ax.fill_between(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
+                         color='black', alpha=0.1)
+        ax.hlines(trgb, *ax.get_xlim(), color='black', linestyle='--')
+        
+        ax.hlines(low, *ax.get_xlim(), color='black', linestyle='--')
+        #ax.fill_betweenx(yarr, mid, low, color='black', alpha=0.1)
+        #if mag_limit_val is not None:
+        #    ax.fill_betweenx(yarr, mag_limit_val, ax.get_xlim()[-1],
+        #                     color='black', alpha=0.5)
+        if not None in [col_min, col_max]:
+            ax.vlines(col_min, *ax.get_ylim(), color='black')
+            ax.vlines(col_max, *ax.get_ylim(), color='black')
     return ax
 
 
@@ -750,6 +674,55 @@ def tpagb_mass_histograms(chi2_location='draft_run', band='opt', dry_run=True,
     return ax
 
 
+def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, target=None,
+             optfilter1='', use_exclude=False, zcolumn='stage'):
+    """
+    A two column plot with a data CMD and a scaled model CMD with stages
+    pointed out.
+    """
+    opt_lfd = load_lf_file(lf_file)[0]
+
+    sgal = rsp.SimGalaxy(trilegal_catalog)
+    filter1, filter2 = [f for f in sgal.name.split('_') if f.startswith('F')]
+    #import pdb; pdb.set_trace()
+    
+    fig, (ax1, ax2) = plt.subplots(ncols=2, sharex=True, sharey=True,
+                                   figsize=(12, 8))
+    
+    if target is not None:
+        optgal = load_obs(target, optfilter1=optfilter1)[0]
+        mag1, = [m for m in optgal.data.dtype.names
+                 if m.startswith('MAG1') and not 'ERR' in m and not 'STD' in m]
+        mag2, = [m for m in optgal.data.dtype.names
+                 if m.startswith('MAG2') and not 'ERR' in m and not 'STD' in m]
+
+        ax1.plot(optgal.data[mag1] - optgal.data[mag2], optgal.data[mag2], '.',
+                color='k', alpha=0.2, zorder=1)
+
+    
+    ax2 = sgal.color_by_arg(sgal.data[filter1] - sgal.data[filter2],
+                            filter2, zcolumn, ax=ax2,
+                            slice_inds=opt_lfd['optidx_norm'][0])
+    for ax in [ax1, ax2]:
+        if use_exclude:
+            match_param = find_match_param(target, optfilter1=optfilter1)
+            exg = stellar_pops.get_exclude_gates(match_param)
+            # exg are V-I vs V not V-I vs I...
+            ax.plot(exg[:, 0], exg[:, 1] - exg[:, 0], lw=2)
+
+        ax.set_xlim(-2, 4.5)
+        ax.set_ylim(28, 16)
+        ax.set_ylabel(r'${}$'.format(filter2))
+        ax.set_xlabel(r'${}-{}$'.format(filter1, filter2))
+        
+        if len(regions_kw) > 0:
+            ax = add_lines_to_plot(ax, lf=False, **regions_kw)
+    
+    outfile = '{}_{}.png'.format(trilegal_catalog.replace('.dat', ''), zcolumn)
+    plt.savefig(outfile)
+    logger.info('wrote {}'.format(outfile))
+    return
+
 def tpagb_masses(chi2file, band='opt', model_src='default', dry_run=False,
                  mass=True, old=False):
     '''
@@ -861,7 +834,6 @@ def trilegal_metals(chi2_location='draft_run', band='opt', dry_run=False,
                                       np.max(zs[i]), target)
 
 
-
 def main(argv):
     from ..analysis.normalize import parse_regions
     parser = argparse.ArgumentParser(description="Plot LFs against galaxy data")
@@ -887,27 +859,39 @@ def main(argv):
     parser.add_argument('-u', '--use_exclude', action='store_true',
                         help='decontaminate LF by excluding stars within exclude_gates')
     
-    parser.add_argument('-n', '--narratio_file', type=str, help='model narratio file')
+    parser.add_argument('-n', '--narratio_file', type=str,
+                        help='model narratio file')
 
-    parser.add_argument('target', type=str, help='target name')
+    parser.add_argument('-d', '--cmd', type=str,
+                        help='trilegal catalog to make a diagnostic cmd instead of plotting LFs')
 
-    parser.add_argument('lf_file', type=str, help='model LFs file')
+    parser.add_argument('-t', '--target', type=str,  default=None, help='target name')
+
+    parser.add_argument('lf_file', type=str,
+                        help='model LFs file')
 
     args = parser.parse_args(argv)
 
     optregions_kw, nirregions_kw = parse_regions(args)
     ast_cor = 'ast' in args.lf_file
-
-    optfake, nirfake = find_fakes(args.target)
-
-    compare_to_gal(optfake=optfake, nirfake=nirfake, optfilter1=args.optfilter1,
-                   target=args.target, lf_file=args.lf_file, 
-                   narratio_file=args.narratio_file, ast_cor=ast_cor, agb_mod=None,
-                   optregions_kw=optregions_kw, nirregions_kw=nirregions_kw,
-                   mplt_kw={}, dplot_kw={},
-                   optfilter2_limit=None,
-                   nirfilter2_limit=None,
-                   draw_lines=True, xlim=None, ylim=None)
+   
+    if args.cmd:
+        zcols = ['stage', 'logAge']
+        for zcol in zcols:
+            diag_cmd(args.cmd, args.lf_file, regions_kw=optregions_kw,
+                     optfilter1=args.optfilter1, target=args.target,
+                     use_exclude=args.use_exclude, zcolumn=zcol)
+    else:
+        optfake, nirfake = find_fakes(args.target)
+    
+        compare_to_gal(optfake=optfake, nirfake=nirfake, optfilter1=args.optfilter1,
+                       target=args.target, lf_file=args.lf_file, 
+                       narratio_file=args.narratio_file, ast_cor=ast_cor, agb_mod=None,
+                       optregions_kw=optregions_kw, nirregions_kw=nirregions_kw,
+                       mplt_kw={}, dplot_kw={},
+                       optfilter2_limit=None,
+                       nirfilter2_limit=None,
+                       draw_lines=True, xlim=None, ylim=None)
 
 if __name__ == '__main__':
     main(sys.argv[1:])

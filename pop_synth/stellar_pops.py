@@ -1,9 +1,11 @@
 import logging
 import os
 import numpy as np
+
 from ResolvedStellarPops.galaxies.starpop import stars_in_region
 from ResolvedStellarPops.galaxies.asts import ASTs
 from ResolvedStellarPops.utils import points_inside_poly
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
