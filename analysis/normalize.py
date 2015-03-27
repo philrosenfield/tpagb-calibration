@@ -51,19 +51,24 @@ def call_exclude_gates(target, mag1, mag2, optfilter1=''):
 
 def do_normalization(opt=True, ast_cor=False, optfilter1=None, sgal=None,
                      tricat=None, nrgbs=None, cut_heb=False, regions_kw={},
-                     use_exclude_gates=False):
+                     use_exclude_gates=False, target=None, Av=0.):
     '''Do the normalization: call rgb_agb_regions and normalize_simulations.'''
 
     filter1, filter2 = select_filters(optfilter1, opt=opt, ast_cor=ast_cor)
 
     if sgal is None:
         sgal = rsp.SimGalaxy(tricat)
-
+        if 'dav' in tricat.lower():
+            print('applying dav')
+            dAv = float('.'.join(sgal.name.split('dav')[1].split('.')[:2]).replace('_',''))
+            sgal.data['F475W'] += sgal.apply_dAv(dAv, 'F475W', 'phat', Av=Av)
+            sgal.data['F814W'] += sgal.apply_dAv(dAv, 'F814W', 'phat', Av=Av)
+        
     if cut_heb:
         sgal = cutheb(sgal)
 
     if use_exclude_gates and opt:
-        inds = call_exclude_gates(sgal.name.split('_')[1], sgal.data[filter1],
+        inds = call_exclude_gates(target, sgal.data[filter1],
                                   sgal.data[filter2], optfilter1=optfilter1)
     else:
         if use_exclude_gates:
@@ -229,15 +234,20 @@ def write_results(res_dict, target, outfile_loc, optfilter1, extra_str=''):
 
 def get_trgb(target, optfilter1=None):
     import difflib
-    angst_data = rsp.angst_tables.angst_data
-
-    angst_target = difflib.get_close_matches(target.upper(),
-                                             angst_data.targets)[0].replace('-', '_')
+    if 'm31' in target.lower() or 'B' in target:
+        # from the PHAT paper
+        opt_trgb = 22.
+        nir_trgb = 22.
+    else:
+        angst_data = rsp.angst_tables.angst_data
     
-    target_row = angst_data.__getattribute__(angst_target)
-    opt_trgb = target_row['%s,%s' % (optfilter1, optfilter2)]['mTRGB']
-
-    nir_trgb = angst_data.get_snap_trgb_av_dmod(target.upper())[0]
+        angst_target = difflib.get_close_matches(target.upper(),
+                                                 angst_data.targets)[0].replace('-', '_')
+        
+        target_row = angst_data.__getattribute__(angst_target)
+        opt_trgb = target_row['%s,%s' % (optfilter1, optfilter2)]['mTRGB']
+    
+        nir_trgb = angst_data.get_snap_trgb_av_dmod(target.upper())[0]
     return opt_trgb, nir_trgb
 
 
@@ -363,7 +373,11 @@ def main(argv):
     parser.add_argument('-o', '--trgboffsets', type=str, default=None,
                         help='comma separated trgb offsets')
 
-    parser.add_argument('-t', '--target', type=str, help='target name')
+    parser.add_argument('-v', '--Av', type=float, default=0.,
+                        help='visual extinction')
+
+    parser.add_argument('-t', '--target', type=str, default=None,
+                        help='target name')
     
     parser.add_argument('-r', '--table', type=str,
                         help='read colorlimits, completness mags from a prepared table')
@@ -379,7 +393,7 @@ def main(argv):
 
     args = parser.parse_args(argv)
 
-    if not args.target:   
+    if args.target is None:
         if args.directory:
             args.target = os.path.split(args.name[0])[1]
         else:
@@ -406,24 +420,31 @@ def main(argv):
 
     optregions_kw, nirregions_kw = parse_regions(args)
     
-    norm_kws = {'ast_cor': args.ast_cor, 'use_exclude_gates': args.use_exclude}
+    norm_kws = {'ast_cor': args.ast_cor, 'use_exclude_gates': args.use_exclude,
+                'target': args.target}
     
     optgal, nirgal = load_obs(args.target, optfilter1=args.optfilter1)
 
-    try:
-        optmag1 = optgal.data['MAG1_ACS']
-        optmag2 = optgal.data['MAG2_ACS']
-    except:
-        optmag1 = optgal.data['MAG1_WFPC2']
-        optmag2 = optgal.data['MAG2_WFPC2']
+    if 'm31' in args.target or 'B' in args.target:
+        optmag1 = optgal.data['F475W']
+        optmag2 = optgal.data['F814W']
+        nirmag1 = optgal.data['F475W']
+        nirmag2 = optgal.data['F814W']
+    else:
+        try:
+            optmag1 = optgal.data['MAG1_ACS']
+            optmag2 = optgal.data['MAG2_ACS']
+        except:
+            optmag1 = optgal.data['MAG1_WFPC2']
+            optmag2 = optgal.data['MAG2_WFPC2']
 
-    nirmag1 = nirgal.data['MAG1_IR']
-    nirmag2 = nirgal.data['MAG2_IR']
+        nirmag1 = nirgal.data['MAG1_IR']
+        nirmag2 = nirgal.data['MAG2_IR']
 
     extra_str = ''
     if args.use_exclude:
-        inds = call_exclude_gates(os.path.split(tricats[0])[1].split('_')[1],
-                                  optmag1, optmag2, optfilter1=args.optfilter1)
+        inds = call_exclude_gates(args.target, optmag1, optmag2,
+                                  optfilter1=args.optfilter1)
         if np.sum(np.diff(inds, 2)) != 0:
             extra_str += '_exg'
     else:
@@ -449,7 +470,7 @@ def main(argv):
         logger.debug('normalizing: {}'.format(tricat))
         sgal, optnorm_dict = do_normalization(opt=True, tricat=tricat,
                                               optfilter1=args.optfilter1,
-                                              nrgbs=obs_optnrgbs,
+                                              nrgbs=obs_optnrgbs, Av=args.Av,
                                               regions_kw=optregions_kw,
                                               **norm_kws)
 
@@ -461,11 +482,13 @@ def main(argv):
 
         narratio_dict = dict(optnorm_dict.items() + nirnorm_dict.items())
         
-        lf_line, narratio_line = gather_results(sgal, args.target, args.optfilter1,
+        lf_line, narratio_line = gather_results(sgal, args.target,
+                                                args.optfilter1,
                                                 narratio_dict=narratio_dict,
                                                 lf_line=lf_line,
                                                 ast_cor=args.ast_cor,
                                                 narratio_line=narratio_line)
+        # does this save time?
         del sgal
     
     if args.ast_cor:
@@ -478,11 +501,11 @@ def main(argv):
     # write the output files
     file_dict = write_results(result_dict, args.target, outfile_loc, 
                               args.optfilter1, extra_str=extra_str)
+
     if args.lfplot:
         ast_cor = 'ast' in file_dict['lf_file']
-        optfake, nirfake = find_fakes(args.target, optfilter1=args.optfilter1)
-        compare_to_gal(optfake=optfake, nirfake=nirfake,
-                       optfilter1=args.optfilter1, extra_str=extra_str,
+        #optfake, nirfake = find_fakes(args.target, optfilter1=args.optfilter1)
+        compare_to_gal(optfilter1=args.optfilter1, extra_str=extra_str,
                        target=args.target, lf_file=file_dict['lf_file'],
                        narratio_file=file_dict['narratio_file'], ast_cor=ast_cor,
                        agb_mod=None, optregions_kw=optregions_kw,
