@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None,
-                    col_max=None, mag1=None, mag_bright=None,
+                    col_max=None, mag1=None, mag_bright=None, color=None,
                     mag_faint=None):
     """
     Return indices of mag in rgb and agb regions
@@ -69,7 +69,7 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
 
     # Recovered stars in simulated RGB region.
     srgb = stars_in_region(mag, low, mid, col_min=col_min, col_max=col_max,
-                           mag1=mag1)
+                           mag1=mag1, color=color)
     if len(srgb) == 0:
         import pdb; pdb.set_trace()
     # define AGB regions

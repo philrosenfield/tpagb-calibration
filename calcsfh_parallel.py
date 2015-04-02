@@ -5,8 +5,10 @@ import os
 import subprocess
 import sys
 
-from glob import glob1
 import numpy as np
+
+from ResolvedStellarPops.match.utils import match_diagnostic
+from ResolvedStellarPops.fileio.fileIO import get_files
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -15,6 +17,15 @@ logger = logging.getLogger(__name__)
 calcsfh = '$HOME/research/match2.5/bin/calcsfh'
 zcombine = '$HOME/research/match2.5/bin/zcombine'
 hybridmc = '$HOME/research/match2.5/bin/hybridMC'
+
+def check_params(prefs):
+    """
+    make a diagnostic plot with the photometery and param file limits
+    see ResolvedStellarPops.match.utils.match_diacnostic.__doc__
+    """
+    for pref in prefs:
+        param, match, _ = calcsfh_existing_files(pref)
+        match_diagnostic(param, match)
 
 def test_files(prefs, run_calcsfh=True):
     """make sure match input files exist"""
@@ -39,14 +50,13 @@ def uniform_filenames(prefs, dry_run=False):
     target_filter1_filter2.gst.suffix all lower case
     use dry_run to print the mv command, or will call os.system.
     """
-    from glob import glob1
     for pref in prefs:
         dirname, p = os.path.split(pref)
         filters = '_'.join(p.split('_')[1:])
         print dirname, p, filters
-        fake, = glob1(dirname, '*{}*fake'.format(filters))
-        match, = glob1(dirname, '*{}*match'.format(filters))
-        param, = glob1(dirname, '*{}*param'.format(filters))
+        fake, = get_files(dirname, '*{}*fake'.format(filters))
+        match, = get_files(dirname, '*{}*match'.format(filters))
+        param, = get_files(dirname, '*{}*param'.format(filters))
         ufake = '_'.join(fake.split('_')[1:]).replace('_gst.fake1',
                                                       '.gst').lower()
         umatch = '_'.join(match.split('_')[1:]).lower()
@@ -58,11 +68,11 @@ def uniform_filenames(prefs, dry_run=False):
             if not dry_run:
                 os.system(cmd)
 
-def calcsfh_existing_files(pref, optfilter1=''):
+def calcsfh_existing_files(pref):
     """file formats for param match and matchfake"""
-    param = pref + '.param'
-    match = pref + '.match'
-    fake = pref + '.matchfake'
+    param, = get_files(os.getcwd(), pref + '*.param')
+    match, = get_files(os.getcwd(), pref + '*.match')
+    fake, = get_files(os.getcwd(), pref + '*.matchfake')
     return (param, match, fake)
 
 
@@ -76,7 +86,7 @@ def calcsfh_new_files(pref):
 
 def hybridmc_existing_files(pref):
     """file formats for the HMC, based off of calcsfh_new_files"""
-    mcin = pref + '.out.dat'
+    mcin, = get_files(os.getcwd(), pref + '*.out.dat')
     return mcin
 
 
@@ -175,6 +185,9 @@ def main(argv):
     parser.add_argument('-s', '--simplify', action='store_true',
                         help='make filename uniform and exit (before calcsfh run)')
 
+    parser.add_argument('-c', '--checkparam', action='store_true',
+                        help='make a diagnostic plot with the phot and param file')
+
     parser.add_argument('pref_list', type=argparse.FileType('r'),
                         help="list of prefixs to run on. E.g., ls */*.match | sed 's/.match//' > pref_list")
 
@@ -192,6 +205,8 @@ def main(argv):
 
     if args.simplify:
         uniform_filenames(prefs, dry_run=args.dry_run)
+    elif args.checkparam:
+        check_params(prefs)
     else:
         logger.info('running on {}'.format(', '.join([p.strip() for p in prefs])))
         run_parallel(prefs, dry_run=args.dry_run, nproc=args.nproc, run_calcsfh=args.hmc)
