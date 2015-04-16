@@ -18,6 +18,41 @@ calcsfh = '$HOME/research/match2.5/bin/calcsfh'
 zcombine = '$HOME/research/match2.5/bin/zcombine'
 hybridmc = '$HOME/research/match2.5/bin/hybridMC'
 
+def match_table(sfh_files)
+    rows = []
+    rowfmt = r'{0} & {1} & {2} & {3} & {4:.2f} & {5:.2f} & {6:.2f} & {7:.2f} & {8} \\'
+    for filename in sfh_files:
+        mcmd = rsp.match.utils.MatchSFH(filename)
+        try:
+            target, filters = rsp.asts.parse_pipeline(filename)
+        except:
+            target, filters = '...', ['...', '...']
+        
+        filters = ','.join(filters)
+        
+        agegyr = 10 ** (mcmd.data.lagef - 9)
+        isf1, = np.nonzero(agegyr < 1)
+        isf13, = np.nonzero((agegyr >= 1) & (agegyr <= 3))
+        
+        total_sfr = np.sum(mcmd.data.sfr)
+
+        sfr1 = np.sum(mcmd.data.sfr[isf1]) / total_sfr
+        sfr13 = np.sum(mcmd.data.sfr[isf13]) / total_sfr
+        
+        mh1 = np.sum(mcmd.data.mh[isf1])/float(len(np.nonzero(mcmd.data.mh[isf1])[0]))
+        mh13 = np.sum(mcmd.data.mh[isf13])/float(len(np.nonzero(mcmd.data.mh[isf13])[0]))
+        z1 = ResolvedStellarPops.convertz.convertz(mh=mh1)[1]
+        z13 = ResolvedStellarPops.convertz.convertz(mh=mh13)[1]
+        feh1 = ResolvedStellarPops.convertz.convertz(mh=mh1)[-2]
+        feh13 = ResolvedStellarPops.convertz.convertz(mh=mh13)[-2]
+        
+        #print target, filters, mcmd.Av, mcmd.dmod, '%.2g' % sfr1, '%.3f' % z1, '%.2g' % sfr13, '%.3f' % z13, mcmd.bestfit
+        row = rowfmt.format(target, filters, mcmd.Av, mcmd.dmod, sfr1, feh1,
+                            sfr13, feh13, mcmd.bestfit)
+        print row
+        rows.append(row)
+        return rows
+
 def check_params(prefs):
     """
     make a diagnostic plot with the photometery and param file limits
@@ -179,6 +214,9 @@ def main(argv):
     parser.add_argument('-m', '--hmc',  action='store_false',
                         help='run hybridMC (must be after a calcsfh run)')
 
+    parser.add_argument('-t', '--table',  action='store_true',
+                        help='make a table of recent sfh')
+
     parser.add_argument('-f', '--logfile', type=str, default='calcsfh_parallel.log',
                         help='log file name')
 
@@ -202,11 +240,15 @@ def main(argv):
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    
+    logger.info('command:', argv)
 
     if args.simplify:
         uniform_filenames(prefs, dry_run=args.dry_run)
     elif args.checkparam:
         check_params(prefs)
+    elif args.table:
+        print 'should code here. I stoppped because I think match_table should go to rsp'
     else:
         logger.info('running on {}'.format(', '.join([p.strip() for p in prefs])))
         run_parallel(prefs, dry_run=args.dry_run, nproc=args.nproc, run_calcsfh=args.hmc)
