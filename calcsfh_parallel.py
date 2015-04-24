@@ -172,6 +172,7 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
                 else:
                     cmd = cmd1.format(**rdict)
             else:
+                rdict['sfh'] = calcsfh_new_files(prefs[i])[-1]
                 rdict['mcin'] = hybridmc_existing_files(prefs[i])
                 rdict['mcmc'], rdict['mcscrn'], rdict['mczc'] = hybridmc_new_files(prefs[i])
                 if os.path.isfile(rdict['mcmc']):
