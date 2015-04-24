@@ -306,8 +306,6 @@ def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={}):
 
 
 def main(argv):
-
-    
     description = ("Scale trilegal catalog to a CMD region of that data",
                  "To define the CMD region, set colorlimits (optional)",
                  "For the mag limits, either directly set maglimits or",

@@ -150,7 +150,7 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
     cmd3 = '{hybridmc} {mcin} {mcmc} -tint=2.0 -nmc=10000 -dt=0.015 > {mcscrn}'
     # zcombine w/ hybrid mc
     #zcombine, mcmc, mczc
-    cmd4 = '{zcombine} {mcmc} -unweighted -medbest -jeffreys -best={mczc}'
+    cmd4 = '{zcombine} {mcmc} -unweighted -medbest -jeffreys -best={sfh} > {mczc}'
 
     niters = np.ceil(len(prefs) / float(nproc))
     sets = np.arange(niters * nproc, dtype=int).reshape(niters, nproc)
@@ -166,11 +166,17 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
             if run_calcsfh:
                 rdict['param'], rdict['match'], rdict['fake'] = calcsfh_existing_files(prefs[i])
                 rdict['out'], rdict['scrn'], rdict['sfh'] = calcsfh_new_files(prefs[i])
-                cmd = cmd1.format(**rdict)
+                if os.path.isfile(rdict['mcmc']):
+                    logger.error('{} exists. Not re-runing calcsfh.'.format(rdict['sfh']))
+                else:
+                    cmd = cmd1.format(**rdict)
             else:
                 rdict['mcin'] = hybridmc_existing_files(prefs[i])
                 rdict['mcmc'], rdict['mcscrn'], rdict['mczc'] = hybridmc_new_files(prefs[i])
-                cmd = cmd3.format(**rdict)
+                if os.path.isfile(rdict['mcmc']):
+                    logger.error('{} exists. Not re-runing hybridMC.'.format(rdict['mcmc']))
+                else:
+                    cmd = cmd3.format(**rdict)
             if not dry_run:
                 procs.append(subprocess.Popen(cmd, shell=True))
             logger.info(cmd)

@@ -41,6 +41,111 @@ def main(argv):
     pass
 
 
+def fit_samples(samples):
+    gmix = mixture.GMM(n_components=2, covariance_type='full', n_iter=1000)
+    gmix.fit(samples)
+    print gmix.means_
+    #colors = ['r' if i==0 else 'g' for i in gmix.predict(samples)]
+    #ax = plt.gca()
+    #ax.scatter(samples[:,0], samples[:,1], c=colors, alpha=0.8)
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+    ax1.hist(samples[:,0], 100) # draw samples
+    b = np.arange(samples[:,0].min(), samples[:,0].max(), 100)
+    ax2.plot(b, np.exp(gmm.score_samples(b)[0]), 'r') # draw GMM
+    plt.show()
+    return gmix
+
+def compute_GMM(N, covariance_type='full', n_iter=1000):
+    models = [None for n in N]
+    for i in range(len(N)):
+        print N[i]
+        models[i] = GMM(n_components=N[i], n_iter=n_iter,
+                        covariance_type=covariance_type)
+        models[i].fit(sample)
+    AIC = [m.aic(X) for m in models]
+    BIC = [m.bic(X) for m in models]
+
+    i_best = np.argmin(BIC)
+    gmm_best = models[i_best]
+    print "best fit converged:", gmm_best.converged_
+    print "BIC: n_components =  %i" % N[i_best]
+
+    return models
+
+
+def contamination(phot, faint_mag, mag_bins=None, cmin=1, cmax=2.5,
+                  thresh=100):
+    pass
+    # 1 if fits file (observation):
+    # read
+    # 2 if stellar pop (model):
+    # correct for ASTs
+    # read
+    mag1, mag2 = np.loadtxt(phot, unpack=True)
+    color = mag1 - mag2
+
+    # 3 get stars brighter than trgb
+    inds, =  np.nonzero((color > cmin) & (mag2 < faint_mag) & (color < cmax))
+    # 4 bin them
+    
+    # 5 fit double gaussian
+    # a) at all mags (is there strong evidence for 2 gaussians?)
+    # b) at some mag step
+    if mag_bins is None:
+        mag_bins = np.digitize(faint_mag, max(mag2), 3)
+    
+    dinds = np.digitize(mag2[inds], mag_bins)
+    # some check here if the dinds are well populated...
+    cseps = []
+    mseps = []
+    halfs = np.diff(mag_bins) / 2.
+    halfs = np.append(halfs, 0)
+    fig, ax = plt.subplots()
+    ax.plot(color[inds], mag2[inds], '.', color='gray')
+    for i in np.unique(dinds):
+        isamp = inds[dinds==i]
+        if len(isamp) < thresh:
+            continue
+        print mag_bins[i]
+        mseps.append(mag_bins[i] - halfs[i])
+        #sample = np.column_stack((color[isamp], mag2[isamp]))
+        sample = color[isamp]
+        #models = fit_samples(sample)
+        #models = compute_GMM(N)
+        gmix = GMM(n_components=2, covariance_type='full', n_iter=1000)
+        gmix.fit(sample)
+        print gmix.means_
+        
+        #ax2 = ax1.twinx()
+        #ax1.hist(sample, 100) # draw samples
+        
+        x = np.linspace(sample.min(), sample.max(), 100)
+        logprob, responsibilities = gmix.score_samples(x)
+        pdf = np.exp(logprob)
+        
+        pdf_individual = responsibilities * pdf[:, np.newaxis]
+        # each gaussian shifted to the proper mag bin (1 mag width wide)
+        ax.plot(x, -1. * np.diff(mag_bins)[i] * pdf_individual[:, 1] / np.max(pdf) + mag_bins[i], '--g')
+        ax.plot(x, -1. * np.diff(mag_bins)[i] * pdf_individual[:, 0] / np.max(pdf) + mag_bins[i], '--k')
+        #ax.set_title(mag_bins[i])
+        # full probablity
+        ax.plot(x, -1. * np.exp(gmix.score_samples(x)[0])/np.max(np.exp(gmix.score_samples(x)[0])) + mag_bins[i], 'r') # draw GMM
+        isect = np.argmin(np.abs(pdf_individual[:, 1][pdf.argmax():] - pdf_individual[:, 0][pdf.argmax():]))
+        #ax.plot(x[pdf.argmax() + isect], pdf[pdf.argmax() + isect], 'o')
+        cseps.append(x[pdf.argmax() + isect])
+
+    #mseps = np.array(mag_bins)[:-1] + np.diff(mag_bins)/2.
+    ax.plot(cseps, mseps, 'o')
+    #   i) fixed width
+    #   ii) fixed width + min threshold of stars (per bin?) to combine mag bins
+    #       ... need a minimum of 2 points, one on the trgb, one above.
+    # 6 find "contamination" of each gaussian around the intersection points
+    # 7 refit to minimize contamination?
+
+# call contamination -- all galaxies, all old galaxies, one at a time
+# could use same SFH and apply ast corrections over and over and see how it changes.    
+
 if __name__ == "__main__":
     main(sys.argv[1:])
 

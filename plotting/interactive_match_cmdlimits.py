@@ -147,6 +147,7 @@ def laad_obs(target, optfilter1=''):
     optphot = fits.getdata(optgalname)
     return optphot, nirphot
 
+
 def find_normalization_limits(target, optfilter1=''):
     optphot, nirphot = laad_obs(target, optfilter1=optfilter1)
     phot_ext = 'acs'
@@ -156,6 +157,7 @@ def find_normalization_limits(target, optfilter1=''):
     optcolmin, optcolmax = find_match_limits(optphot, phot_ext, color_only=True)
     nircolmin, nircolmax = find_match_limits(nirphot, 'ir', color_only=True)
     print ','.join('%.2f' % m for m in [optcolmin, optcolmax, nircolmin, nircolmax])
+
 
 def match_limits(color_only=False, data_file='snap_galaxies.dat',
                  target=None):
@@ -208,9 +210,7 @@ def match_limits(color_only=False, data_file='snap_galaxies.dat',
         new_lines += new_line
 
     print new_lines
-    
-    
-    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Find color mag limits of CMDs interactively")
