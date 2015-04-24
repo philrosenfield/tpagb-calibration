@@ -196,6 +196,8 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
                 rdict['out'], rdict['scrn'], rdict['sfh'] = calcsfh_new_files(prefs[i])
                 zcom = cmd2.format(**rdict)
             else:
+                rdict['sfh'] = calcsfh_new_files(prefs[i])[-1]
+                rdict['mcmc'], rdict['mcscrn'], rdict['mczc'] = hybridmc_new_files(prefs[i])
                 zcom = cmd4.format(**rdict)
             if not dry_run:
                 procs.append(subprocess.Popen(zcom, shell=True))
