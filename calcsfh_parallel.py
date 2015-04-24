@@ -18,7 +18,7 @@ calcsfh = '$HOME/research/match2.5/bin/calcsfh'
 zcombine = '$HOME/research/match2.5/bin/zcombine'
 hybridmc = '$HOME/research/match2.5/bin/hybridMC'
 
-def match_table(sfh_files)
+def match_table(sfh_files):
     rows = []
     rowfmt = r'{0} & {1} & {2} & {3} & {4:.2f} & {5:.2f} & {6:.2f} & {7:.2f} & {8} \\'
     for filename in sfh_files:
