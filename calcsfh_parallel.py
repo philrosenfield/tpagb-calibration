@@ -168,6 +168,7 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
                 rdict['out'], rdict['scrn'], rdict['sfh'] = calcsfh_new_files(prefs[i])
                 if os.path.isfile(rdict['mcmc']):
                     logger.error('{} exists. Not re-runing calcsfh.'.format(rdict['sfh']))
+                    cmd = ''
                 else:
                     cmd = cmd1.format(**rdict)
             else:
@@ -175,6 +176,7 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
                 rdict['mcmc'], rdict['mcscrn'], rdict['mczc'] = hybridmc_new_files(prefs[i])
                 if os.path.isfile(rdict['mcmc']):
                     logger.error('{} exists. Not re-runing hybridMC.'.format(rdict['mcmc']))
+                    cmd = ''
                 else:
                     cmd = cmd3.format(**rdict)
             if not dry_run:
