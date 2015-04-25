@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['VarySFHs']
 
+def prepare_galaxy_inputfile(outfile, sfh_file, object_sfr_file,
+                             match_zdisp=0., gal_dict={}, target=None):
+    """Make a galaxy input file for trilegal"""
+
+
+    
+    return 
 
 def jobwait(line=''):
     """add bash script to wait for current jobs to finish"""
@@ -25,55 +32,36 @@ def jobwait(line=''):
 
 class VarySFHs(SFH):
     '''run several variations of the age sfr z from SFH'''
-    def __init__(self, inp_obj=None, input_file=None):
+    def __init__(self, indict):
         """Vary the SFH from MATCH for a trilegal simulations
         
         Parameters
         ----------
-            inp_obj : rsp.fileio.InputParameters object
-                input parameters object
-            input_file : path to file that can be read into a dictionary via rsp.fileio.load_input
-        
-            Necessary contents of input_file/inp_obj
-            ------------------
-            file_origin : str
-                what type of SFH file (match-grid, match-hmc)
-        
-            filter1, filter2 : str, str
-                V, I filters. Used only in file name conventions
-        
-            galaxy_input : str
-                template galaxy input. object_mass and sfr-z file will be adjusted
-        
-            outfile_loc : str
-                path to put the trilegal output files
-        
-            target : str
-                name of observation target for file name conventions
-        
-            hmc_file : str
-                path to the Hybrid MCMC file
+        filter1, filter2 : str, str
+        V, I filters. Used only in file name conventions
             
-            sfh_file : str
-                path to the MATCH SFH file
-                
-            cmd_input_file : str
-                path to the cmd input file to run TRILEGAL
+        outfile_loc : str
+            path to put the trilegal output files
+    
+        target : str
+            name of observation target for file name conventions
+    
+        hmc_file : str
+            path to the Hybrid MCMC file
         
-            object_mass : str, will be converted to float
-                optional, overwrite the mass set in galaxy_input
-        
-            nsfhs : str, will be converted to int
-                number of sfhs to sample
+        sfh_file : str
+            path to the MATCH SFH file
+            
+        cmd_input_file : str
+            path to the cmd input file to run TRILEGAL
+    
+        object_mass : str, will be converted to float
+            optional, overwrite the mass set in galaxy_input
+    
+        nsfhs : str, will be converted to int
+            number of sfhs to sample
         """
         # load SFH instance to make lots of trilegal runs
-        self.input_file = input_file
-        if input_file is not None:
-            indict = rsp.fileio.load_input(input_file)
-
-        if inp_obj is not None:
-            indict = inp_obj.__dict__
-
         self.initialize_inputs(indict)
 
         if self.nsfhs > 1:
@@ -86,9 +74,8 @@ class VarySFHs(SFH):
     def initialize_inputs(self, indict):
         """load input parameters needed for vary_sfh"""
         # parameters needed
-        inputs = ['file_origin', 'filter1', 'filter2', 'galaxy_input',
-                  'outfile_loc', 'target', 'hmc_file', 'cmd_input_file',
-                  'object_mass', 'nsfhs', 'sfh_file']
+        inputs = ['filter1', 'filter2', 'outfile_loc', 'target', 'hmc_file',
+                  'cmd_input_file', 'fake_file', 'nsfhs', 'sfh_file']
 
         needed = [k for k in inputs if not k in indict.keys()]
         if len(needed) > 0:
@@ -98,7 +85,7 @@ class VarySFHs(SFH):
         if len(unused) > 0:
             logger.warning('not using {}'.format(unused))
 
-        [self.__setattr__(k, v) for k, v in indict.items() if k in inputs]
+        [self.__setattr__(k, v) for k, v in indict.items() if k in needed]
         return
 
     def trilegal_file_fmt(self):
@@ -116,35 +103,47 @@ class VarySFHs(SFH):
         sfr_fmt = '{}{}_tri_%003i.sfr'.format(self.target, self.filter1)
         self.sfr_fmt = os.path.join(self.outfile_loc, sfr_fmt)
         
-    def prepare_galaxy_input(self, object_mass=None, overwrite=False):
+        galinp_fmt = '{}_{:003d}.galinp'.format(self.target)
+        self.galinp_fmt = os.path.join(self.outfile_loc, galinp_fmt)
+        
+    def prepare_galaxy_input(self, object_mass=None, overwrite=False,
+                             file_imf=None, binary_frac=0.35,
+                             object_cutoffmass=0.8):
         '''
-        write the galaxy input file from a previously written template.
-        simply overwrites the filename line to link to the new sfr
-        file.
+        write the galaxy input file
+        
+        TO DO:
+        BF could/should come from match param file... could make a mistake here
+        also could do better with IMF...
+        wfc3snap and filter1 are hard coded...
         '''
         self.galaxy_inputs = []
-        galaxy_input = self.galaxy_input
-        ext = '.' + galaxy_input.split('.')[-1]
-        lines = open(galaxy_input).readlines()
-        # line that links to sfr file.
-        extra = ' '.join(lines[-3].split(' ')[1:])
-
-        if object_mass is not None:
-            extra2 = ' '.join(lines[-6].split()[1:])
+        msfh = rsp.match.utils.MatchSFH(self.sfh_file)
+        
+        if msfh.IMF == 0:
+            file_imf = 'tab_imf/imf_kroupa_match.dat'
+        
+        gal_dict = \
+            {'mag_limit_val': limiting_mag(self.fake_file, 0.1)[1],
+             'object_av': msfh.Av,
+             'object_dist': 10 ** (msfh.dmod / 5. + 1.),
+             'photsys': 'wfc3snap',
+             'object_mass': object_mass or load_sim_masses(self.target),
+             'file_imf': file_imf,
+             'filter1': 'F814W',
+             'object_cutoffmass': object_cutoffmass}
+    
+        trigal_dict = rsp.trilegal.utils.galaxy_input_dict(**gal_dict)
         
         for i in range(len(self.sfr_files)):
-            lines[-3] = ' '.join([self.sfr_files[i], extra])
-            if object_mass is not None:
-                lines[-6] = ' '.join(['%.4e' % object_mass, extra2]) + '\n'
-            new_name = os.path.split(galaxy_input)[1].replace(ext, '_%003i' % i + ext)
-            new_out = os.path.join(self.outfile_loc, new_name)
+            gal_dict['object_sfr_file'] =  self.sfr_files[i]
+            new_out = self.galinp_fmt.format(i)
+            self.galaxy_inputs.append(new_out)
             if not os.path.isfile(new_out) or overwrite:
-                with open(new_out, 'w') as f:
-                    f.write(''.join(lines))
-                logger.info('wrote {}'.format(new_out))
+                gal_inp = rsp.fileio.InputParameters(default_dict=trigal_dict)
+                gal_inp.write_params(new_out, rsp.trilegal.utils.galaxy_input_fmt())
             else:
                 logger.info('not overwritting {}'.format(new_out))
-            self.galaxy_inputs.append(new_out)
 
     def prepare_trilegal_files(self, random_sfr=True, random_z=False,
                                zdisp=False, overwrite=False, object_mass=None):
@@ -194,8 +193,7 @@ class VarySFHs(SFH):
     def run_many(self, nproc=8, overwrite=False):
         """Call self.run_once self.nsfh of times in iterations base on nproc"""
         self.prepare_trilegal_files(random_sfr=True, random_z=False,
-                                    zdisp=False, overwrite=overwrite,
-                                    object_mass=None)
+                                    zdisp=False, overwrite=overwrite)
 
         # How many sets of calls to the max number of processors
         niters = np.ceil(self.nsfhs / float(nproc))
@@ -213,7 +211,7 @@ class VarySFHs(SFH):
             line += jobwait()
         return line
 
-def call_VarySFH(input_file, loud=False, nproc=8, outfile=None,
+def call_VarySFH(inputs, loud=False, nproc=8, outfile='trilegal_script.sh',
                  overwrite=False):
     """
     write a script to run trilegal in parallel sampling the sfh
@@ -235,7 +233,7 @@ def call_VarySFH(input_file, loud=False, nproc=8, outfile=None,
     logger.addHandler(handler)
     logger.info('logger writing to {}_vary_sfh.log'.format(input_file))
 
-    vsh = VarySFHs(input_file=input_file)
+    vsh = VarySFHs(inputs)
 
     line = vsh.call_run(nproc=nproc, overwrite=overwrite)
     if outfile is None:
@@ -257,19 +255,45 @@ def main(argv):
     parser.add_argument('-n', '--nproc', type=int, default=8,
                         help='number of processors')
 
-    parser.add_argument('-o', '--outfile', type=str, default='trilegal_script.sh',
-                        help='name of output script')
-
     parser.add_argument('-f', '--overwrite', action='store_true',
                         help='write call to trilegal even if output file exists')
 
-    parser.add_argument('name', type=str,
-                        help='input file. To create, see initialize_inputs.__doc__')
+    parser.add_argument('-s', '--nsfhs', type=int, default=1,
+                        help='number of times to sample sfh')
+
+    parser.add_argument('-c', '--cmd_input_file', type=int, default='cmd_input_CAF09_V1.2S_M36_S12D_NS_NAS.dat',
+                        help='trilegal cmd input file')
+
+    parser.add_argument('sfh_file', type=str,
+                        help='MATCH SFH file')
+
+    parser.add_argument('hmc_file', type=str,
+                        help='MATCH HybridMC file')
+
+    parser.add_argument('fake_file', type=str,
+                        help='AST file (for stellar pop mag depth)')
 
     args = parser.parse_args(argv)
+    
+    target, filter1, filter2 = \
+        os.path.split(args.sfh_file)[0].split('.')[0].split('_')
+    
+    agb_mod = args.cmd_input_file.replace('cmd_input_', '').replace('.dat', '').lower()
+    outfile_loc = os.path.join(os.getcwd(), agb_mod)
+    rsp.fileio.ensure_dir(outfile_loc)
 
-    call_VarySFH(args.name, loud=args.verbose, nproc=args.nproc,
-                 outfile=args.outfile, overwrite=args.overwrite)
+    indict = {'filter1': filter1,
+              'filter2': filter2,
+              'outfile_loc': outfile_loc,
+              'target': target,
+              'hmc_file': args.hmc_file,
+              'cmd_input_file': args.cmd_input_file,
+              'fake_file': args.fake_file,
+              'nsfhs': args.nsfhs,
+              'sfh_file': args.sfh_file}
+
+    call_VarySFH(indict, loud=args.verbose, nproc=args.nproc,
+                 overwrite=args.overwrite)
 
 
 if __name__ == '__main__':
