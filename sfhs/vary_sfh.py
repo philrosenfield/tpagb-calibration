@@ -202,7 +202,7 @@ class VarySFHs(SFH):
         if self.nsfhs <= 1:
             self.prepare_trilegal_files(random_sfr=False, random_z=False,
                                         zdisp=False, overwrite=overwrite)
-            cmd = self.run_once(galaxy_input='{}.galinp'.format(self.target),
+            cmd = self.run_once(galaxy_input=self.galaxy_inputs[0],
                                 triout=self.tname + '_bestsfr.dat',
                                 overwrite=overwrite)
             cmd += ' &\n'
