@@ -210,7 +210,6 @@ class VarySFHs(SFH):
 
     def run_many(self, nproc=8, overwrite=False):
         """Call self.run_once self.nsfh of times in iterations base on nproc"""
-        import pdb; pdb.set_trace()
         self.prepare_trilegal_files(random_sfr=True, random_z=False,
                                     zdisp=False, overwrite=overwrite)
 
