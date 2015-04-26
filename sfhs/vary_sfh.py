@@ -106,16 +106,16 @@ class VarySFHs(SFH):
         agb_mod = tmp.lower().replace('.dat', '').replace('cmd_input_', '')
         # trilegal output format
         self.tname = \
-            os.path.join(self.outfile_loc, 'output_%s_%s_%s_%s' % (self.target,
-                                                                   self.filter1,
-                                                                   self.filter2,
-                                                                   agb_mod))
+            os.path.join(self.outfile_loc, 'out_%s_%s_%s_%s' % (self.target,
+                                                                self.filter1,
+                                                                self.filter2,
+                                                                agb_mod))
         self.triout_fmt = self.tname + '_%003i.dat'
 
-        sfr_fmt = '{}{}_tri_%003i.sfr'.format(self.target, self.filter1)
+        sfr_fmt = '{}_{}_%003i.trisfr'.format(self.target, self.filter1)
         self.sfr_fmt = os.path.join(self.outfile_loc, sfr_fmt)
         
-        galinp_fmt = '{}_%003i.galinp'.format(self.target)
+        galinp_fmt = '{}_{}_%003i.galinp'.format(self.target, self.filter1)
         self.galinp_fmt = os.path.join(self.outfile_loc, galinp_fmt)
         
     def prepare_galaxy_input(self, object_mass=None, overwrite=False,
@@ -150,7 +150,7 @@ class VarySFHs(SFH):
         for i in range(len(self.sfr_files)):
             gal_dict['object_sfr_file'] =  self.sfr_files[i]
             if len(self.sfr_files) == 1:
-                new_out = '{}.galinp'.format(self.target)
+                new_out = os.path.join(self.outfile_loc, '{}_{}.galinp'.format(self.target, self.filter1))
             else:
                 new_out = self.galinp_fmt % i
             self.galaxy_inputs.append(new_out)
