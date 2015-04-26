@@ -121,7 +121,7 @@ class StarFormationHistories(object):
             elif errp == 0 and errm != 0:
                 # no positive uncertainties
                 neg_gauss = np.random.normal(val, errm, npoints)
-                new_arr = neg_gauss[neg_gauss <= val]
+                new_arr = neg_gauss#[neg_gauss <= val]
             elif errp != 0 and errm == 0:
                 # no negative uncertainties
                 pos_gauss = np.random.normal(val, errp, npoints)

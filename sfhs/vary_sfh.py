@@ -34,7 +34,7 @@ def load_sim_masses(target):
     elif target in ['ugc-5139']:
         mass = 1.0e+09
     else:
-        logger.warning('no info on object mass for {}, assuming 1e8Msun'.format(target))
+        logger.warning('no info on object mass for {}, assuming 5e8Msun'.format(target))
         mass = 5.0e+08
     return mass
 
@@ -149,7 +149,10 @@ class VarySFHs(SFH):
         
         for i in range(len(self.sfr_files)):
             gal_dict['object_sfr_file'] =  self.sfr_files[i]
-            new_out = self.galinp_fmt % i
+            if len(self.sfr_files) == 1:
+                new_out = '{}.galinp'.format(self.target)
+            else:
+                new_out = self.galinp_fmt % i
             self.galaxy_inputs.append(new_out)
             if not os.path.isfile(new_out) or overwrite:
                 gal_inp = rsp.fileio.InputParameters(default_dict=trigal_dict)
@@ -195,17 +198,19 @@ class VarySFHs(SFH):
     def call_run(self, dry_run=False, nproc=8, overwrite=False):
         """Call run_once or run_parallel depending on self.nsfh value"""
         if self.nsfhs <= 1:
-            import pdb; pdb.set_trace()    
             self.prepare_trilegal_files(random_sfr=False, random_z=False,
                                         zdisp=False, overwrite=overwrite)
-            cmd = self.run_once(triout=self.tname + '_bestsfr.dat',
+            cmd = self.run_once(galaxy_input='{}.galinp'.format(self.target),
+                                triout=self.tname + '_bestsfr.dat',
                                 overwrite=overwrite)
+            cmd += ' &\n'
         else:
             cmd = self.run_many(nproc=nproc, overwrite=overwrite)
         return cmd
 
     def run_many(self, nproc=8, overwrite=False):
         """Call self.run_once self.nsfh of times in iterations base on nproc"""
+        import pdb; pdb.set_trace()
         self.prepare_trilegal_files(random_sfr=True, random_z=False,
                                     zdisp=False, overwrite=overwrite)
 
