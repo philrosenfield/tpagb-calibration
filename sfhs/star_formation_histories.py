@@ -167,10 +167,6 @@ class StarFormationHistories(object):
         # Zsun is just a scaling that needs to be undone from MATCH to here.
         zsun = 0.02
 
-        if self.file_origin == 'match-old':
-            random_sfr = False
-            random_z = False
-            zdisp = False
         if outfile == 'default':
             outfile = os.path.join(self.base,
                                    self.name.replace(self.sfh_ext, '.tri.dat'))

@@ -62,6 +62,7 @@ def check_params(prefs):
         param, match, _ = calcsfh_existing_files(pref)
         match_diagnostic(param, match)
 
+
 def test_files(prefs, run_calcsfh=True):
     """make sure match input files exist"""
     return_code = 0
@@ -78,6 +79,7 @@ def test_files(prefs, run_calcsfh=True):
     if return_code > 0:
         sys.exit(2)
     return
+
 
 def uniform_filenames(prefs, dry_run=False):
     """
@@ -102,6 +104,7 @@ def uniform_filenames(prefs, dry_run=False):
             logger.info(cmd)
             if not dry_run:
                 os.system(cmd)
+
 
 def calcsfh_existing_files(pref):
     """file formats for param match and matchfake"""
@@ -163,21 +166,19 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
         # run calcsfh
         procs = []
         for i in iset:
+            cmd = ''
             if run_calcsfh:
                 rdict['param'], rdict['match'], rdict['fake'] = calcsfh_existing_files(prefs[i])
                 rdict['out'], rdict['scrn'], rdict['sfh'] = calcsfh_new_files(prefs[i])
                 if os.path.isfile(rdict['mcmc']):
                     logger.error('{} exists. Not re-runing calcsfh.'.format(rdict['sfh']))
-                    cmd = ''
                 else:
                     cmd = cmd1.format(**rdict)
             else:
-                rdict['sfh'] = calcsfh_new_files(prefs[i])[-1]
                 rdict['mcin'] = hybridmc_existing_files(prefs[i])
                 rdict['mcmc'], rdict['mcscrn'], rdict['mczc'] = hybridmc_new_files(prefs[i])
                 if os.path.isfile(rdict['mcmc']):
                     logger.error('{} exists. Not re-runing hybridMC.'.format(rdict['mcmc']))
-                    cmd = ''
                 else:
                     cmd = cmd3.format(**rdict)
             if not dry_run:
@@ -193,11 +194,11 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
         procs = []
         for i in iset:
             if run_calcsfh:
-                rdict['out'], rdict['scrn'], rdict['sfh'] = calcsfh_new_files(prefs[i])
+                rdict['out'], _, rdict['sfh'] = calcsfh_new_files(prefs[i])
                 zcom = cmd2.format(**rdict)
             else:
                 rdict['sfh'] = calcsfh_new_files(prefs[i])[-1]
-                rdict['mcmc'], rdict['mcscrn'], rdict['mczc'] = hybridmc_new_files(prefs[i])
+                rdict['mcmc'], _, rdict['mczc'] = hybridmc_new_files(prefs[i])
                 zcom = cmd4.format(**rdict)
             if not dry_run:
                 procs.append(subprocess.Popen(zcom, shell=True))

@@ -11,19 +11,32 @@ import time
 import ResolvedStellarPops as rsp
 
 from .star_formation_histories import StarFormationHistories as SFH
+from ..pop_synth.stellar_pops import limiting_mag
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 __all__ = ['VarySFHs']
 
-def prepare_galaxy_inputfile(outfile, sfh_file, object_sfr_file,
-                             match_zdisp=0., gal_dict={}, target=None):
-    """Make a galaxy input file for trilegal"""
+def load_sim_masses(target):
+    '''
+    adapted from thesis spaz.
 
-
-    
-    return 
+    the simulation should have more than 2.5 times the number of stars in
+    the CMD as are in the data. Set here are object_mass that should give
+    at least that number of stars based on the best fit sfh.
+    '''
+    if target in ['ngc3741', 'eso540-030', 'ugc-4305-1', 'kkh37', 'ugc-4305-2',
+                  'ngc404', 'ngc2976-deep', 'ngc4163', 'ddo78', 'ngc2403-deep']:
+        mass = 5e+08
+    elif target in ['ddo82', 'ic2574-sgs']:
+        mass = 2.5e+09
+    elif target in ['ugc-5139']:
+        mass = 1.0e+09
+    else:
+        logger.warning('no info on object mass for {}, assuming 1e8Msun'.format(target))
+        mass = 5.0e+08
+    return mass
 
 def jobwait(line=''):
     """add bash script to wait for current jobs to finish"""
@@ -64,9 +77,8 @@ class VarySFHs(SFH):
         # load SFH instance to make lots of trilegal runs
         self.initialize_inputs(indict)
 
-        if self.nsfhs > 1:
-            # load in hmc data to self.data
-            SFH.__init__(self, hmc_file=self.hmc_file, sfh_file=self.sfh_file)
+        # load in hmc data to self.data
+        SFH.__init__(self, hmc_file=self.hmc_file, sfh_file=self.sfh_file)
 
         # setup file formats
         self.trilegal_file_fmt()
@@ -85,7 +97,7 @@ class VarySFHs(SFH):
         if len(unused) > 0:
             logger.warning('not using {}'.format(unused))
 
-        [self.__setattr__(k, v) for k, v in indict.items() if k in needed]
+        [self.__setattr__(k, v) for k, v in indict.items() if k in inputs]
         return
 
     def trilegal_file_fmt(self):
@@ -103,7 +115,7 @@ class VarySFHs(SFH):
         sfr_fmt = '{}{}_tri_%003i.sfr'.format(self.target, self.filter1)
         self.sfr_fmt = os.path.join(self.outfile_loc, sfr_fmt)
         
-        galinp_fmt = '{}_{:003d}.galinp'.format(self.target)
+        galinp_fmt = '{}_%003i.galinp'.format(self.target)
         self.galinp_fmt = os.path.join(self.outfile_loc, galinp_fmt)
         
     def prepare_galaxy_input(self, object_mass=None, overwrite=False,
@@ -137,7 +149,7 @@ class VarySFHs(SFH):
         
         for i in range(len(self.sfr_files)):
             gal_dict['object_sfr_file'] =  self.sfr_files[i]
-            new_out = self.galinp_fmt.format(i)
+            new_out = self.galinp_fmt % i
             self.galaxy_inputs.append(new_out)
             if not os.path.isfile(new_out) or overwrite:
                 gal_inp = rsp.fileio.InputParameters(default_dict=trigal_dict)
@@ -183,8 +195,10 @@ class VarySFHs(SFH):
     def call_run(self, dry_run=False, nproc=8, overwrite=False):
         """Call run_once or run_parallel depending on self.nsfh value"""
         if self.nsfhs <= 1:
-            cmd = self.run_once(galaxy_input=self.galaxy_input,
-                                triout=self.tname + '_bestsfr.dat',
+            import pdb; pdb.set_trace()    
+            self.prepare_trilegal_files(random_sfr=False, random_z=False,
+                                        zdisp=False, overwrite=overwrite)
+            cmd = self.run_once(triout=self.tname + '_bestsfr.dat',
                                 overwrite=overwrite)
         else:
             cmd = self.run_many(nproc=nproc, overwrite=overwrite)
@@ -222,7 +236,7 @@ def call_VarySFH(inputs, loud=False, nproc=8, outfile='trilegal_script.sh',
        file already exists. (Will still overwrite the .dat file)
     """
     # set up logging
-    handler = logging.FileHandler('{}_vary_sfh.log'.format(input_file))
+    handler = logging.FileHandler('vary_sfh.log')
     logger.setLevel(logging.DEBUG)
     if loud:
         handler.setLevel(logging.DEBUG)
@@ -231,7 +245,7 @@ def call_VarySFH(inputs, loud=False, nproc=8, outfile='trilegal_script.sh',
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    logger.info('logger writing to {}_vary_sfh.log'.format(input_file))
+    logger.info('logger writing to vary_sfh.log')
 
     vsh = VarySFHs(inputs)
 
@@ -261,7 +275,7 @@ def main(argv):
     parser.add_argument('-s', '--nsfhs', type=int, default=1,
                         help='number of times to sample sfh')
 
-    parser.add_argument('-c', '--cmd_input_file', type=int, default='cmd_input_CAF09_V1.2S_M36_S12D_NS_NAS.dat',
+    parser.add_argument('-c', '--cmd_input_file', type=str, default='cmd_input_CAF09_V1.2S_M36_S12D_NS_NAS.dat',
                         help='trilegal cmd input file')
 
     parser.add_argument('sfh_file', type=str,
@@ -274,9 +288,8 @@ def main(argv):
                         help='AST file (for stellar pop mag depth)')
 
     args = parser.parse_args(argv)
-    
     target, filter1, filter2 = \
-        os.path.split(args.sfh_file)[0].split('.')[0].split('_')
+        os.path.split(args.sfh_file)[1].split('.')[0].split('_')
     
     agb_mod = args.cmd_input_file.replace('cmd_input_', '').replace('.dat', '').lower()
     outfile_loc = os.path.join(os.getcwd(), agb_mod)
