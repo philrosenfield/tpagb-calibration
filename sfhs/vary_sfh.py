@@ -148,9 +148,11 @@ class VarySFHs(SFH):
         trigal_dict = rsp.trilegal.utils.galaxy_input_dict(**gal_dict)
         
         for i in range(len(self.sfr_files)):
-            gal_dict['object_sfr_file'] =  self.sfr_files[i]
+            trigal_dict['object_sfr_file'] =  self.sfr_files[i]
             if len(self.sfr_files) == 1:
-                new_out = os.path.join(self.outfile_loc, '{}_{}.galinp'.format(self.target, self.filter1))
+                new_out = os.path.join(self.outfile_loc,
+                                       '{}_{}.galinp'.format(self.target,
+                                                             self.filter1))
             else:
                 new_out = self.galinp_fmt % i
             self.galaxy_inputs.append(new_out)
