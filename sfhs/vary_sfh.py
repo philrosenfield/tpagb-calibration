@@ -26,18 +26,16 @@ def load_sim_masses(target):
     the CMD as are in the data. Set here are object_mass that should give
     at least that number of stars based on the best fit sfh.
     '''
-    if target in ['ngc3741', 'eso540-030',  'kkh37', 'ugc4305-2',
-                  'ngc404', 'ngc2403-deep']:
-        mass = 5e+08
+    if target in ['ugc4459', 'ngc2976-deep', 'ddo71']:
+        mass = 1.0e+09
     elif target in ['ddo82', 'ic2574-sgs', 'ddo78', 'ugc5139']:
         mass = 2.5e+09
-    elif target in ['ugc4459', 'ngc2976-deep', 'ddo71']:
-        mass = 1.0e+09
     elif target in ['ugc4305-1', 'ngc4163']:
         mass = 5.0e+09
     else:
-        logger.warning('no info on object mass for {}, assuming 5e8Msun'.format(target))
         mass = 5.0e+08
+        logger.warning('no info on object mass for {}, assuming {} Msun'.format(target, mass))
+
     return mass
 
 def jobwait(line=''):
