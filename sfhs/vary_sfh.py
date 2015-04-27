@@ -27,11 +27,11 @@ def load_sim_masses(target):
     at least that number of stars based on the best fit sfh.
     '''
     if target in ['ngc3741', 'eso540-030', 'ugc4305-1', 'kkh37', 'ugc4305-2',
-                  'ngc404', 'ngc2976-deep', 'ngc4163', 'ddo78', 'ngc2403-deep']:
+                  'ngc404', 'ddo78', 'ngc2403-deep']:
         mass = 5e+08
-    elif target in ['ddo82', 'ic2574-sgs']:
+    elif target in ['ddo82', 'ic2574-sgs', 'ugc5139']:
         mass = 2.5e+09
-    elif target in ['ugc5139']:
+    elif target in ['ugc4459', 'ngc4163', 'ngc2976-deep', 'ddo78', 'ddo71']:
         mass = 1.0e+09
     else:
         logger.warning('no info on object mass for {}, assuming 5e8Msun'.format(target))
@@ -266,8 +266,8 @@ def call_VarySFH(inputs, loud=False, nproc=8, outfile='trilegal_script.sh',
 
 def main(argv):
     """main function to call_VarySFH"""
-    parser = argparse.ArgumentParser(description="Run trilegal many times by \
-                                     randomly sampling SFH uncertainies")
+    description="Run trilegal many times by randomly sampling SFH uncertainies."
+    parser = argparse.ArgumentParser(description=description)
 
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose mode')
@@ -285,7 +285,7 @@ def main(argv):
                         help='trilegal cmd input file')
 
     parser.add_argument('sfh_file', type=str,
-                        help='MATCH SFH file')
+                        help='MATCH SFH file: must have the format target_filter1_filter2.extensions')
 
     parser.add_argument('hmc_file', type=str,
                         help='MATCH HybridMC file')
@@ -294,6 +294,7 @@ def main(argv):
                         help='AST file (for stellar pop mag depth)')
 
     args = parser.parse_args(argv)
+
     target, filter1, filter2 = \
         os.path.split(args.sfh_file)[1].split('.')[0].split('_')
     
@@ -301,15 +302,15 @@ def main(argv):
     outfile_loc = os.path.join(os.getcwd(), agb_mod)
     rsp.fileio.ensure_dir(outfile_loc)
 
-    indict = {'filter1': filter1,
-              'filter2': filter2,
-              'outfile_loc': outfile_loc,
-              'target': target,
-              'hmc_file': args.hmc_file,
-              'cmd_input_file': args.cmd_input_file,
+    indict = {'cmd_input_file': args.cmd_input_file,
               'fake_file': args.fake_file,
+              'filter1': filter1,
+              'filter2': filter2,
+              'hmc_file': args.hmc_file,
               'nsfhs': args.nsfhs,
-              'sfh_file': args.sfh_file}
+              'outfile_loc': outfile_loc,              
+              'sfh_file': args.sfh_file,
+              'target': target}
 
     call_VarySFH(indict, loud=args.verbose, nproc=args.nproc,
                  overwrite=args.overwrite)

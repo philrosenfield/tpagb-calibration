@@ -63,18 +63,20 @@ def compute_GMM(N, covariance_type='full', n_iter=1000):
         models[i] = GMM(n_components=N[i], n_iter=n_iter,
                         covariance_type=covariance_type)
         models[i].fit(sample)
-    AIC = [m.aic(X) for m in models]
-    BIC = [m.bic(X) for m in models]
+    AIC = [m.aic(sample) for m in models]
+    BIC = [m.bic(sample) for m in models]
 
     i_best = np.argmin(BIC)
     gmm_best = models[i_best]
     print "best fit converged:", gmm_best.converged_
     print "BIC: n_components =  %i" % N[i_best]
 
-    return models
+    return models, gmm_best
 
+for mu, C, w in zip(gmm_best.means_, gmm_best.covars_, gmm_best.weights_):
+        draw_ellipse(mu, C, ax=ax, scales=[3], fc='none', ec='k')
 
-def contamination(phot, faint_mag, mag_bins=None, cmin=1, cmax=2.5,
+def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.5,
                   thresh=100):
     pass
     # 1 if fits file (observation):
@@ -86,29 +88,39 @@ def contamination(phot, faint_mag, mag_bins=None, cmin=1, cmax=2.5,
     color = mag1 - mag2
 
     # 3 get stars brighter than trgb
-    inds, =  np.nonzero((color > cmin) & (mag2 < faint_mag) & (color < cmax))
+    inds, =  np.nonzero((color > cmin) & (mag2 < faint_mag) & (color < cmax) &
+                        (mag2 > bright_mag))
     # 4 bin them
     
     # 5 fit double gaussian
     # a) at all mags (is there strong evidence for 2 gaussians?)
     # b) at some mag step
     if mag_bins is None:
-        mag_bins = np.digitize(faint_mag, max(mag2), 3)
-    
-    dinds = np.digitize(mag2[inds], mag_bins)
+        smag2 = np.argsort(mag2[inds])
+        nstars = len(smag2)
+        stars_per_bin = nstars / 3
+        inds1 = smag2[:stars_per_bin]
+        inds2 = smag2[stars_per_bin: 2 * stars_per_bin]
+        inds3 = smag2[2 * stars_per_bin:]
+        
+    #dinds = np.digitize(mag2[inds], mag_bins)
     # some check here if the dinds are well populated...
     cseps = []
     mseps = []
-    halfs = np.diff(mag_bins) / 2.
-    halfs = np.append(halfs, 0)
+    #halfs = np.diff(mag_bins) / 2.
+    #halfs = np.append(halfs, 0)
     fig, ax = plt.subplots()
     ax.plot(color[inds], mag2[inds], '.', color='gray')
-    for i in np.unique(dinds):
-        isamp = inds[dinds==i]
+    #for j, i in enumerate(np.unique(dinds)):
+    for j, i in enumerate([inds1, inds2, inds3]):
+        #isamp = inds[dinds==i]
+        isamp = inds[i]
         if len(isamp) < thresh:
             continue
-        print mag_bins[i]
-        mseps.append(mag_bins[i] - halfs[i])
+        #print mag_bins[i]
+        #mseps.append(mag_bins[j] + halfs[j])
+        mdiff = np.max(mag2[isamp]) - np.min(mag2[isamp])
+        mseps.append(np.mean(mag2[isamp]))
         #sample = np.column_stack((color[isamp], mag2[isamp]))
         sample = color[isamp]
         #models = fit_samples(sample)
@@ -126,14 +138,20 @@ def contamination(phot, faint_mag, mag_bins=None, cmin=1, cmax=2.5,
         
         pdf_individual = responsibilities * pdf[:, np.newaxis]
         # each gaussian shifted to the proper mag bin (1 mag width wide)
-        ax.plot(x, -1. * np.diff(mag_bins)[i] * pdf_individual[:, 1] / np.max(pdf) + mag_bins[i], '--g')
-        ax.plot(x, -1. * np.diff(mag_bins)[i] * pdf_individual[:, 0] / np.max(pdf) + mag_bins[i], '--k')
+        ax.plot(x, -1. * mdiff * pdf_individual[:, 1] / np.max(pdf) + mseps[j], '--g')
+        ax.plot(x, -1. * mdiff * pdf_individual[:, 0] / np.max(pdf) + mseps[j], '--k')
+
+        #ax.plot(x, -1. * np.diff(mag_bins)[j] * pdf_individual[:, 1] / np.max(pdf) + mag_bins[i], '--g')
+        #ax.plot(x, -1. * np.diff(mag_bins)[j] * pdf_individual[:, 0] / np.max(pdf) + mag_bins[i], '--k')
         #ax.set_title(mag_bins[i])
         # full probablity
-        ax.plot(x, -1. * np.exp(gmix.score_samples(x)[0])/np.max(np.exp(gmix.score_samples(x)[0])) + mag_bins[i], 'r') # draw GMM
-        isect = np.argmin(np.abs(pdf_individual[:, 1][pdf.argmax():] - pdf_individual[:, 0][pdf.argmax():]))
+        #ax.plot(x, -1. * np.exp(gmix.score_samples(x)[0])/np.max(np.exp(gmix.score_samples(x)[0])) + mag_bins[i], 'r') # draw GMM
+        ax.plot(x, -1. * mdiff * np.exp(gmix.score_samples(x)[0])/np.max(np.exp(gmix.score_samples(x)[0])) + mseps[j], 'r') # draw GMM
+        
+        #isect = np.argmin(np.abs(pdf_individual[:, 1] - pdf_individual[:, 0]))
+        isect = rsp.utils.find_peaks(pdf)['minima_locations']
         #ax.plot(x[pdf.argmax() + isect], pdf[pdf.argmax() + isect], 'o')
-        cseps.append(x[pdf.argmax() + isect])
+        cseps.append(x[isect])
 
     #mseps = np.array(mag_bins)[:-1] + np.diff(mag_bins)/2.
     ax.plot(cseps, mseps, 'o')

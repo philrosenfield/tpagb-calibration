@@ -10,13 +10,13 @@ import time
 
 import matplotlib as mpl
 mpl.use('Agg')
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import ResolvedStellarPops as rsp
 
 from astropy.io import ascii
 from astropy.table import Table
 from IPython import parallel
-from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, exclude_gate_inds, limiting_mag
+from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag
 from ..plotting.plotting import compare_to_gal
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_obs, find_fakes, find_match_param
@@ -25,25 +25,6 @@ from ..utils import check_astcor
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-
-def select_filters(optfilter1, opt=True, ast_cor=True):
-    if opt:
-        filter1 = optfilter1
-        filter2 = optfilter2
-    else:
-        filter1 = nirfilter1
-        filter2 = nirfilter2
-
-    if ast_cor:
-        filter1, filter2 = check_astcor([filter1, filter2])
-    return filter1, filter2
-
-def call_exclude_gates(target, mag1, mag2, optfilter1=''):
-    match_param = find_match_param(target, optfilter1=optfilter1)
-    inds = exclude_gate_inds(mag1, mag2, match_param=match_param)
-    if False in np.isfinite(inds):
-        inds = np.arange(len(mag1))
-    return inds
 
 def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
                      sgal=None, tricat=None, nrgbs=None, regions_kw={}, Av=0.):
@@ -73,7 +54,7 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
     norm_dict = {'norm': norm, 'sim_rgb': sim_rgb, 'sim_agb': sim_agb,
                  'sgal_rgb': sgal_rgb, 'sgal_agb': sgal_agb,
                  'idx_norm': idx_norm}
-        
+
     return sgal, norm_dict
 
 
@@ -249,6 +230,9 @@ def parse_regions(args):
     else:
         if args.colorlimits is not None:
             colmin, colmax = map(float, args.colorlimits.split(','))
+            if colmax < colmin:
+                colmax = colmin + colmax
+                logger.info('colmax was less than colmin, assuming it is dcol, colmax is set to colmin + dcol')
 
         if args.maglimits is not None:
             magfaint, magbright = map(float, args.maglimits.split(','))
@@ -276,7 +260,7 @@ def parse_regions(args):
                   'col_max': colmax,
                   'mag_bright': magbright,
                   'mag_faint': magfaint}
-
+    logger.info('regions: {}'.format(regions_kw))
     return regions_kw
 
 
@@ -320,11 +304,11 @@ def main(argv):
     parser.add_argument('-a', '--ast_cor', action='store_true',
                         help='use ast corrected mags already in trilegal catalog')
     
-    parser.add_argument('-b', '--comp_frac', type=float, default=0.9,
+    parser.add_argument('-b', '--comp_frac', type=float, default=None,
                         help='completeness fraction for use in combo with -f')
 
     parser.add_argument('-c', '--colorlimits', type=str, default=None,
-                        help='comma separated color min, color max, opt then nir')
+                        help='comma separated color min, color max')
 
     parser.add_argument('-d', '--directory', action='store_true',
                         help='opperate on *_???.dat files in a directory')
@@ -335,8 +319,8 @@ def main(argv):
     parser.add_argument('-f', '--fake_file', type=str, default=None,
                         help='AST file if -b flag should match filter2 with yfilter')
 
-    parser.add_argument('-g', '--trgboffset', type=float, default=1.5,
-                        help='comma separated trgb offsets')
+    parser.add_argument('-g', '--trgboffset', type=float, default=1.,
+                        help='trgb offset')
 
     parser.add_argument('-m', '--maglimits', type=str, default=None,
                         help='comma separated faint and bright yaxis mag limits')
@@ -378,7 +362,7 @@ def main(argv):
     else:
         tricats = args.simpop
         outfile_loc = os.path.split(args.simpop[0])[0]
-        args.target = os.path.split(outfile_loc)[1]
+        args.target = args.simpop[0].split('_')[1]
 
     # set up logging
     logfile = os.path.join(outfile_loc, 'normalize.log')
@@ -414,7 +398,15 @@ def main(argv):
                                                tricat=tricat,
                                                nrgbs=obs_nrgbs, Av=args.Av,
                                                regions_kw=regions_kw, **kws)
+        fig, ax = plt.subplots()
+        mag1, mag2 = load_observation(args.observation, col1, col2)
+        ax.plot(mag1-mag2, mag2, '.', color='k')
+        ax.plot(sgal.data[filter1] - sgal.data[filter2], sgal.data[filter2], '.')
+        ax.plot(sgal.data[filter1][narratio_dict['idx_norm']] - sgal.data[filter2][narratio_dict['idx_norm']], sgal.data[filter2][narratio_dict['idx_norm']], '.')
+        ax.plot(sgal.data[filter1][narratio_dict['sgal_rgb']] - sgal.data[filter2][narratio_dict['sgal_rgb']], sgal.data[filter2][narratio_dict['sgal_rgb']], '.')
+        ax.set_ylim(ax.get_ylim()[::-1])
 
+        plt.savefig(sgal.name + 'diag.png')
         lf_line, narratio_line = gather_results(sgal, args.target,
                                                 narratio_dict=narratio_dict,                                                
                                                 narratio_line=narratio_line,
