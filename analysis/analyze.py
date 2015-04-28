@@ -73,8 +73,8 @@ def compute_GMM(N, covariance_type='full', n_iter=1000):
 
     return models, gmm_best
 
-for mu, C, w in zip(gmm_best.means_, gmm_best.covars_, gmm_best.weights_):
-        draw_ellipse(mu, C, ax=ax, scales=[3], fc='none', ec='k')
+#for mu, C, w in zip(gmm_best.means_, gmm_best.covars_, gmm_best.weights_):
+#        draw_ellipse(mu, C, ax=ax, scales=[3], fc='none', ec='k')
 
 def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.5,
                   thresh=100):

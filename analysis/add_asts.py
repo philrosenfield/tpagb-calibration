@@ -38,22 +38,22 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
     for i, trilegal_catalog in enumerate(trilegal_catalogs):
         logger.info('working on {}'.format(trilegal_catalog))
         header = open(trilegal_catalog, 'r').readline()
-        test = [n for n in header.split() if '_cor' in n]
-        if len(test) > 0:
-            logger.warning('{} seems to have asts: {}'.format(trilegal_catalog,
-                                                              test))
+        
+        sgal = rsp.SimGalaxy(trilegal_catalog)
+        # "overwrite" (append columns) to the existing catalog by default
+        if outfmt == 'default':
+            outfile = trilegal_catalog
         else:
-            sgal = rsp.SimGalaxy(trilegal_catalog)
-            # "overwrite" (append columns) to the existing catalog by default
-            if outfmt == 'default':
-                outfile = trilegal_catalog
-            else:
-                outfile = outfiles[i]
-            # do the ast corrections
-            [rsp.ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
-                                     outfile=outfile, diag_plot=diag_plot,
-                                     hdf5=hdf5)
-             for ast in asts]
+            outfile = outfiles[i]
+        # do the ast corrections
+        for ast in asts:
+            if ast.filter1 + '_cor' in header.split():
+                continue
+            if ast.filter2 + '_cor' in header.split():
+                continue
+            rsp.ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
+                                 outfile=outfile, diag_plot=diag_plot,
+                                 hdf5=hdf5)
     return
 
 
@@ -87,7 +87,7 @@ def main(argv):
         if args.directory:
             target = os.path.split(args.name[0])[1]
         else:
-            target = tricat.split('_')[1]
+            target = args.name[0].split('_')[1]
     else:
         target = args.target
 

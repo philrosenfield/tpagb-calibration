@@ -8,18 +8,14 @@ import os
 import sys
 import time
 
-import matplotlib as mpl
-mpl.use('Agg')
 import matplotlib.pyplot as plt
 import ResolvedStellarPops as rsp
 
 from astropy.io import ascii
-from astropy.table import Table
-from IPython import parallel
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag
 from ..plotting.plotting import compare_to_gal
 from ..sfhs.star_formation_histories import StarFormationHistories
-from ..fileio import load_obs, find_fakes, find_match_param
+from ..fileio import load_observation
 from ..utils import check_astcor
 
 logging.basicConfig(level=logging.DEBUG)
@@ -37,7 +33,11 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
             dAv = float('.'.join(sgal.name.split('dav')[1].split('.')[:2]).replace('_',''))
             sgal.data['F475W'] += sgal.apply_dAv(dAv, 'F475W', 'phat', Av=Av)
             sgal.data['F814W'] += sgal.apply_dAv(dAv, 'F814W', 'phat', Av=Av)
-        
+    
+    if ast_cor:
+        filter1 += '_cor'
+        filter2 += '_cor'
+
     ymag = sgal.data[filter2]
     if yfilter == 'V':
         ymag = sgal.data[filter1]
@@ -264,16 +264,6 @@ def parse_regions(args):
     return regions_kw
 
 
-def load_observation(filename, colname1, colname2):
-    if filename.endswith('fits'):
-        data = Table.read(filename, format='fits')
-        mag1 = data[colname1]
-        mag2 = data[colname2]
-    else:
-        mag1, mag2 = np.loadtxt(filename)
-    return mag1, mag2
-
-
 def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={}):
     mag1, mag2 = load_observation(filename, col1, col2)
     ymag = mag2
@@ -343,7 +333,7 @@ def main(argv):
     parser.add_argument('-v', '--Av', type=float, default=0.,
                         help='visual extinction')
 
-    parser.add_argument('-y', '--yfilter', type=str, default='V',
+    parser.add_argument('-y', '--yfilter', type=str, default='I',
                         help='V or I filter to use as y axis of CMD')
 
     parser.add_argument('observation', type=str,
@@ -401,9 +391,14 @@ def main(argv):
         fig, ax = plt.subplots()
         mag1, mag2 = load_observation(args.observation, col1, col2)
         ax.plot(mag1-mag2, mag2, '.', color='k')
-        ax.plot(sgal.data[filter1] - sgal.data[filter2], sgal.data[filter2], '.')
-        ax.plot(sgal.data[filter1][narratio_dict['idx_norm']] - sgal.data[filter2][narratio_dict['idx_norm']], sgal.data[filter2][narratio_dict['idx_norm']], '.')
-        ax.plot(sgal.data[filter1][narratio_dict['sgal_rgb']] - sgal.data[filter2][narratio_dict['sgal_rgb']], sgal.data[filter2][narratio_dict['sgal_rgb']], '.')
+        ax.plot(sgal.data[filter1] - sgal.data[filter2],
+                sgal.data[filter2], '.')
+        ax.plot(sgal.data[filter1][narratio_dict['idx_norm']] - \
+                sgal.data[filter2][narratio_dict['idx_norm']],
+                sgal.data[filter2][narratio_dict['idx_norm']], '.')
+        ax.plot(sgal.data[filter1][narratio_dict['sgal_rgb']] - \
+                sgal.data[filter2][narratio_dict['sgal_rgb']],
+                sgal.data[filter2][narratio_dict['sgal_rgb']], '.')
         ax.set_ylim(ax.get_ylim()[::-1])
 
         plt.savefig(sgal.name + 'diag.png')

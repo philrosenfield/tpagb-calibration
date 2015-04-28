@@ -1,15 +1,206 @@
+import argparse
 import logging
+import sys
 import os
 
 import numpy as np
-import matplotlib.pyplt as plt
+import matplotlib.pyplot as plt
 import ResolvedStellarPops as rsp
 
-from TPAGBparams import snap_src
+#from TPAGBparams import snap_src
+
+from astroML.stats import binned_statistic_2d
+from ..fileio import load_lf_file, load_observation
+
+angst_data = rsp.angst_tables.angst_table.AngstTables()
 
 logger = logging.getLogger()
 
-angst_data = rsp.angst_tables.angst_table.AngstTables()
+
+def extrema(func, arr1, arr2):
+    return func([func(arr1), func(arr2)])
+
+
+def minmax(arr1, arr2):
+    return extrema(np.min, arr1, arr2), extrema(np.max, arr1, arr2)
+
+
+def tpagb_rheb_line(color, mag, dmod=0.):
+    b = 1.17303
+    m = -5.20269
+    # redder than the line
+    return np.nonzero(color > ((mag - b - dmod) / m))
+
+def get_itpagb(target, color, mag):
+    # careful! get_snap assumes F160W
+    mtrgb, Av, dmod = angst_data.get_snap_trgb_av_dmod(target.upper())
+    redward_of_rheb, = tpagb_rheb_line(color, mag, dmod=dmod)
+    brighter_than_trgb, = np.nonzero(mag < mtrgb)
+    return list(set(redward_of_rheb) & set(brighter_than_trgb))
+
+
+def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
+                col1='MAG2_ACS', col2='MAG4_IR', dcol=0.1, dmag=0.1,
+                yfilter='I', narratio_file=None):
+
+    target = os.path.split(lf_file)[1].split('_')[0]
+    # load data
+    mag1, mag2 = load_observation(observation, col1, col2)
+    color = mag1 - mag2
+
+    lf_dict = load_lf_file(lf_file)
+    # will need to concatenate or list comprehend... [0] just assumes bestfit
+    idx_norm = lf_dict['idx_norm']
+    smag1 = lf_dict[filter1][0][idx_norm]
+    smag2 = lf_dict[filter2][0][idx_norm]
+    
+    # for opt_nir_matched data, take the obs limits from the data
+    # could use limiting mag or something...
+    inds, = np.nonzero((smag1 <= mag1.max()) & (smag2 <= mag2.max()) &
+                       (smag1 >= mag1.min()) & (smag2 >= mag2.min()))
+    smag1 = smag1[inds]
+    smag2 = smag2[inds]
+
+    scolor = smag1 - smag2
+
+    # set the yaxis
+    symag = smag2
+    ymag = mag2
+    if yfilter.upper() != 'I':
+        symag = smag1
+        ymag = mag1
+
+    # apply cmd cuts here.
+    itpagb = get_itpagb(target, color, ymag)
+    sitpagb = get_itpagb(target, scolor, symag)
+
+    iall = np.arange(len(color))
+    siall = np.arange(len(scolor))
+
+    statistic = 'count'
+    sstatistic = 'count'
+    # if ...
+        # many CMDs -- debate mean vs median here.
+        # sstatistic = 'mean'
+    
+    for i, (inds, sinds) in enumerate(zip([iall, itpagb], [siall, sitpagb])):
+        cbins = np.arange(*minmax(scolor[sinds], color[inds]), step=dcol)
+        mbins = np.arange(*minmax(symag[sinds], ymag[inds]), step=dmag)
+
+        shess, xe, ye = binned_statistic_2d(scolor[sinds], symag[sinds],
+                                            symag[sinds], sstatistic,
+                                            bins=[cbins, mbins])
+    
+        hess, xe, ye = binned_statistic_2d(color[inds], ymag[inds], ymag[inds],
+                                           statistic, bins=[cbins, mbins])
+
+        prob, pct_dif, sig = rsp.match.likelihood.stellar_prob(hess, shess)
+
+        dif = hess - shess
+    
+        extent = [xe[0], xe[-1], ye[-1], ye[0]]
+        labels = ['data', 'model', r'$\rm{{data}} - \rm{{model}}$',
+                  r'$\chi^2={:.2f}$'.format(prob)]
+
+        if i == 1:
+            labels[0] = r'$N_{{\rm TP-AGB}}={}$'.format(np.sum(hess))
+            labels[1] = r'$N_{{\rm TP-AGB}}={}$'.format(np.sum(shess))
+            figname = lf_file.replace('lf', 'tpagb_hess').replace('.dat', '.png')
+            print('tpagb prob {}'.format(prob))
+        if i == 0:
+            if narratio_file is not None:
+                ratio_data = rsp.fileio.readfile(narratio_file,
+                                                 string_column=[0, 1, 2])
+                nagb = float(ratio_data[0]['nagb'])
+                nrgb = float(ratio_data[0]['nrgb'])
+
+                dratio = nagb / nrgb
+                dratio_err = rsp.utils.count_uncert_ratio(nagb, nrgb)
+
+                indx, = np.nonzero(ratio_data['target'] == target)
+                mrgb = float(ratio_data[indx]['nrgb'])
+                magb = float(ratio_data[indx]['nagb'])
+
+                mratio = magb / mrgb
+                mratio_err = rsp.utils.count_uncert_ratio(magb, mrgb)
+                fmt = r'$N_{{\rm RGB}}={}\ \frac{{N_{{TP-AGB}}}}{{N_{{RGB}}}}={:.3f}\pm{:.3f}$'
+                labels[0] = fmt.format(nrgb, dratio, dratio_err)
+                labels[1] = fmt.format(mrgb, mratio, mratio_err)
+                figname = lf_file.replace('lf', 'hess').replace('.dat', '.png')
+            print('full prob {}'.format(prob))
+        grid = rsp.match.graphics.match_plot([hess.T, shess.T, dif.T, sig.T],
+                                             extent, labels=labels)
+        [ax.set_ylabel(r'$\rm F160W$') for ax in grid.axes_column[0]]
+        [ax.set_xlabel(r'$\rm F160W - F814W$') for ax in grid.axes_row[1]]
+        plt.savefig(figname)
+        # labels
+        #plt.savefig()
+        # translate prop into chi2...
+
+    
+# 1d analysis - per galaxy
+# see compare_to_gal in plotting.py
+# bin into LF
+# if lf file has many cmds, do mean, median or whatever
+# compare to observation
+
+# 2d analysis - all galaxies
+# chi2 vs galaxy plot for each agb_mod
+
+# 1d analysis - all galaxies
+# see compare_lfs in plotting.py
+
+# chi2 vs galaxy plot for each agb_mod
+
+def main(argv):
+    description = ("stats...")
+    parser = argparse.ArgumentParser(description=description)
+
+    parser.add_argument('-o', '--colnames', type=str, default='MAG2_ACS,MAG4_IR',
+                        help='comma separated column names in observation data')
+
+    parser.add_argument('-s', '--scolnames', type=str, default='F814W_cor,F160W_cor',
+                        help='comma separated column names in trilegal catalog')
+
+    parser.add_argument('-d', '--dcolmag', type=str, default='0.1,0.1',
+                        help='comma separated dcol, dmag for binning')
+
+    parser.add_argument('-n', '--narratio_file', type=str,
+                        help='nagb/nrgb ratio file')
+
+    parser.add_argument('-y', '--yfilter', type=str, default='I',
+                        help='V or I filter to use as y axis of CMD')
+
+    parser.add_argument('lf_file', type=str,
+                        help='luminosity function file')
+
+    parser.add_argument('observation', type=str,
+                        help='data file to compare to')
+
+    args = parser.parse_args(argv)
+    
+    col1, col2 = args.colnames.split(',')
+    filter1, filter2 = args.scolnames.split(',')
+    dcol, dmag = map(float, args.dcolmag.split(','))
+    
+    compare_hess(args.lf_file, args.observation, filter1=filter1,
+                 filter2=filter2, col1=col1, col2=col2, dcol=dcol, dmag=dmag,
+                 yfilter=args.yfilter, narratio_file=args.narratio_file)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
+
+
+
+
+
+
+
+
+
+
+# old shit below
 
 def narratio_table(self):
     narratio_files = rsp.fileIO.get_files(self.outfile_dir, '*narratio*dat')

@@ -4,7 +4,10 @@ import sys
 
 import numpy as np
 import ResolvedStellarPops as rsp
+
+from astropy.table import Table
 from TPAGBparams import snap_src, phat_src
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -82,20 +85,21 @@ def find_match_param(target, optfilter1=''):
 
 
 def load_lf_file(lf_file):
-    header = open(lf_file).readline().replace('#', '').split()
-    try:
-        header[header.index('F814W')] = 'optfilter2'
-        header[header.index('F110W')] = 'nirfilter1'
-        header[header.index('F160W')] = 'nirfilter2'
-    except:
-        header[header.index('F814W_cor')] = 'optfilter2'
-        header[header.index('F110W_cor')] = 'nirfilter1'
-        header[header.index('F160W_cor')] = 'nirfilter2'
-
-    filt1, = [h for h in header if h.upper().startswith('F')]
-    header[header.index(filt1)] = 'optfilter1'
+    """
+    Read a strange formatted file... basically, the rows are transformed.
     
+    Each data row of the file corresponds to a header key.
+    
+    For example, data row 1 corresponds to header key 1, data row 2 corresponds
+    to header key 2 ... up to the number of header keys, and then repeats.
+    So if there are 5 header keys, data row 6 corresponds to header key 1, etc.
+    
+    It was done this way because some header keys correspond to a float,
+    some correspond to an array of variable length.
+    """
+    header = open(lf_file).readline().replace('#', '').split()
     ncols = len(header)
+
     with open(lf_file, 'r') as lf:
         lines = [l.strip() for l in lf.readlines() if not l.startswith('#')]
 
@@ -103,8 +107,17 @@ def load_lf_file(lf_file):
     for i, key in enumerate(header):
         lfd[key] = [np.array(map(rsp.utils.is_numeric, l.split()))
                     for l in lines[i::ncols]]
-    opt_dict = {k: v for k, v in lfd.items() if k.startswith('opt')}
-    nir_dict = {k: v for k, v in lfd.items() if k.startswith('nir')}
 
-    return opt_dict, nir_dict
+    return lfd
+
+
+def load_observation(filename, colname1, colname2):
+    if filename.endswith('fits'):
+        data = Table.read(filename, format='fits')
+        mag1 = data[colname1]
+        mag2 = data[colname2]
+    else:
+        mag1, mag2 = np.loadtxt(filename)
+    return mag1, mag2
+
 
