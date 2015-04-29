@@ -49,10 +49,12 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
     color = mag1 - mag2
 
     lf_dict = load_lf_file(lf_file)
-    # will need to concatenate or list comprehend... [0] just assumes bestfit
     idx_norm = lf_dict['idx_norm']
-    smag1 = lf_dict[filter1][0][idx_norm]
-    smag2 = lf_dict[filter2][0][idx_norm]
+    import pdb; pdb.set_trace()
+    smag1 = np.concatenate([lf_dict[filter1][i][idx_norm[i]]
+                            for i in range(len(idx_norm))])
+    smag2 = np.concatenate([lf_dict[filter2][i][idx_norm[i]]
+                            for i in range(len(idx_norm))])
     
     # for opt_nir_matched data, take the obs limits from the data
     # could use limiting mag or something...
@@ -79,11 +81,11 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
 
     statistic = 'count'
     sstatistic = 'count'
-    # if ...
+    if len(idx_norm) > 1:
         # many CMDs -- debate mean vs median here.
-        # sstatistic = 'mean'
+        sstatistic = np.nanmean
     
-    for i, (inds, sinds) in enumerate(zip([iall, itpagb], [siall, sitpagb])):
+    for i, (inds, sinds) in enumerate(zip([itpagb, iall], [sitpagb, siall])):
         cbins = np.arange(*minmax(scolor[sinds], color[inds]), step=dcol)
         mbins = np.arange(*minmax(symag[sinds], ymag[inds]), step=dmag)
 
@@ -102,24 +104,26 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
         labels = ['data', 'model', r'$\rm{{data}} - \rm{{model}}$',
                   r'$\chi^2={:.2f}$'.format(prob)]
 
-        if i == 1:
-            labels[0] = r'$N_{{\rm TP-AGB}}={}$'.format(np.sum(hess))
-            labels[1] = r'$N_{{\rm TP-AGB}}={}$'.format(np.sum(shess))
+        if i == 0:
+            nagb = np.nansum(hess)
+            magb = np.nansum(shess)
+            labels[0] = r'$N_{{\rm TP-AGB}}={}$'.format(nagb)
+            labels[1] = r'$N_{{\rm TP-AGB}}={}$'.format(magb)
             figname = lf_file.replace('lf', 'tpagb_hess').replace('.dat', '.png')
             print('tpagb prob {}'.format(prob))
-        if i == 0:
+        if i == 1:
             if narratio_file is not None:
                 ratio_data = rsp.fileio.readfile(narratio_file,
                                                  string_column=[0, 1, 2])
-                nagb = float(ratio_data[0]['nagb'])
+                #nagb = float(ratio_data[0]['nagb'])
                 nrgb = float(ratio_data[0]['nrgb'])
 
                 dratio = nagb / nrgb
                 dratio_err = rsp.utils.count_uncert_ratio(nagb, nrgb)
 
                 indx, = np.nonzero(ratio_data['target'] == target)
-                mrgb = float(ratio_data[indx]['nrgb'])
-                magb = float(ratio_data[indx]['nagb'])
+                mrgb = np.mean(map(float, ratio_data[indx]['nrgb']))
+                #magb = np.mean(map(float, ratio_data[indx]['nagb']))
 
                 mratio = magb / mrgb
                 mratio_err = rsp.utils.count_uncert_ratio(magb, mrgb)

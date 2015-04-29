@@ -63,7 +63,7 @@ def tpagb_lf(sgal, narratio_dict, filt1, filt2, lf_line=''):
     rgb = narratio_dict['sim_rgb']
     agb = narratio_dict['sim_agb']
 
-    header = '# {} {} '.format(filt1, filt2)
+    header = '# target {} {} '.format(filt1, filt2)
     header += 'sim_rgb sim_agb sgal_rgb sgal_agb idx_norm norm\n'
     
     if len(lf_line) == 0:
