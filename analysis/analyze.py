@@ -38,7 +38,25 @@ nirfilter1 = 'F110W'
 
 
 def main(argv):
-    pass
+    """main function of analyze"""
+    description="Run analysis routines, so far just match_stats."
+    parser = argparse.ArgumentParser(description=description)
+
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='does nothing')
+
+    parser.add_argument('-f', '--overwrite', action='store_true',
+                        help='does nothing.')
+
+    parser.add_argument('hmc_file', type=str,
+                        help='MATCH HybridMC file')
+
+    parser.add_argument('cmd_file', type=str,
+                        help='MATCH SFH file: must have the format target_filter1_filter2.extensions')
+
+    args = parser.parse_args(argv)
+    
+    rsp.match.likelihood.match_stats(args.hmc_file, args.cmd_file)
 
 
 def fit_samples(samples):
