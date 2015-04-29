@@ -56,7 +56,7 @@ def main(argv):
 
     args = parser.parse_args(argv)
     
-    rsp.match.likelihood.match_stats(args.hmc_file, args.cmd_file)
+    rsp.match.likelihood.match_stats(args.hmc_file, args.cmd_file, dry_run=False)
 
 
 def fit_samples(samples):
