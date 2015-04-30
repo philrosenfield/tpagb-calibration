@@ -11,41 +11,38 @@ import numpy as np
 import ResolvedStellarPops as rsp
 angst_data = rsp.angst_tables.angst_data
 
+from ..analysis.analyze import get_itpagb
 from ..fileio import load_obs, find_fakes, find_match_param, load_lf_file
+from ..fileio import load_observation
+from ..utils import minmax
+
 from ..pop_synth import stellar_pops
 from ..sfhs import star_formation_histories
 # where the matchfake files live
 from ..TPAGBparams import snap_src
+matchfake_loc = os.path.join(snap_src, 'data', 'galaxies')
+data_loc = os.path.join(snap_src, 'data', 'opt_ir_matched_v2')
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-optfilter2 = 'F814W'
-# optfilter1 varies from F475W, F555W, F606W
-nirfilter2 = 'F160W'
-nirfilter1 = 'F110W'
 
-def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB', opt=True):
+def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
     stext_kw = dict({'color': 'black', 'fontsize': 14, 'ha': 'center'}.items() +
                     rsp.graphics.GraphicsUtils.ann_kwargs.items())
     dtext_kw = dict(stext_kw.items() + {'color': 'darkred'}.items())
 
-    if opt:
-        filt = 'opt'
-    else:
-        filt = 'nir'
-
     assert ratio_data[0]['target'] == 'data', \
         'the first line of the narratio file needs to be a data measurement'
-    nagb = float(ratio_data[0]['{}nagb'.format(filt)])
-    nrgb = float(ratio_data[0]['{}nrgb'.format(filt)])
+    nagb = float(ratio_data[0]['nagb'])
+    nrgb = float(ratio_data[0]['nrgb'])
 
     dratio = nagb / nrgb
     dratio_err = rsp.utils.count_uncert_ratio(nagb, nrgb)
 
     indx, = np.nonzero(ratio_data['target'] == target)
-    mrgb = float(ratio_data[indx]['{}nrgb'.format(filt)])
-    magb = float(ratio_data[indx]['{}nagb'.format(filt)])
+    mrgb = float(ratio_data[indx]['nrgb'])
+    magb = float(ratio_data[indx]['nagb'])
 
     #yval = 1.2  # text yloc found by eye, depends on fontsize
     stext_kw['transform'] = ax.transAxes
@@ -62,8 +59,8 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB', opt=True):
 
     # one could argue taking the mean isn't the best idea for
     # the ratio errors.
-    sratio_text = '$f=%.3f\pm%.3f$' % (np.mean(ratio_data['{}ar_ratio'.format(filt)]),
-                                       np.mean(ratio_data['{}ar_ratio_err'.format(filt)]))
+    sratio_text = '$f=%.3f\pm%.3f$' % (np.mean(ratio_data['ar_ratio']),
+                                       np.mean(ratio_data['ar_ratio_err']))
 
     drgb_text = r'$N_{\rm %s}=%i$' % (mid_txt, nrgb)
     dagb_text = r'$N_{\rm TP-AGB}=%i$' % nagb
@@ -173,43 +170,48 @@ def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None):
     return ax
 
 
-def plot_models(lf_file, bins, opt=True, maglimit=None, ax=None, plt_kw=None,
+def plot_models(lf_file, bins, filt, maglimit=None, ax=None, plt_kw=None,
                 agb_mod=None):
     plt_kw = plt_kw or {}
-    opt_lfd, nir_lfd = load_lf_file(lf_file)
-    if opt:
-        mag2s = opt_lfd['optfilter2']
-        inorm = opt_lfd['optidx_norm']
-    else:
-        mag2s = nir_lfd['nirfilter2']
-        inorm = nir_lfd['niridx_norm']
-
-    ax = plot_model(mag2s=mag2s, bins=bins, inorm=inorm,
+    lfd = load_lf_file(lf_file)
+    
+    mags = lfd[filt]
+        
+    ax = plot_model(mag2s=mags, bins=bins, inorm=lfd['idx_norm'],
                     maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod=agb_mod)
+
+    plt_kw['color'] = 'darkgreen'
+    ax = plot_model(mag2s=mags, bins=bins, inorm=lfd['sim_agb'],
+                    maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod='TP-AGB')
+
     return ax
 
 
-def mag2Mag(mag2, target, opt=True):
+def mag2Mag(mag2, target, filter2):
     angst_target = \
     difflib.get_close_matches(target.upper(),
                               angst_data.targets)[0].replace('-', '_')
 
-    if not opt:
+    if 'F160W' in filter2:
         _, av, dmod = angst_data.get_snap_trgb_av_dmod(angst_target)
-        filter2 = nirfilter2
-    else:
+    if 'F814W' in filter2:
         target_row = angst_data.__getattribute__(angst_target)
-        key, = [k for k in target_row.keys() if ',' in k]
+        try:
+            key, = [k for k in target_row.keys() if ',' in k]
+        except:
+            #print target_row
+            key = [k for k in target_row.keys() if ',' in k][0]
         av = target_row[key]['Av']
         dmod = target_row[key]['dmod']
-        filter2 = optfilter2
-    
-    mag = rsp.astronomy_utils.mag2Mag(mag2, filter2, 'wfc3snap', Av=av, dmod=dmod)
+
+    mag = rsp.astronomy_utils.mag2Mag(mag2, filter2, 'wfc3snap', Av=av,
+                                      dmod=dmod)
     
     return mag
 
 
-def compare_lfs(lf_files, extra_str=''):
+def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
+                col1='MAG2_ACS', col2='MAG4_IR', dmag=0.1, extra_str=''):
     """
     3 panel plot of LF, (data-model)/model, data-model
     doesn't work on lf files with many runs...
@@ -221,70 +223,63 @@ def compare_lfs(lf_files, extra_str=''):
     # model - data / data
     # model - data
     # plot all three
+    galaxies = rsp.fileio.get_files(data_loc, '*fits')
+    
     fig1, opt_axs = plt.subplots(nrows=3, sharex=True, figsize=(6, 9))
     fig2, nir_axs = plt.subplots(nrows=3, sharex=True, figsize=(6, 9))
 
-    for lf_file in lf_files:
-        opt_lfd, nir_lfd = load_lf_file(lf_file)
-        optfilter1 = lf_file.split('_')[1].upper()
+    bins = np.arange(16, 27, dmag)
+    
+    for i, lf_file in enumerate(lf_files):
+        lfd = load_lf_file(lf_file)
         target = os.path.split(lf_file)[1].split('_')[0]
-        for i, opt in enumerate([True, False]):
-            if opt:
+        observation, = [g for g in galaxies if target.upper() in g]
+        mag1, mag2 = load_observation(observation, col1, col2)
+        color = mag1 - mag2
+        
+        search_str = '*{}*.matchfake'.format(target.upper())    
+        fakes = rsp.fileio.get_files(matchfake_loc, search_str)
+        nirfake, = [f for f in fakes if 'IR' in f]
+        optfake = [f for f in fakes if not 'IR' in f][0]
+
+        for i, filt in enumerate([filter1, filter2]):
+            if i == 0:
                 axs = opt_axs
+                mag = mag1
+                fake_file = optfake
             else:
                 axs = nir_axs
-                
-            mag2, filter2, regions_kw, fake_file, maglimit, extra_str = \
-                load_data(opt=opt, optfilter1=optfilter1, target=target,
-                          extra_str=extra_str)
-            
-            #if ast_cor:
-            #    if not '_ast_cor' in extra_str:
-            #        extra_str += '_ast_cor'
-    
-            bins = np.arange(16, 27, 0.4)
-            Mbins = mag2Mag(bins, target, opt=opt)
+                mag = mag2
+                fake_file = nirfake
+
+            Mbins = mag2Mag(bins, target, filt.replace('_cor', ''))
             #ax.errorbar(bins[1:], hist, yerr=err, **plot_kw)
     
-            if fake_file is not None:
-                comp_corr = stellar_pops.completeness_corrections(fake_file,
-                                                                  bins)
-                comp_mag2 = stellar_pops.limiting_mag(fake_file, 0.9)[1]
-                inds, = np.nonzero(mag2 > comp_mag2)
-                data = np.array(np.histogram(mag2, bins=bins)[0], dtype=float)
-                # mask 0s or they will be turned to Abs Mag
-                data[data == 0] = np.nan
-                data /= comp_corr[1:]
-                
-            else:
-                data = np.histogram(mag2, bins=bins)[0]
+            
+            comp_corr = stellar_pops.completeness_corrections(fake_file,
+                                                              bins)
+            data = np.array(np.histogram(mag2, bins=bins)[0], dtype=float)
+            # mask 0s or they will be turned to Abs Mag
+            data[data == 0] = np.nan
+            data /= comp_corr[1:]
 
-            data = mag2Mag(data, target, opt=opt)
+            data = mag2Mag(data, target, filt.replace('_cor', ''))
             err = np.sqrt(data)
-                
-            if opt:
-                mag2s = np.concatenate(opt_lfd['optfilter2'])
-                inorm = np.concatenate(opt_lfd['optidx_norm'])
-                mag2s_scaled = mag2s[inorm]
-            else:
-                mag2s = np.concatenate(nir_lfd['nirfilter2'])
-                inorm = np.concatenate(nir_lfd['niridx_norm'])
-                mag2s_scaled = mag2s[inorm]
             
-            if fake_file is not None:
-                inds, = np.nonzero(mag2s_scaled > comp_mag2)
-            else:
-                inds, = np.arange(len(mag2s_scaled))    
-            
-            model = np.array(np.histogram(mag2s_scaled, bins=bins)[0],
+            smag = np.concatenate(lfd[filt])
+            inorm = np.concatenate(lfd['idx_norm'])
+            smag_scaled = smag[inorm]
+                        
+            model = np.array(np.histogram(smag_scaled, bins=bins)[0],
                              dtype=float)
             # mask 0s or they will be turned to Abs Mag
             model[model == 0] = np.nan
             
-            model = mag2Mag(model, target, opt=opt)
+            model = mag2Mag(model, target, filt.replace('_cor', ''))
+            
             dmdiff = data - model
             sdiff = dmdiff / data
-            #import pdb; pdb.set_trace()
+            
             axs[0].errorbar(Mbins[1:], model, yerr=np.sqrt(err),
                             linestyle='steps-mid')
             axs[1].plot(Mbins[1:], dmdiff, drawstyle='steps-mid')
@@ -296,12 +291,15 @@ def compare_lfs(lf_files, extra_str=''):
         axs[1].set_ylabel(r'($N_{data} - N_{model}) / N_{data}$')
         axs[2].set_ylabel(r'$N_{data} - N_{model}$')
 
-    opt_axs[2].set_xlabel(r'${}$'.format(optfilter2))
-    nir_axs[2].set_xlabel(r'${}$'.format(nirfilter2))
+    opt_axs[2].set_xlabel(r'${}$'.format(filter1.replace('_cor', '')))
+    nir_axs[2].set_xlabel(r'${}$'.format(filter2.replace('_cor', '')))
 
     [opt_axs[i].set_xlim(-10, 3) for i in range(3)]
-    [nir_axs[i].set_xlim(-6, 3) for i in range(3)]
-
+    [nir_axs[i].set_xlim(-10, -1) for i in range(3)]
+    [opt_axs[i].set_ylim(-500, 500) for i in [1,2]]
+    [nir_axs[i].set_ylim(-500, 500) for i in [1,2]]
+    fig1.savefig('{}_{}_comp_lfs.png'.format(extra_str, filter1))
+    fig2.savefig('{}_{}_comp_lfs.png'.format(extra_str, filter2))
     return opt_axs, nir_axs
 
 
@@ -338,11 +336,11 @@ def load_data(opt=True, optfilter1=None, target=None, extra_str='',
     return mag2, filter2, regions_kw, fake_file, maglimit, extra_str
 
 
-def compare_to_gal(optfilter1=None, target=None,
-                   lf_file=None, optfilter2_limit=None, nirfilter2_limit=None,
-                   draw_lines=True, xlim=None, ylim=None, extra_str='',
-                   narratio_file=None, ast_cor=False, agb_mod=None,
-                   mplt_kw={}, dplot_kw={}, optregions_kw={}, nirregions_kw={}):
+def compare_to_gal(lf_file, observation, filter1='F814W_cor',
+                   filter2='F160W_cor', col1='MAG2_ACS', col2='MAG4_IR',
+                   dmag=0.1, narratio_file=None, make_plot=True,
+                   regions_kw=None, xlim=None, ylim=None, extra_str='',
+                   agb_mod=None, mplt_kw={}, dplot_kw={}):
     '''
     Plot the LFs and galaxy LF.
 
@@ -354,27 +352,35 @@ def compare_to_gal(optfilter1=None, target=None,
     ax1, ax2: axes instances created for the plot.
 
     '''
+    target = os.path.split(lf_file)[1].split('_')[0]
+
+    mag1, mag2 = load_observation(observation, col1, col2)
+    #color = mag1 - mag2
+    #ogal, ngal = load_obs(target)
+    #mag1 = ogal.data['MAG2_ACS']
+    #mag2 = ngal.data['MAG2_IR']
+    
+    search_str = '*{}*.matchfake'.format(target.upper())    
+    fakes = rsp.fileio.get_files(matchfake_loc, search_str)
+    nirfake, = [f for f in fakes if 'IR' in f]
+    optfake = [f for f in fakes if not 'IR' in f][0]
+    
     if narratio_file is not None:
-        ratio_data = rsp.fileio.readfile(narratio_file, string_column=[0, 1, 6])
+        ratio_data = rsp.fileio.readfile(narratio_file, string_column=[0, 1, 2])
 
-    for opt in [True, False]:
-        mag2, filter2, regions_kw, fake_file, maglimit, extra_str = \
-            load_data(opt=opt,
-                      optfilter1=optfilter1, target=target, extra_str=extra_str,
-                      optfilter2_limit=optfilter2_limit,
-                      nirfilter2_limit=nirfilter2_limit, 
-                      optregions_kw=optregions_kw,
-                      nirregions_kw=nirregions_kw)
+    if 'cor' in filter1:
+        if not '_ast_cor' in extra_str:
+            extra_str += '_ast_cor'
 
-        if ast_cor:
-            if not '_ast_cor' in extra_str:
-                extra_str += '_ast_cor'
-
-        bins = np.arange(16, 27, 0.1)
-        ax = plot_models(lf_file, bins, opt=opt, maglimit=maglimit, plt_kw=mplt_kw)
+    for filt, fake_file in zip([filter1, filter2], [optfake, nirfake]):
+        mag = mag2 
+        if filt == filter1:
+            mag = mag1
+        bins = np.arange(mag.min(), mag.max(), step=dmag)
+        ax = plot_models(lf_file, bins, filt, plt_kw=mplt_kw, agb_mod=agb_mod)
 
         # plot galaxy data
-        ax = plot_gal(mag2, bins, ax=ax, target=target, fake_file=fake_file,
+        ax = plot_gal(mag, bins, ax=ax, target=target, fake_file=fake_file,
                       plot_kw=dplot_kw)
 
         ax.set_yscale('log')
@@ -390,26 +396,25 @@ def compare_to_gal(optfilter1=None, target=None,
         #    xmin = np.min([np.min(mag2), np.min(np.concatenate(mag2s))])
         #    ax.set_xlim(xmin, xmax)
 
-        if draw_lines:
+        if regions_kw is not None:
             ax = add_lines_to_plot(ax, **regions_kw)
         
         ax.legend(loc='lower right')
-        ax.set_xlabel('${}$'.format(filter2), fontsize=20)
+        ax.set_xlabel('${}$'.format(filt.replace('_cor', '')), fontsize=20)
 
         if narratio_file is not None:
-            ax = add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB',
-                                      opt=opt)
+            ax = add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB')
 
         plt.tick_params(labelsize=16)
-        outfile = '{}{}_lfs.png'.format(lf_file.split('_lf')[0], extra_str)
+        outfile = '{}_{}{}_lfs.png'.format(lf_file.split('_lf')[0], filt, extra_str)
         plt.savefig(outfile)
         print 'wrote {}'.format(outfile)
     return
 
 
-def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None, trgb=None,
-                      trgb_exclude=None, lf=True, col_min=None, col_max=None,
-                      **kwargs):
+def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None,
+                      trgb=None, trgb_exclude=None, lf=True, col_min=None,
+                      col_max=None, **kwargs):
     
     if mag_bright is not None:
         low = mag_faint
@@ -452,7 +457,7 @@ def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None, trgb=Non
     return ax
 
 
-def diag_cmd(trilegal_catalog, lf_file, opt=True, regions_kw={}, Av=0.,
+def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
              target=None, optfilter1='', use_exclude=False, zcolumns='stage'):
     """
     A two column plot with a data CMD and a scaled model CMD with stages
@@ -595,38 +600,35 @@ def main(argv):
     parser.add_argument('-d', '--cmd', type=str,
                         help='trilegal catalog to make a diagnostic cmd instead of plotting LFs')
 
-    parser.add_argument('-t', '--target', type=str,  default=None, help='target name')
-
     parser.add_argument('-v', '--Av', type=float, default=0.,
                         help='visual extinction')
-
-    parser.add_argument('lf_file', type=str,
+    
+    parser.add_argument('lf_file', type=str, nargs='*',
                         help='model LFs file')
+
+    parser.add_argument('observation', type=str,
+                        help='data file to compare to')
+        
+    parser.add_argument('agb_mod', type=str,
+                        help='agb model name')
 
     args = parser.parse_args(argv)
 
-    optregions_kw, nirregions_kw = parse_regions(args)
+    #optregions_kw, nirregions_kw = parse_regions(args)
     
-    ast_cor = 'ast' in args.lf_file
-   
+
     if args.cmd:
         zcols = ['stage', 'logAge', 'm_ini', '[M/H]', 'C/O', 'logML']
-        diag_cmd(args.cmd, args.lf_file, regions_kw=optregions_kw,
-                 optfilter1=args.optfilter1, target=args.target,
+        diag_cmd(args.cmd, args.lf_file[0], regions_kw=optregions_kw,
                  use_exclude=args.use_exclude, zcolumns=zcols)
         diag_cmd(args.cmd, args.lf_file, opt=False, regions_kw=nirregions_kw,
-                 optfilter1=args.optfilter1, target=args.target,
                  use_exclude=args.use_exclude, zcolumns=zcols, Av=args.Av)
+    elif len(args.lf_file) > 1:
+        compare_lfs(args.lf_file, extra_str=args.agb_mod)
     else:
-        compare_to_gal(optfilter1=args.optfilter1,
-                       target=args.target, lf_file=args.lf_file, 
-                       narratio_file=args.narratio_file, ast_cor=ast_cor,
-                       agb_mod=None,
-                       optregions_kw=optregions_kw, nirregions_kw=nirregions_kw,
-                       mplt_kw={}, dplot_kw={},
-                       optfilter2_limit=None,
-                       nirfilter2_limit=None,
-                       draw_lines=True, xlim=None, ylim=None)
+        compare_to_gal(args.lf_file[0], args.observation,
+                       narratio_file=args.narratio_file,
+                       agb_mod=args.agb_mod, xlim=None, ylim=None)
 
 if __name__ == '__main__':
     main(sys.argv[1:])

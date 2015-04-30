@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import ResolvedStellarPops as rsp
 
 from astropy.io import ascii
+from .analyze import get_itpagb
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag
 from ..plotting.plotting import compare_to_gal
 from ..sfhs.star_formation_histories import StarFormationHistories
@@ -45,8 +46,11 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
     regions_kw['color'] = sgal.data[filter1] - sgal.data[filter2]
 
     # select rgb and agb regions
-    sgal_rgb, sgal_agb = rgb_agb_regions(ymag, **regions_kw)
-
+    sgal_rgb, x = rgb_agb_regions(ymag, **regions_kw)
+    
+    target = os.path.split(tricat)[1].split('_')[1]
+    sgal_agb = get_itpagb(target, regions_kw['color'], ymag)
+    
     # normalization
     norm, idx_norm, sim_rgb, sim_agb = normalize_simulation(ymag, nrgbs,
                                                             sgal_rgb, sgal_agb)
@@ -60,18 +64,16 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
 
 def tpagb_lf(sgal, narratio_dict, filt1, filt2, lf_line=''):
     """format a narratio_dict for a line in the LF output file"""
-    rgb = narratio_dict['sim_rgb']
-    agb = narratio_dict['sim_agb']
 
-    header = '# target {} {} '.format(filt1, filt2)
+    header = '# {} {} '.format(filt1, filt2)
     header += 'sim_rgb sim_agb sgal_rgb sgal_agb idx_norm norm\n'
     
     if len(lf_line) == 0:
         lf_line = header
     lf_line += '\n'.join([' '.join(['%g' % m for m in sgal.data[filt1]]),
                           ' '.join(['%g' % m for m in sgal.data[filt2]]),
-                          ' '.join(['%i' % m for m in rgb]),
-                          ' '.join(['%i' % m for m in agb]),
+                          ' '.join(['%i' % m for m in narratio_dict['sim_rgb']]),
+                          ' '.join(['%i' % m for m in narratio_dict['sim_agb']]),
                           ' '.join(['%i' % m for m in narratio_dict['sgal_rgb']]),
                           ' '.join(['%i' % m for m in narratio_dict['sgal_agb']]),
                           ' '.join(['%i' % m for m in narratio_dict['idx_norm']]),
@@ -137,7 +139,7 @@ def write_results(res_dict, target, filter1, filter2, outfile_loc, extra_str='')
         file and path to file
         ex: lf_file: <path_to_lf_file>
     '''
-    narratio_header = '# filter1 filter2 nrgb nagb ar_ratio ar_ratio_err \n'
+    narratio_header = '# target filter1 filter2 nrgb nagb ar_ratio ar_ratio_err \n'
 
     fdict = {}
     for key, line in res_dict.items():
@@ -265,6 +267,7 @@ def parse_regions(args):
 
 
 def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={}):
+    target = os.path.split(filename)[1].split('_')[1]
     mag1, mag2 = load_observation(filename, col1, col2)
     ymag = mag2
     if yfilter == 'V':
@@ -274,8 +277,9 @@ def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={}):
     # as verts, so leave mag2 and mag1 as is, and if CMD has V for yaxis,
     # just relfect that in
     regions_kw['color'] = mag1 - mag2
-    gal_rgb, gal_agb = rgb_agb_regions(ymag, **regions_kw)
-
+    gal_rgb, _ = rgb_agb_regions(ymag, **regions_kw)
+    gal_agb = get_itpagb(target, regions_kw['color'], ymag)
+    
     return float(len(gal_rgb)), float(len(gal_agb))
 
 
@@ -414,22 +418,9 @@ def main(argv):
     #                                                     sgal_agb, filter2)
     
     # write the output files
-    file_dict = write_results(result_dict, args.target, filter1, filter2, outfile_loc,
-                              extra_str=extra_str)
+    write_results(result_dict, args.target, filter1, filter2, outfile_loc,
+                  extra_str=extra_str)
 
-    if args.lfplot:
-        pass
-        # fix this!
-        ast_cor = 'ast' in file_dict['lf_file']
-        #optfake, nirfake = find_fakes(args.target, optfilter1=args.optfilter1)
-        compare_to_gal(optfilter1=args.optfilter1, extra_str=extra_str,
-                       lf_file=file_dict['lf_file'],
-                       narratio_file=file_dict['narratio_file'], ast_cor=ast_cor,
-                       agb_mod=None, optregions_kw=optregions_kw,
-                       nirregions_kw=nirregions_kw, mplt_kw={}, dplot_kw={},
-                       draw_lines=True, xlim=None, ylim=None)
-    else:
-        print file_dict
     return
 
 

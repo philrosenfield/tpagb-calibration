@@ -87,7 +87,7 @@ def main(argv):
         if args.directory:
             target = os.path.split(args.name[0])[1]
         else:
-            target = args.name[0].split('_')[1]
+            target = os.path.split(args.name[0])[1].split('_')[1]
     else:
         target = args.target
 

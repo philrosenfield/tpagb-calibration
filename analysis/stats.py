@@ -10,138 +10,115 @@ import ResolvedStellarPops as rsp
 #from TPAGBparams import snap_src
 
 from astroML.stats import binned_statistic_2d
-from ..fileio import load_lf_file, load_observation
-
-angst_data = rsp.angst_tables.angst_table.AngstTables()
-
+from ..fileio import load_photometry
+from .analyze import get_itpagb
+from ..utils import minmax
 logger = logging.getLogger()
 
 
-def extrema(func, arr1, arr2):
-    return func([func(arr1), func(arr2)])
+def chi2(obs, model):
+    from scipy import stats
+    # t-test:
+    #ti = (ohist - mhist) ** 2 / (ohist + mhist)
+    #naners = np.isnan(ti)
+    #ti[naners] = 0
+    #print np.sum(ti)
+    # maybe there is a better way to mask this... chiw was a typo...
+    import pdb; pdb.set_trace()
+    chiw = (model - obs) ** 2 / obs
 
+    naners = np.isinf(chiw)
+    chiw[np.isinf(chiw)] = 0
+    naners = np.isnan(chiw)
+    chiw[np.isnan(chiw)] = 0
 
-def minmax(arr1, arr2):
-    return extrema(np.min, arr1, arr2), extrema(np.max, arr1, arr2)
+    N = len(np.nonzero(chiw > 0)[0]) - 1
 
-
-def tpagb_rheb_line(color, mag, dmod=0.):
-    b = 1.17303
-    m = -5.20269
-    # redder than the line
-    return np.nonzero(color > ((mag - b - dmod) / m))
-
-def get_itpagb(target, color, mag):
-    # careful! get_snap assumes F160W
-    mtrgb, Av, dmod = angst_data.get_snap_trgb_av_dmod(target.upper())
-    redward_of_rheb, = tpagb_rheb_line(color, mag, dmod=dmod)
-    brighter_than_trgb, = np.nonzero(mag < mtrgb)
-    return list(set(redward_of_rheb) & set(brighter_than_trgb))
+    chisq = np.sum(chiw) / float(N)
+    pval = 1. - stats.chi2.cdf(chisq, N)
+    return chisq, pval
 
 
 def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
                 col1='MAG2_ACS', col2='MAG4_IR', dcol=0.1, dmag=0.1,
-                yfilter='I', narratio_file=None):
+                yfilter='I', narratio_file=None, make_plot=True,
+                outfile='compare_hess.txt'):
+    if not os.path.isfile(outfile):
+        header = '# target full_prob tpagb_prob nmodels \n'
+        with open(outfile, 'w') as out:
+            out.write(header)
 
+    linefmt = '{} {:.3f} {:.3f} {} \n'
     target = os.path.split(lf_file)[1].split('_')[0]
-    # load data
-    mag1, mag2 = load_observation(observation, col1, col2)
-    color = mag1 - mag2
-
-    lf_dict = load_lf_file(lf_file)
-    idx_norm = lf_dict['idx_norm']
-    import pdb; pdb.set_trace()
-    smag1 = np.concatenate([lf_dict[filter1][i][idx_norm[i]]
-                            for i in range(len(idx_norm))])
-    smag2 = np.concatenate([lf_dict[filter2][i][idx_norm[i]]
-                            for i in range(len(idx_norm))])
     
-    # for opt_nir_matched data, take the obs limits from the data
-    # could use limiting mag or something...
-    inds, = np.nonzero((smag1 <= mag1.max()) & (smag2 <= mag2.max()) &
-                       (smag1 >= mag1.min()) & (smag2 >= mag2.min()))
-    smag1 = smag1[inds]
-    smag2 = smag2[inds]
-
-    scolor = smag1 - smag2
-
-    # set the yaxis
-    symag = smag2
-    ymag = mag2
-    if yfilter.upper() != 'I':
-        symag = smag1
-        ymag = mag1
-
-    # apply cmd cuts here.
+    # load data
+    color, ymag, scolor, symag, nmodels = \
+        load_photometry(lf_file, observation, filter1=filter1, filter2=filter2,
+                         col1=col1, col2=col2, yfilter=yfilter)
+    # apply cmd cuts
+    # just the tpagb:
     itpagb = get_itpagb(target, color, ymag)
     sitpagb = get_itpagb(target, scolor, symag)
-
+    # the entire cmd:
     iall = np.arange(len(color))
     siall = np.arange(len(scolor))
+    # could also single out non-rheb and non-tpagb ...
 
-    statistic = 'count'
-    sstatistic = 'count'
-    if len(idx_norm) > 1:
-        # many CMDs -- debate mean vs median here.
-        sstatistic = np.nanmean
-    
     for i, (inds, sinds) in enumerate(zip([itpagb, iall], [sitpagb, siall])):
         cbins = np.arange(*minmax(scolor[sinds], color[inds]), step=dcol)
         mbins = np.arange(*minmax(symag[sinds], ymag[inds]), step=dmag)
 
         shess, xe, ye = binned_statistic_2d(scolor[sinds], symag[sinds],
-                                            symag[sinds], sstatistic,
+                                            symag[sinds], 'count',
                                             bins=[cbins, mbins])
-    
+        
+        # get the mean hess if many models are co-added.
+        shess /= float(nmodels)
+        
         hess, xe, ye = binned_statistic_2d(color[inds], ymag[inds], ymag[inds],
-                                           statistic, bins=[cbins, mbins])
+                                           'count', bins=[cbins, mbins])
 
         prob, pct_dif, sig = rsp.match.likelihood.stellar_prob(hess, shess)
 
         dif = hess - shess
-    
         extent = [xe[0], xe[-1], ye[-1], ye[0]]
         labels = ['data', 'model', r'$\rm{{data}} - \rm{{model}}$',
                   r'$\chi^2={:.2f}$'.format(prob)]
 
+        if narratio_file is not None:
+            nrgb, nagb, dratio, dratio_err, mrgb, magb, mratio, mratio_err = \
+                narratio(narratio_file, target)
+
         if i == 0:
-            nagb = np.nansum(hess)
-            magb = np.nansum(shess)
-            labels[0] = r'$N_{{\rm TP-AGB}}={}$'.format(nagb)
-            labels[1] = r'$N_{{\rm TP-AGB}}={}$'.format(magb)
+            if narratio_file is None:
+                nagb = np.nansum(hess)
+                magb = np.nansum(shess)
+            tpagb_prob = prob
+            fmt = r'$N_{{\rm TP-AGB}}={}$'
+            labels[0] = fmt.format(nagb)
+            labels[1] = fmt.format(magb)
             figname = lf_file.replace('lf', 'tpagb_hess').replace('.dat', '.png')
-            print('tpagb prob {}'.format(prob))
+            
         if i == 1:
+            full_prob = prob
+            figname = lf_file.replace('lf', 'hess').replace('.dat', '.png')
             if narratio_file is not None:
-                ratio_data = rsp.fileio.readfile(narratio_file,
-                                                 string_column=[0, 1, 2])
-                #nagb = float(ratio_data[0]['nagb'])
-                nrgb = float(ratio_data[0]['nrgb'])
-
-                dratio = nagb / nrgb
-                dratio_err = rsp.utils.count_uncert_ratio(nagb, nrgb)
-
-                indx, = np.nonzero(ratio_data['target'] == target)
-                mrgb = np.mean(map(float, ratio_data[indx]['nrgb']))
-                #magb = np.mean(map(float, ratio_data[indx]['nagb']))
-
-                mratio = magb / mrgb
-                mratio_err = rsp.utils.count_uncert_ratio(magb, mrgb)
                 fmt = r'$N_{{\rm RGB}}={}\ \frac{{N_{{TP-AGB}}}}{{N_{{RGB}}}}={:.3f}\pm{:.3f}$'
                 labels[0] = fmt.format(nrgb, dratio, dratio_err)
                 labels[1] = fmt.format(mrgb, mratio, mratio_err)
-                figname = lf_file.replace('lf', 'hess').replace('.dat', '.png')
-            print('full prob {}'.format(prob))
-        grid = rsp.match.graphics.match_plot([hess.T, shess.T, dif.T, sig.T],
-                                             extent, labels=labels)
-        [ax.set_ylabel(r'$\rm F160W$') for ax in grid.axes_column[0]]
-        [ax.set_xlabel(r'$\rm F160W - F814W$') for ax in grid.axes_row[1]]
-        plt.savefig(figname)
-        # labels
-        #plt.savefig()
-        # translate prop into chi2...
 
-    
+        if make_plot:
+            grid = rsp.match.graphics.match_plot([hess.T, shess.T, dif.T, sig.T],
+                                                 extent, labels=labels)
+            [ax.set_ylabel(r'$\rm F160W$') for ax in grid.axes_column[0]]
+            [ax.set_xlabel(r'$\rm F160W - F814W$') for ax in grid.axes_row[1]]
+            plt.savefig(figname)
+        
+    line = linefmt.format(target, tpagb_prob, full_prob, nmodels)
+    with open(outfile, 'a') as out:
+        out.write(line)
+    logger.info('wrote to {}'.format(outfile))
+      
 # 1d analysis - per galaxy
 # see compare_to_gal in plotting.py
 # bin into LF
@@ -155,6 +132,30 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
 # see compare_lfs in plotting.py
 
 # chi2 vs galaxy plot for each agb_mod
+
+def narratio(narratio_file, target, nagb=None, magb=None):
+    ratio_data = rsp.fileio.readfile(narratio_file,
+                                     string_column=[0, 1, 2])
+    if nagb is None:
+        nagb = float(ratio_data[0]['nagb'])
+    nrgb = float(ratio_data[0]['nrgb'])
+
+    dratio = nagb / nrgb
+    dratio_err = rsp.utils.count_uncert_ratio(nagb, nrgb)
+
+    indx, = np.nonzero(ratio_data['target'] == target)
+    mrgb = np.mean(map(float, ratio_data[indx]['nrgb']))
+
+    if magb is None:
+        magb = np.mean(map(float, ratio_data[indx]['nagb']))
+
+    mratio = magb / mrgb
+    mratio_err = rsp.utils.count_uncert_ratio(magb, mrgb)
+
+
+
+    return nrgb, nagb, dratio, dratio_err, mrgb, magb, mratio, mratio_err
+
 
 def main(argv):
     description = ("stats...")
@@ -181,16 +182,121 @@ def main(argv):
     parser.add_argument('observation', type=str,
                         help='data file to compare to')
 
+    parser.add_argument('agb_mod', type=str,
+                        help='agb model name')
+
     args = parser.parse_args(argv)
     
     col1, col2 = args.colnames.split(',')
     filter1, filter2 = args.scolnames.split(',')
     dcol, dmag = map(float, args.dcolmag.split(','))
+    outfile = 'compare_hess_{}.txt'.format(args.agb_mod)
     
     compare_hess(args.lf_file, args.observation, filter1=filter1,
                  filter2=filter2, col1=col1, col2=col2, dcol=dcol, dmag=dmag,
-                 yfilter=args.yfilter, narratio_file=args.narratio_file)
+                 yfilter=args.yfilter, narratio_file=args.narratio_file,
+                 outfile=outfile)
+    
+    plotting.compare_to_gal(args.lf_file, args.observation, filter1=filter1,
+                   filter2=filter2, col1=col1, col2=col2,
+                   dmag=dmag, narratio_file=args.narratio_file, make_plot=True,
+                   regions_kw=None, agb_mod=args.agb_mod)  
 
+
+def chi2plot(chi2table, outfile_loc=None):
+    """
+    this works by pasting tables together and deleting the target names
+    (except for the first column) and nmodel columns.
+    """
+    chi2tab = rsp.fileio.readfile(chi2table, string_column=0)
+    nagb_mods = (len(chi2tab.dtype) - 1) / 2
+
+    cols = [u'#E24A33', u'#348ABD', u'#988ED5', u'#777777', u'#FBC15E',
+            u'#8EBA42', u'#FFB5B8']
+    
+    assert len(cols) >= nagb_mods, 'need more colors!'
+    
+        
+    agb_mods = [c.replace('_prob','') for c in chi2tab.dtype.names[1::2]]
+    offsets = np.linspace(0, 1, len(chi2tab))
+    targets = chi2tab['target']
+
+    fig, axs = plt.subplots(ncols=2, sharex=True, sharey=False,
+                            figsize=(15, 6))
+    
+    for ioff, colmn in enumerate(chi2tab.dtype.names[1:]):
+        col = cols[agb_mods.index(colmn.split('_')[0])]
+        iax = 0
+        if 'tpagb' in colmn:
+            iax = 1
+        ax = axs[iax]
+
+        #ax.errorbar(offsets[ioff], val, yerr=errval, marker=sym, color=col, ms=12,
+        #            mfc=mfc, ecolor='black', mew=1.5, elinewidth=2)
+        ax.scatter(offsets, chi2tab[colmn], marker=sym, s=60, c=col)
+        
+        ax.hlines(np.median(chi2tab[colmn]), -0.1, 1.1, color=col,
+                  label=colmn.split('_')[0], alpha=0.5, lw=2)
+        ax.xaxis.set_ticks(offsets)
+        ax.set_xticklabels(['$%s$' % t.replace('-deep', '').replace('-halo-6', '').replace('-', '\!-\!').upper() for t in targets])
+        [t.set_rotation(30) for t in ax.get_xticklabels()]
+        #plt.tick_params(labelsize=16)
+    fig.subplots_adjust(hspace=0.1, bottom=0.15, left=0.1, right=0.95)
+    
+    xlims = ax.get_xlim()
+    off = np.diff(offsets)[0]
+    ax.set_xlim(xlims[0] - off / 2, xlims[1] + off / 2)
+    [ax.set_ylabel('$\chi^2$', fontsize=20) for ax in axs]
+    #[ax.set_ylim(0, 25) for ax in axs[:, 0]]
+    #[ax.set_ylim(0, 10) for ax in axs[:, 1]]
+
+    axs[0].legend(loc=0, numpoints=1)
+    axs[1].annotate(r'$\rm{TP\!-\!AGB\ Only}$', (0.02, 0.02), fontsize=16,
+                    xycoords='axes fraction')
+    if outfile_loc is None:
+        outfile_loc = os.getcwd()
+
+    outfile = os.path.join(outfile_loc, 'chi2_plot.png')
+    plt.savefig(outfile, dpi=150)
+    return axs
+
+def narratio_table(nartables):
+    line = ''
+    for i, nartable in enumerate(nartables):
+        ratio_data = rsp.fileio.readfile(nartable, string_length=36,
+                                         string_column=[0, 1, 2])
+
+        targets = [t for t in ratio_data['target'] if not 'data' in t]
+        fmt = r'${:.3f}\pm{:.3f}$'
+        line += nartable
+        line += '\n'
+        for target in targets:
+            dindx, = np.nonzero(ratio_data['target'] == '{}_data'.format(target))
+            indx, = np.nonzero(ratio_data['target'] == target)
+            
+            nagb = float(ratio_data[dindx]['nagb'])
+            nrgb = float(ratio_data[dindx]['nrgb'])
+
+            dratio = nagb / nrgb
+            dratio_err = rsp.utils.count_uncert_ratio(nagb, nrgb)
+    
+            mrgb = np.mean(map(float, ratio_data[indx]['nrgb']))
+            magb = np.mean(map(float, ratio_data[indx]['nagb']))
+    
+            mratio = magb / mrgb
+            mratio_err = rsp.utils.count_uncert_ratio(magb, mrgb)        
+    
+            pct_diff = (mratio / dratio)
+            pct_diff_err = np.abs(pct_diff * (mratio_err / mratio + dratio_err / dratio))
+    
+            #print 'target data_ratio model_ratio frac_diff'
+            if i == 0:
+                line += ' & '.join([target.upper(), fmt.format(dratio, dratio_err), fmt.format(mratio, mratio_err), fmt.format(pct_diff, pct_diff_err)])
+                line += '\n'
+            else:
+                line += ' & '.join([fmt.format(mratio, mratio_err), fmt.format(pct_diff, pct_diff_err)])
+                line += '\n'
+    print line
 
 if __name__ == "__main__":
     main(sys.argv[1:])
@@ -198,30 +304,7 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
-
-
 # old shit below
-
-def narratio_table(self):
-    narratio_files = rsp.fileIO.get_files(self.outfile_dir, '*narratio*dat')
-    stats.narratio_table(narratio_files)
-    return
-
-def chi2_stats(targets, cmd_inputs, outfile_dir='default', extra_str=''):
-    chi2_files = stats.write_chi2_table(targets, cmd_inputs,
-                                            outfile_loc=outfile_dir,
-                                            extra_str=extra_str)
-    chi2_dicts = stats.result2dict(chi2_files)
-    stats.chi2plot(chi2_dicts, outfile_loc=outfile_dir)
-    chi2_files = stats.write_chi2_table(targets, cmd_inputs,
-                                            outfile_loc=outfile_dir,
-                                            extra_str=extra_str,
-                                            just_gauss=True)
-    return
 
 def contamination_files(filenames):
     opt_eagb_contam = np.array([])
@@ -282,504 +365,3 @@ def contamination_files(filenames):
     print 'ir bheb, ms', np.max(ir_bheb_contam), np.max(ir_ms_contam)
 
 
-class StatisticalComparisons(object):
-    def __init__(self, cmd_input_file, target, outfile_loc='default',
-                 extra_str='', mc=True):
-        self.target = target
-        self.outfile_loc, self.fnames, self.agb_mod = \
-            sfh_tests_multi_proc.setup_files(cmd_input_file, target,
-                                             outfile_loc=outfile_loc,
-                                             extra_str=extra_str, mc=mc)
-        self.files = sfh_tests_multi_proc.FileIO()
-        self.files.mc = mc
-
-    def poission_chi2(self, hist_it_up=False, table_file='default',
-                      just_gauss=False):
-        self.files.ags = sfh_tests_multi_proc.load_default_ancient_galaxies(table_file=table_file)
-        self.files.load_data_for_normalization(target=self.target, ags=self.files.ags)
-
-        opt_gal, ir_gal = self.files.load_galaxies(hist_it_up=hist_it_up)
-
-        # cut LF at 90% completeness
-        obins, = np.nonzero(opt_gal.bins <= self.files.opt_offset)
-        ibins, = np.nonzero(ir_gal.bins <= self.files.ir_offset)
-
-        agb_obins, = np.nonzero(opt_gal.bins <= self.files.opt_trgb - \
-                                                self.files.opt_trgb_err * \
-                                                self.files.ags.factor[0])
-        agb_ibins, = np.nonzero(ir_gal.bins <= self.files.ir_trgb - \
-                                                self.files.ir_trgb_err * \
-                                                self.files.ags.factor[1])
-        opt_model_hists, opt_models_binss, opt_model_norms = self.files.load_lf_file(self.fnames[0])
-        ir_model_hists, ir_models_binss, ir_model_norms = self.files.load_lf_file(self.fnames[1])
-
-        opt_chi2 = np.array([])
-        ir_chi2 = np.array([])
-
-        opt_chi2_agb = np.array([])
-        ir_chi2_agb = np.array([])
-        opt_pval = np.array([])
-        ir_pval = np.array([])
-
-        opt_pval_agb = np.array([])
-        ir_pval_agb = np.array([])
-
-        nhists = np.min([len(ir_model_hists), len(opt_model_hists)])
-
-        for i in range(nhists):
-            chi2, pct_dif, sig = rsp.Galaxies.stellar_prob(opt_gal.hist[obins[1:]],
-                                                           opt_model_hists[i][obins[1:]])
-            if just_gauss is True:
-                chi2, pval = self.chi2(opt_gal.hist[obins[1:]],
-                                       opt_model_hists[i][obins[1:]])
-                opt_pval = np.append(opt_pval, pval)
-
-            opt_chi2 = np.append(opt_chi2, chi2)
-            #print 'opt', chi2, np.mean(sig)
-            chi2, pct_dif, sig = rsp.Galaxies.stellar_prob(ir_gal.hist[ibins[1:]],
-                                                           ir_model_hists[i][ibins[1:]])
-            if just_gauss is True:
-                chi2, pval = self.chi2(ir_gal.hist[ibins[1:]],
-                                       ir_model_hists[i][ibins[1:]])
-                ir_pval = np.append(ir_pval, pval)
-
-            ir_chi2 = np.append(ir_chi2, chi2)
-            #print 'ir', chi2, np.mean(sig)
-
-            chi2, pct_dif, sig = rsp.Galaxies.stellar_prob(opt_gal.hist[agb_obins[1:]],
-                                                           opt_model_hists[i][agb_obins[1:]])
-            if just_gauss is True:
-                chi2, pval = self.chi2(opt_gal.hist[agb_obins[1:]],
-                                       opt_model_hists[i][agb_obins[1:]])
-                opt_pval_agb = np.append(opt_pval_agb, pval)
-
-            opt_chi2_agb = np.append(opt_chi2_agb, chi2)
-            #print 'opta', chi2, np.mean(sig)
-
-            chi2, pct_dif, sig = rsp.Galaxies.stellar_prob(ir_gal.hist[agb_ibins[1:]],
-                                                           ir_model_hists[i][agb_ibins[1:]])
-            if just_gauss is True:
-                chi2, pval = self.chi2(ir_gal.hist[agb_ibins[1:]],
-                                       ir_model_hists[i][agb_ibins[1:]])
-                ir_pval_agb = np.append(ir_pval_agb, pval)
-            ir_chi2_agb = np.append(ir_chi2_agb, chi2)
-            #print 'ira ', chi2, np.mean(sig)
-        if just_gauss is True:
-            return opt_chi2, ir_chi2, opt_chi2_agb, ir_chi2_agb, opt_pval, ir_pval, opt_pval_agb, ir_pval_agb
-        else:
-            return opt_chi2, ir_chi2, opt_chi2_agb, ir_chi2_agb
-
-    def chi2(self, ohist, mhist):
-        from scipy import stats
-        # t-test:
-        #ti = (ohist - mhist) ** 2 / (ohist + mhist)
-        #naners = np.isnan(ti)
-        #ti[naners] = 0
-        #print np.sum(ti)
-        # maybe there is a better way to mask this... chiw was a typo...
-        chiw = (mhist - ohist) ** 2 / ohist
-        naners = np.isinf(chiw)
-        chiw[naners] = 0
-        naners = np.isnan(chiw)
-        chiw[naners] = 0
-        oinds, = np.nonzero(chiw > 0)
-        chi2 = np.sum(chiw)/float(len(oinds)-1)#, len(oinds)
-        pval = 1 - stats.chi2.cdf(chi2, len(oinds)-1)
-        return chi2, pval
-
-
-def result2dict(result_files, search=None):
-    res_dict = {}
-
-    if 'narratio' in result_files[0]:
-        if search is None:
-            search = 'ratio'
-        chi2 = False
-    elif 'chi2' in result_files[0]:
-        if search is None:
-            search = 'chi2'
-        chi2 = True
-    else:
-        print 'either narratio file or chi2 file'
-        return {}
-
-    for result_file in result_files:
-        data = rsp.fileIO.readfile(result_file, string_column=0)
-        target = os.path.split(result_file)[1].split('_')[3]
-        agb_mod = os.path.split(result_file)[1].split(target)[0][:-1]
-        if search == 'all':
-            fields = [d for d in data.dtype.names if not 'target' in d]
-        else:
-            fields = [d for d in data.dtype.names if search in d]
-        key = '%s_%s' % (target, agb_mod)
-        for f in fields:
-            res_dict['%s_%s_mean' % (key, f)] = np.mean(data[f])
-            if chi2 is True:
-                res_dict['%s_%s_std' % (key, f)] = np.std(data[f])
-
-    # to get narratio means
-    #opt_total = [v for k,v in narr_dict.items() if 'opt_ar_ratio_mean' in k]
-    #ir_total = [v for k,v in narr_dict.items() if 'ir_ar_ratio_mean' in k]
-    #narr_dict['%s_opt_ratio_mean' % agb_mod] = np.mean(opt_total)
-    #narr_dict['%s_ir__ratio_mean' % agb_mod] = np.mean(ir_total)
-    #print '%s opt $%.2f\pm%.2f$' % (self.agb_mod, np.mean(opt_total), np.std(opt_total))
-    #print '%s ir $%.2f\pm%.2f$' % (self.agb_mod, np.mean(ir_total), np.std(ir_total))
-    # to get chi2 means
-    #agb_mods = np.unique(agb_mods)
-    #for extra in extras:
-    #    for band in bands:
-    #        band += extra
-    #        for agb_mod in agb_mods:
-    #            total = [v for k,v in chi_dict.items() if '%s_%s_mean' % (agb_mod, band) in k]
-    #            chi_dict['%s_%s_mean' % (agb_mod, band)] = np.mean(total)
-    #            chi_dict['%s_%s_std' % (agb_mod, band)] = np.std(total)
-
-    return res_dict
-
-
-def write_chi2_table(targets, cmd_input_files, table_file='default',
-                     outfile_loc='default', extra_str='', just_gauss=False):
-    if just_gauss is True:
-        extra_str2 = extra_str + '_gauss'
-    else:
-        extra_str2 = extra_str
-    chi2_files = []
-    for target in targets:
-        for cmd_input_file in cmd_input_files:
-            st = StatisticalComparisons(cmd_input_file, target,
-                                        outfile_loc=outfile_loc,
-                                        extra_str=extra_str)
-            chi2_file = os.path.join(outfile_loc,
-                                     '%s_%s%s_chi2.dat' % (st.agb_mod, target,
-                                                           extra_str2))
-            result =  st.poission_chi2(table_file=table_file, just_gauss=just_gauss)
-            if just_gauss is True:
-                opt_chi2, ir_chi2, opt_chi2_agb, ir_chi2_agb, opt_pval, ir_pval, opt_pval_agb, ir_pval_agb = result
-                cfmt = '%i %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n'
-                with open(chi2_file, 'w') as c2:
-                    c2.write('# sfr opt_chi2 ir_chi2 opt_agb_chi2 ir_agb_chi2 ')
-                    c2.write('ir_chi2_agb opt_pval ir_pval opt_pval_agb ir_pval_agb \n')
-                    for i in range(len(opt_chi2)):
-                        c2.write(cfmt % (i, opt_chi2[i], ir_chi2[i],
-                                         opt_chi2_agb[i], ir_chi2_agb[i],
-                                         opt_pval[i], ir_pval[i],
-                                         opt_pval_agb[i], ir_pval_agb[i]))
-                chi2_files.append(chi2_file)
-            else:
-                opt_chi2, ir_chi2, opt_chi2_agb, ir_chi2_agb = result
-                cfmt = '%i %.3f %.3f %.3f %.3f \n'
-                with open(chi2_file, 'w') as c2:
-                    c2.write('# sfr opt_chi2 ir_chi2 opt_agb_chi2 ir_agb_chi2\n')
-                    for i in range(len(opt_chi2)):
-                        c2.write(cfmt % (i, opt_chi2[i], ir_chi2[i],
-                                         opt_chi2_agb[i], ir_chi2_agb[i]))
-                chi2_files.append(chi2_file)
-
-    return chi2_files
-
-
-def get_data(table_file='default'):
-    if table_file == 'default':
-        table_file = snap_src + '/tables/ancients_0.1_0.2_galaxies.dat'
-    ags = sfh_tests_multi_proc.AncientGalaxies()
-    ags.read_trgb_table(table_file)
-    data_dict = {}
-    for i, target in enumerate(ags.data.target):
-        for band in ['opt', 'ir']:
-            ratio = ags.data[i]['n%s_agb' % band] / \
-                    ags.data[i]['n%s_rgb' % band]
-            data_dict['%s_%s' % (target, band)] = ratio
-            data_dict['%s_%s_err' % (target, band)] = \
-                galaxy_tests.count_uncert_ratio(ags.data[i]['n%s_agb' % band],
-                                                ags.data[i]['n%s_rgb' % band])
-    return data_dict
-
-
-def narratio_table(narratio_files, table_file='default'):
-    '''write the latex table'''
-    data_dict = get_data(table_file=table_file)
-    nar_dict = result2dict(narratio_files)
-    targets = list(np.unique([k.split('_')[0] for k in nar_dict.keys()]))
-    agb_mods = list(np.unique(['_'.join(k.split('_')[1:4])
-                               for k in nar_dict.keys()]))
-    # table columns: target, data ratio, (ratio, frac diff) per agb mod
-    ir_table = np.empty(shape=(len(targets) + 1, len(agb_mods)*2 + 1),
-                        dtype='|S20')
-    ir_table[:, :] = ''
-    opt_table = np.empty(shape=(len(targets) + 1, len(agb_mods)*2 + 1),
-                         dtype='|S20')
-    opt_table[:, :] = ''
-
-    fmt = r'$%.3f\pm%.3f$ & '
-    fmt2 = r'$%.3f\pm%.3f$ \\'
-    for key, val in nar_dict.items():
-        # go through half the dict (see below)
-        if 'err' in key:
-            continue
-
-        # choose which table
-        if 'ir' in key:
-            table = ir_table
-            band = 'ir'
-
-        if 'opt' in key:
-            table = opt_table
-            band = 'opt'
-
-        # choose the correct row and column placement in the table
-        target = key.split('_')[0]
-        agb_mod = '_'.join(key.split('_')[1:4])
-        row = targets.index(target)
-        # column 0 is target, columns 1, 3, 5 have ratios
-        column = (agb_mods.index(agb_mod) * 2) + 1
-        #print row, column
-        # target
-        table[row, 0] = '%s &' % target.upper()
-
-        # data
-        dnarr = data_dict['%s_%s' % (target.lower(), band)]
-        derr = data_dict['%s_%s_err' % (target.lower(), band)]
-        #dstr = fmt % (dnarr, derr)
-        #table[row, 1] = dstr
-
-        # model
-        mnarr = val
-        # grab the error from the dict
-        err_key = key.replace('mean', 'err_mean')
-        mnerr = nar_dict[err_key]
-        mstr = fmt % (mnarr, mnerr)
-        table[row, column] = mstr
-
-        # frac difference
-        #pct_diff = (mnarr - dnarr) / dnarr
-        #pct_diff_err = np.abs(pct_diff * (mnerr/mnarr + derr/dnarr))
-        pct_diff = (mnarr / dnarr)
-        pct_diff_err = np.abs(pct_diff * (mnerr/mnarr + derr/dnarr))
-
-        f = fmt
-        # if final column, put \\ not &
-        if column + 1 == table.shape[1] - 1:
-            f = fmt2
-        pdstr = f % (pct_diff, pct_diff_err)
-        table[row, column + 1] = pdstr
-
-    # totals:
-    nar_dict = result2dict(narratio_files, search='all')
-    data_total = data_table(targets)
-    data_total = np.array(data_total.translate(None, '\\$Total&').replace('pm', ' ').split(), dtype=float)
-
-    for i, agb_mod in enumerate(agb_mods):
-        for band, table in zip(['ir', 'opt'], [ir_table, opt_table]):
-            f = fmt
-            column = (i * 2) + 1
-            nrgb = np.sum([v for k, v in nar_dict.items()
-                           if agb_mod in k and band in k and 'rgb' in k])
-            nagb = np.sum([v for k, v in nar_dict.items()
-                           if agb_mod in k and band in k and 'agb' in k])
-            ratio = nagb / nrgb
-            err = galaxy_tests.count_uncert_ratio(nagb, nrgb)
-            table[-1, column] = f % (ratio, err)
-            column += 1
-            if column == table.shape[1] - 1:
-                f = fmt2
-            # frac difference
-            if band == 'ir':
-                j = 6
-            if band == 'opt':
-                j = 2
-            dratio = data_total[j]
-            derr = data_total[j+1]
-            pct_diff = (ratio / dratio)
-            pct_diff_err = np.abs(pct_diff * (err/ratio + derr/dratio))
-            #table[-1, column] = f % (pct_diff, pct_diff_err)
-            #table[-1, 0] = 'Total & '
-    # mean
-
-    for i, agb_mod in enumerate(agb_mods):
-        for table in [ir_table, opt_table]:
-            f = fmt
-            column = (i * 2) + 1
-            val, err = \
-                np.mean(np.array([l.translate(None, ' $&\\').split('pm')
-                    for l in table[:, column][:-1]], dtype=float), axis=0)
-            print agb_mod, err/val
-            table[-1, column] = f % (val, err)
-            column += 1
-            if column == table.shape[1] - 1:
-                f = fmt2
-            val, err = \
-                np.mean(np.array([l.translate(None, ' $&\\').split('pm')
-                    for l in table[:, column][:-1]], dtype=float), axis=0)
-            table[-1, column] = f % (val, err)
-            table[-1, 0] = 'Mean & '
-
-    # write the file
-    ratio_str = '$\\frac{N_{\\rm TP-AGB}}{N_{\\rm RGB}}$'
-    header = 'Target & '
-    for i in range(len(agb_mods)):
-        header += '%s %s & Frac. Difference & ' % (ratio_str,
-                                                   agb_mods[i].split('_')[-1])
-    header = header[:-2] + '\\\\ \n \\hline \n'
-
-    outfile_dir = os.path.split(narratio_files[0])[0]
-    for band, table in zip(['opt', 'ir'], [opt_table, ir_table]):
-        outfile = os.path.join(outfile_dir, '%s_narratio_table.tex' % band)
-        with open(outfile, 'w') as out:
-            out.write(header)
-            np.savetxt(out, table, fmt='%s')
-    return ir_table, opt_table
-
-
-def data_table(targets, table_file='default'):
-    """latex data table """
-    # target, av, dist, [opt: frac comp, trgb, nrgb, nagb ratio] [ir: ..]
-    if table_file == 'default':
-        table_file = snap_src + '/tables/ancients_0.1_0.2_galaxies.dat'
-    ags = sfh_tests_multi_proc.AncientGalaxies()
-    ags.read_trgb_table(table_file)
-    data_dict = get_data(table_file=table_file)
-    comp_data = tables.read_completeness_table()
-    row = ''
-    row2 = ''
-    ts = list(set([t.lower() for t in targets]) & set(ags.data.target))
-    assert len(ts) == len(targets), 'cant find all targets in ags.data'
-    inds = list([np.where(t.lower() == ags.data.target)[0][0] for t in targets])
-    opt_agb_tot = np.sum(ags.data.nopt_agb[inds])
-    opt_rgb_tot = np.sum(ags.data.nopt_rgb[inds])
-    ir_agb_tot = np.sum(ags.data.nir_agb[inds])
-    ir_rgb_tot = np.sum(ags.data.nir_rgb[inds])
-
-    totfmt = 'Total & %i & %i & $%.3f\\pm%.3f$ &  %i & %i & $%.3f\\pm%.3f$ \\\\'
-    total = totfmt % (opt_agb_tot, opt_rgb_tot, opt_agb_tot/opt_rgb_tot,
-                      galaxy_tests.count_uncert_ratio(opt_agb_tot, opt_rgb_tot),
-                      ir_agb_tot, ir_rgb_tot, ir_agb_tot/ir_rgb_tot,
-                      galaxy_tests.count_uncert_ratio(ir_agb_tot, ir_rgb_tot))
-
-    for target in targets:
-        if target.upper() == 'NGC2976-DEEP':
-            extra_key='F606W,F814W'
-        else:
-            extra_key=None
-        (Av, dmod) = [angst_data.get_item(target, i, extra_key=extra_key)
-                      for i in ['Av', 'dmod']]
-        comp_row = rsp.fileIO.get_row(comp_data, 'target', target)
-        nstars_row = rsp.fileIO.get_row(ags.data, 'target', target)
-        sub_dict  = {}
-        opt_err_pct = []
-        ir_err_pct = []
-        for (k,v) in data_dict.items():
-            if '404' in target:
-                target = target.lower().replace('-deep', '')
-            if target in k or target.lower() in k:
-                sub_dict[k] = v
-        opt_err_pct.append(sub_dict['%s_opt_err' % target.lower()] /
-                           sub_dict['%s_opt' % target.lower()])
-        ir_err_pct.append(sub_dict['%s_ir_err' % target.lower()] /
-                          sub_dict['%s_ir' % target.lower()])
-
-        row += '%s & %.2f & %.2f & ' % (target, Av, dmod)
-        row += '%(opt_filter2).2f & ' % comp_row
-        row += '%(opt_trgb).2f & ' % nstars_row
-        row += '%(ir_filter2).2f & ' % comp_row
-        row += '%(ir_trgb).2f \\\\ \n' % nstars_row
-
-        row2 += '%s & ' % target
-        row2 += '%(nopt_agb)i & %(nopt_rgb)i & ' % nstars_row
-        row2 += '$%.3f\\pm%.3f$ & ' % (sub_dict['%s_opt' % target.lower()],
-                                       sub_dict['%s_opt_err' % target.lower()])
-        row2 += '%(nir_agb)i & %(nir_rgb)i & ' % nstars_row
-        row2 += '$%.3f\\pm%.3f$ \\\\ \n' % (sub_dict['%s_ir' % target.lower()],
-                                            sub_dict['%s_ir_err' % target.lower()])
-
-    with open('data_table.tex', 'w') as out:
-        out.write(row)
-        out.write(row2)
-        out.write(total)
-
-        out.write('# max err pct. opt: %.3f ir: %.3f \n' % \
-                  (np.max(opt_err_pct), np.max(ir_err_pct)))
-    return total
-
-
-def chi2plot(model_dict, outfile_loc=None):
-    targets = list(np.unique([k.split('_')[0] for k in model_dict.keys()]))
-    agb_mods = list(np.unique(['_'.join(k.split('_')[1:4])
-                               for k in model_dict.keys()]))
-
-    cols = ['darkgreen', 'navy', 'darkred']
-
-    fig, axs = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=False,
-                            figsize=(10,10))
-    offsets = np.linspace(0, 1, len(targets))
-    for key, val in model_dict.items():
-        if 'std' in key:
-            continue
-        target = key.split('_')[0]
-        errval = model_dict[key.replace('mean', 'std')]
-        ioff = targets.index(target)
-        agb_mod = '_'.join(key.split('_')[1:4])
-        col = cols[agb_mods.index(agb_mod)]
-        sym = 'o'
-        if not agb_mod.endswith('nov13'):
-            mfc='white'
-        else:
-            mfc = col
-        if not 'nov13' in agb_mod:
-            sym = '*'
-        ax_row = 0
-        ax_col = 0
-        if not '_agb' in key:
-            ax_row = 1
-        if 'ir' in key:
-            ax_col = 1
-        ax = axs[ax_row][ax_col]
-
-        ax.errorbar(offsets[ioff], val, yerr=errval, marker=sym, color=col, ms=12,
-                    mfc=mfc, ecolor='black', mew=1.5, elinewidth=2)
-        ax.set_ylabel('$\chi^2$', fontsize=20)
-
-        ax.xaxis.set_ticks(offsets)
-        ax.set_xticklabels(['$%s$' % t.replace('-deep', '').replace('-', '\!-\!').upper() for t in targets])
-        [t.set_rotation(30) for t in ax.get_xticklabels()]
-
-        #ymaxs[ax_num] = np.max([val, ymaxs[ax_num]])
-    axs[0][0].set_title(r'$\rm{Optical}$', fontsize=20)
-    axs[0][1].set_title(r'$\rm{NIR}$', fontsize=20)
-    [ax.set_ylim(0, 25) for ax in axs[:, 0]]
-    [ax.set_ylim(0, 10) for ax in axs[:, 1]]
-    fig.subplots_adjust(hspace=0.1)
-    xlims = ax.get_xlim()
-    off = np.diff(offsets)[0]
-    ax.set_xlim(xlims[0]-off/2, xlims[1]+off/2)
-    sym = ['o', 'o', '*']
-    mfc = [cols[0], 'None', 'None']
-    [axs[0, 0].plot(-99, 99, sym[j], mfc=mfc[j], ms=12, mew=1.5, color=cols[j],
-     label='$%s$' % model_plots.translate_model_name(agb_mods[j].split('_')[-1]))
-     for j in range(len(agb_mods))]
-    axs[0, 0].legend(loc=0, numpoints=1)
-    [ax.annotate(r'$\rm{TP\!-\!AGB\ Only}$', (0.02, 0.02), fontsize=16,
-                 xycoords='axes fraction') for ax in axs[0, :]]
-    if outfile_loc is None:
-        outfile_loc = os.getcwd()
-    outfile = os.path.join(outfile_loc, 'chi2_plot.png')
-    plt.tick_params(labelsize=16)
-    plt.savefig(outfile, dpi=150)
-
-    return axs
-
-
-def run_match_stats(targets='ancients'):
-    targets = galaxy_tests.load_targets(targets)
-    hmc_file_loc = os.path.join(snap_src, 'data', 'sfh_parsec')
-    cmd_file_loc = os.path.join(hmc_file_loc, 'cmd_files')
-    for target in targets:
-        target = target.lower()
-        try:
-            target = target.replace('-deep', '')
-            hmc_file, = rsp.fileIO.get_files(hmc_file_loc, '%s*sfh' % target)
-            cmd_file, = rsp.fileIO.get_files(cmd_file_loc, '%s*cmd' % target)
-        except:
-            print target, 'cmd file not found.'
-            continue
-        rsp.match_utils.match_stats(hmc_file, cmd_file)
-    return

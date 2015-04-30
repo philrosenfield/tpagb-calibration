@@ -120,4 +120,46 @@ def load_observation(filename, colname1, colname2):
         mag1, mag2 = np.loadtxt(filename)
     return mag1, mag2
 
+def load_photometry(lf_file, observation, filter1='F814W_cor',
+                     filter2='F160W_cor', col1='MAG2_ACS',
+                     col2='MAG4_IR', yfilter='I', flatten=True):
+    mag1, mag2 = load_observation(observation, col1, col2)
+    color = mag1 - mag2
 
+    # load models
+    lf_dict = load_lf_file(lf_file)
+    
+    # idx_norm are the normalized indices of the simulation set to match RGB
+    idx_norm = lf_dict['idx_norm']
+    
+    # nmodels corresponds to the number of trilegal simulations that are in
+    # the lf_file.
+    nmodels = len(idx_norm)
+    
+    # take all the scaled cmds in the file together and make an average hess
+
+    smag1 = np.array([lf_dict[filter1][i][idx_norm[i]]
+                            for i in range(nmodels)])
+    smag2 = np.array([lf_dict[filter2][i][idx_norm[i]]
+                            for i in range(nmodels)])
+    if flatten:
+        smag1 = np.concatenate(smag1)
+        smag2 = np.concatenate(smag2)
+    
+    # for opt_nir_matched data, take the obs limits from the data
+    # could use limiting mag or something...
+    inds, = np.nonzero((smag1 <= mag1.max()) & (smag2 <= mag2.max()) &
+                       (smag1 >= mag1.min()) & (smag2 >= mag2.min()))
+    smag1 = smag1[inds]
+    smag2 = smag2[inds]
+
+    scolor = smag1 - smag2
+
+    # set the yaxis
+    symag = smag2
+    ymag = mag2
+    if yfilter.upper() != 'I':
+        symag = smag1
+        ymag = mag1
+
+    return color, ymag, scolor, symag, nmodels

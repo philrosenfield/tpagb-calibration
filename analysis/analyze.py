@@ -8,26 +8,36 @@ import os
 import sys
 import time
 
-import matplotlib as mpl
-mpl.use('Agg')
+#import matplotlib as mpl
+#mpl.use('Agg')
 import matplotlib.pylab as plt
 import ResolvedStellarPops as rsp
 
 from astropy.io import ascii
 from IPython import parallel
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions
-from ..plotting.plotting import compare_to_gal
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_obs, find_fakes
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-optfilter2 = 'F814W'
-# optfilter1 varies from F475W, F555W, F606W
-nirfilter2 = 'F160W'
-nirfilter1 = 'F110W'
+angst_data = rsp.angst_tables.angst_table.AngstTables()
 
+__all__ = ['get_itpagb']
+
+def tpagb_rheb_line(color, mag, dmod=0.):
+    b = 1.17303
+    m = -5.20269
+    # redder than the line
+    return np.nonzero(color > ((mag - b - dmod) / m))
+
+def get_itpagb(target, color, mag):
+    # careful! get_snap assumes F160W
+    mtrgb, Av, dmod = angst_data.get_snap_trgb_av_dmod(target.upper())
+    redward_of_rheb, = tpagb_rheb_line(color, mag, dmod=dmod)
+    brighter_than_trgb, = np.nonzero(mag < mtrgb)
+    return list(set(redward_of_rheb) & set(brighter_than_trgb))
 
 # Someday this will call all the codes in order
 # add_asts
@@ -187,20 +197,6 @@ if __name__ == "__main__":
 
 
 ### Snippets below ###
-
-def chi2_stats(targets, cmd_inputs, outfile_dir='default', extra_str=''):
-    chi2_files = stats.write_chi2_table(targets, cmd_inputs,
-                                            outfile_loc=outfile_dir,
-                                            extra_str=extra_str)
-    chi2_dicts = stats.result2dict(chi2_files)
-    stats.chi2plot(chi2_dicts, outfile_loc=outfile_dir)
-    chi2_files = stats.write_chi2_table(targets, cmd_inputs,
-                                            outfile_loc=outfile_dir,
-                                            extra_str=extra_str,
-                                            just_gauss=True)
-    return
-
-
 def contamination_by_phases(sgal, srgb, sagb, filter2, diag_plot=False,
                             color_cut=None, target='', line=''):
 
