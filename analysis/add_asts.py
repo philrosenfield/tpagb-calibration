@@ -65,7 +65,7 @@ def main(argv):
     python add_asts.py -vd ~/research/TP-AGBcalib/SNAP/varysfh/kkh37
     
     if the target directory name is different than it is in the matchfake file name:
-    python analyze.py -vd -t ugc4459 ~/research/TP-AGBcalib/SNAP/varysfh/ugc-04459
+    python add_asts.py -vd -t ugc4459 ~/research/TP-AGBcalib/SNAP/varysfh/ugc-04459
     """
     parser = argparse.ArgumentParser(description="Cull useful info from \
                                                   trilegal catalog")

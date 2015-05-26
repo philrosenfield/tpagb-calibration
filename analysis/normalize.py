@@ -276,9 +276,9 @@ def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={}):
     # as long as col_min is not None, it will use magbright and col_min etc
     # as verts, so leave mag2 and mag1 as is, and if CMD has V for yaxis,
     # just relfect that in
-    regions_kw['color'] = mag1 - mag2
+    color = mag1 - mag2
     gal_rgb, _ = rgb_agb_regions(ymag, **regions_kw)
-    gal_agb = get_itpagb(target, regions_kw['color'], ymag)
+    gal_agb = get_itpagb(target, color, ymag)
     
     return float(len(gal_rgb)), float(len(gal_agb))
 
