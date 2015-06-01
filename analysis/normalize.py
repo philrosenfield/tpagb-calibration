@@ -66,12 +66,14 @@ def tpagb_lf(sgal, narratio_dict, filt1, filt2, lf_line=''):
     """format a narratio_dict for a line in the LF output file"""
 
     header = '# {} {} '.format(filt1, filt2)
-    header += 'sim_rgb sim_agb sgal_rgb sgal_agb idx_norm norm\n'
+    header += 'logAge [M/H] sim_rgb sim_agb sgal_rgb sgal_agb idx_norm norm\n'
     
     if len(lf_line) == 0:
         lf_line = header
     lf_line += '\n'.join([' '.join(['%g' % m for m in sgal.data[filt1]]),
                           ' '.join(['%g' % m for m in sgal.data[filt2]]),
+                          ' '.join(['%g' % m for m in sgal.data['logAge']]),
+                          ' '.join(['%g' % m for m in sgal.data['[M/H]']]),
                           ' '.join(['%i' % m for m in narratio_dict['sim_rgb']]),
                           ' '.join(['%i' % m for m in narratio_dict['sim_agb']]),
                           ' '.join(['%i' % m for m in narratio_dict['sgal_rgb']]),

@@ -13,6 +13,7 @@ from astroML.stats import binned_statistic_2d
 from ..fileio import load_photometry
 from .analyze import get_itpagb
 from ..utils import minmax
+from ..plotting.plotting import compare_to_gal
 logger = logging.getLogger()
 
 
@@ -44,27 +45,34 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
                 yfilter='I', narratio_file=None, make_plot=True,
                 outfile='compare_hess.txt'):
     if not os.path.isfile(outfile):
-        header = '# target full_prob tpagb_prob nmodels \n'
+        header = '# target full_prob tpagb_prob notpagb_prob nmodels \n'
         with open(outfile, 'w') as out:
             out.write(header)
 
-    linefmt = '{} {:.3f} {:.3f} {} \n'
+    linefmt = '{:15s} {:.3f} {:.3f} {:.3f} {} \n'
     target = os.path.split(lf_file)[1].split('_')[0]
     
     # load data
     color, ymag, scolor, symag, nmodels = \
         load_photometry(lf_file, observation, filter1=filter1, filter2=filter2,
-                         col1=col1, col2=col2, yfilter=yfilter)
+                         col1=col1, col2=col2, yfilter=yfilter,
+                         comp_frac=0.9)
     # apply cmd cuts
     # just the tpagb:
     itpagb = get_itpagb(target, color, ymag)
     sitpagb = get_itpagb(target, scolor, symag)
+    
     # the entire cmd:
     iall = np.arange(len(color))
     siall = np.arange(len(scolor))
+    
+    # the cmd without tpagb:
+    icmd = [a for a in iall if not a in itpagb]
+    sicmd = [a for a in siall if not a in sitpagb]
     # could also single out non-rheb and non-tpagb ...
 
-    for i, (inds, sinds) in enumerate(zip([itpagb, iall], [sitpagb, siall])):
+    for i, (inds, sinds) in enumerate(zip([itpagb, iall, icmd],
+                                          [sitpagb, siall, sicmd])):
         cbins = np.arange(*minmax(scolor[sinds], color[inds]), step=dcol)
         mbins = np.arange(*minmax(symag[sinds], ymag[inds]), step=dmag)
 
@@ -106,6 +114,12 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
                 fmt = r'$N_{{\rm RGB}}={}\ \frac{{N_{{TP-AGB}}}}{{N_{{RGB}}}}={:.3f}\pm{:.3f}$'
                 labels[0] = fmt.format(nrgb, dratio, dratio_err)
                 labels[1] = fmt.format(mrgb, mratio, mratio_err)
+        
+        if i == 2:
+            notpgab_prob = prob
+            figname = lf_file.replace('lf', 'notpagb_hess').replace('.dat', '.png')
+            labels = ['data', 'model', r'$\rm{{data}} - \rm{{model}}$',
+                      r'$\chi^2={:.2f}$'.format(prob)]
 
         if make_plot:
             grid = rsp.match.graphics.match_plot([hess.T, shess.T, dif.T, sig.T],
@@ -114,7 +128,7 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
             [ax.set_xlabel(r'$\rm F160W - F814W$') for ax in grid.axes_row[1]]
             plt.savefig(figname)
         
-    line = linefmt.format(target, tpagb_prob, full_prob, nmodels)
+    line = linefmt.format(target, tpagb_prob, full_prob, notpgab_prob, nmodels)
     with open(outfile, 'a') as out:
         out.write(line)
     logger.info('wrote to {}'.format(outfile))
@@ -197,48 +211,90 @@ def main(argv):
                  yfilter=args.yfilter, narratio_file=args.narratio_file,
                  outfile=outfile)
     
-    plotting.compare_to_gal(args.lf_file, args.observation, filter1=filter1,
-                   filter2=filter2, col1=col1, col2=col2,
-                   dmag=dmag, narratio_file=args.narratio_file, make_plot=True,
-                   regions_kw=None, agb_mod=args.agb_mod)  
+    # just use plotting.main...
+    #compare_to_gal(args.lf_file, args.observation, filter1=filter1,
+    #               filter2=filter2, col1=col1, col2=col2,
+    #               dmag=dmag, narratio_file=args.narratio_file, make_plot=True,
+    #               regions_kw=None, agb_mod=args.agb_mod)  
 
 
 def chi2plot(chi2table, outfile_loc=None):
     """
     this works by pasting tables together and deleting the target names
     (except for the first column) and nmodel columns.
+    
+    this is being used in ipython ...
     """
+    if outfile_loc is None:
+        outfile_loc = os.getcwd()
+    
     chi2tab = rsp.fileio.readfile(chi2table, string_column=0)
-    nagb_mods = (len(chi2tab.dtype) - 1) / 2
-
+    probs = [c for c in chi2tab.dtype.names if c.endswith('prob')]
+    agb_mods = list(np.unique([c.split('_')[0] for c in probs]))
+    nagb_mods = len(agb_mods)
+    
     cols = [u'#E24A33', u'#348ABD', u'#988ED5', u'#777777', u'#FBC15E',
             u'#8EBA42', u'#FFB5B8']
     
     assert len(cols) >= nagb_mods, 'need more colors!'
     
-        
-    agb_mods = [c.replace('_prob','') for c in chi2tab.dtype.names[1::2]]
-    offsets = np.linspace(0, 1, len(chi2tab))
+    offsets = np.linspace(0, 1, len(chi2tab['target']))
     targets = chi2tab['target']
-
-    fig, axs = plt.subplots(ncols=2, sharex=True, sharey=False,
-                            figsize=(15, 6))
+    tnames = ['$%s$' % t.replace('-deep', '').replace('-halo-6', '').replace('-', '\!-\!').upper() for t in targets]
+    # key plots still missing:
+    # chi2 versus fraction of y<1 Gyr ages? and agains metallicity?
+    # or against both, e.g chi2 X age with dots coloured according to metallicity
     
-    for ioff, colmn in enumerate(chi2tab.dtype.names[1:]):
+    ycols = [y for y in chi2tab.dtype.names[1:] if not y.endswith('prob')]
+    for ycol in ycols:
+        fig, axs = plt.subplots(ncols=3, sharex=True, sharey=False,
+                                figsize=(15, 6))
+        isort = np.argsort(chi2tab[ycol])
+        axs[0].plot(chi2tab['chi2eff'][isort], chi2tab[ycol][isort], 'o', color='k',
+                label='chi2eff')
+        for colmn in probs:
+            col = cols[agb_mods.index(colmn.split('_')[0])]
+            iax = 0
+            if 'tpagb' in colmn:
+                iax = 1
+            if 'not' in colmn:
+                iax = 2
+            ax = axs[iax]
+            ax.plot(chi2tab[colmn][isort], chi2tab[ycol][isort], 'o', color=col,
+                    label=colmn.split('_')[0])
+        for i in range(len(targets)):
+            ax.annotate(tnames[i], (0, chi2tab[ycol][i]))
+        [ax.set_xlabel('$\chi^2$', fontsize=20) for ax in axs]
+        [ax.set_ylabel('${}$'.format(ycol), fontsize=20) for ax in axs]
+        
+        axs[0].legend(loc=0, numpoints=1)
+        axs[1].annotate(r'$\rm{TP\!-\!AGB\ Only}$', (0.02, 0.02), fontsize=16,
+                        xycoords='axes fraction')
+        axs[2].annotate(r'$\rm{No TP\!-\!AGB}$', (0.02, 0.02), fontsize=16,
+                        xycoords='axes fraction')
+        outfile = os.path.join(outfile_loc, 'chi2_{}.png'.format(ycol))
+        fig.savefig(outfile, dpi=150)
+
+    fig, axs = plt.subplots(ncols=3, sharex=True, sharey=False,
+                            figsize=(15, 6))
+
+    for ioff, colmn in enumerate(probs):
         col = cols[agb_mods.index(colmn.split('_')[0])]
         iax = 0
         if 'tpagb' in colmn:
             iax = 1
+        if 'not' in colmn:
+            iax = 2
         ax = axs[iax]
-
+        
         #ax.errorbar(offsets[ioff], val, yerr=errval, marker=sym, color=col, ms=12,
         #            mfc=mfc, ecolor='black', mew=1.5, elinewidth=2)
-        ax.scatter(offsets, chi2tab[colmn], marker=sym, s=60, c=col)
+        ax.scatter(offsets, chi2tab[colmn], marker='o', s=60, c=col)
         
         ax.hlines(np.median(chi2tab[colmn]), -0.1, 1.1, color=col,
                   label=colmn.split('_')[0], alpha=0.5, lw=2)
         ax.xaxis.set_ticks(offsets)
-        ax.set_xticklabels(['$%s$' % t.replace('-deep', '').replace('-halo-6', '').replace('-', '\!-\!').upper() for t in targets])
+        ax.set_xticklabels(tnames)
         [t.set_rotation(30) for t in ax.get_xticklabels()]
         #plt.tick_params(labelsize=16)
     fig.subplots_adjust(hspace=0.1, bottom=0.15, left=0.1, right=0.95)
@@ -250,15 +306,16 @@ def chi2plot(chi2table, outfile_loc=None):
     #[ax.set_ylim(0, 25) for ax in axs[:, 0]]
     #[ax.set_ylim(0, 10) for ax in axs[:, 1]]
 
+
     axs[0].legend(loc=0, numpoints=1)
     axs[1].annotate(r'$\rm{TP\!-\!AGB\ Only}$', (0.02, 0.02), fontsize=16,
                     xycoords='axes fraction')
-    if outfile_loc is None:
-        outfile_loc = os.getcwd()
-
-    outfile = os.path.join(outfile_loc, 'chi2_plot.png')
-    plt.savefig(outfile, dpi=150)
+    
+    outfile = os.path.join(outfile_loc, 'chi2_target.png')
+    fig.savefig(outfile, dpi=150)
+    
     return axs
+
 
 def narratio_table(nartables):
     line = ''
@@ -300,7 +357,6 @@ def narratio_table(nartables):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-
 
 
 

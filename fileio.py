@@ -8,6 +8,7 @@ import ResolvedStellarPops as rsp
 from astropy.table import Table
 from TPAGBparams import snap_src, phat_src
 
+from pop_synth.stellar_pops import limiting_mag
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -59,7 +60,10 @@ def find_fakes(target, optfilter1=''):
         optfake = [f for f in fakes if not 'IR' in f]
     
         if len(optfake) > 1:
-            optfake, = [o for o in optfake if optfilter1 in o]
+            if optfilter1 != '':
+                optfake, = [o for o in optfake if optfilter1 in o]
+            else:
+                optfake = optfake[0]
         elif len(optfake) == 1:
             optfake, = optfake
     return optfake, nirfake
@@ -122,10 +126,9 @@ def load_observation(filename, colname1, colname2):
 
 def load_photometry(lf_file, observation, filter1='F814W_cor',
                      filter2='F160W_cor', col1='MAG2_ACS',
-                     col2='MAG4_IR', yfilter='I', flatten=True):
-    mag1, mag2 = load_observation(observation, col1, col2)
-    color = mag1 - mag2
-
+                     col2='MAG4_IR', yfilter='I', flatten=True,
+                     optfake=None, comp_frac=None, nirfake=None):
+    
     # load models
     lf_dict = load_lf_file(lf_file)
     
@@ -146,10 +149,26 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
         smag1 = np.concatenate(smag1)
         smag2 = np.concatenate(smag2)
     
+    # load observation
+    mag1, mag2 = load_observation(observation, col1, col2)
+
     # for opt_nir_matched data, take the obs limits from the data
-    # could use limiting mag or something...
     inds, = np.nonzero((smag1 <= mag1.max()) & (smag2 <= mag2.max()) &
                        (smag1 >= mag1.min()) & (smag2 >= mag2.min()))
+    if comp_frac is not None:
+        if optfake is None:
+            target = os.path.split(lf_file)[1].split('_')[0]
+            optfake, nirfake = find_fakes(target)
+        _, comp1 = limiting_mag(optfake, comp_frac)
+        _, comp2 = limiting_mag(nirfake, comp_frac)
+        sinds, = np.nonzero((smag2 <= comp2))# & (smag1 <= comp1))
+        inds = list(set(sinds) & set(inds))
+        oinds, = np.nonzero((mag2 <= comp2))# & (mag1 <= comp1))
+        mag1 = mag1[oinds]
+        mag2 = mag2[oinds]
+        
+    color = mag1 - mag2
+
     smag1 = smag1[inds]
     smag2 = smag2[inds]
 
@@ -161,5 +180,6 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
     if yfilter.upper() != 'I':
         symag = smag1
         ymag = mag1
-
+    
     return color, ymag, scolor, symag, nmodels
+

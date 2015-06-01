@@ -7,6 +7,7 @@ import sys
 import matplotlib as mpl
 #mpl.use('Agg')
 import matplotlib.pylab as plt
+
 import numpy as np
 import ResolvedStellarPops as rsp
 angst_data = rsp.angst_tables.angst_data
@@ -26,10 +27,17 @@ data_loc = os.path.join(snap_src, 'data', 'opt_ir_matched_v2')
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+plt.style.use('presentation')
+
+def emboss():
+    from matplotlib.patheffects import withStroke
+    myeffect = withStroke(foreground="w", linewidth=3)
+    ann_kwargs = dict(path_effects=[myeffect])
+    return ann_kwargs
 
 def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
     stext_kw = dict({'color': 'black', 'fontsize': 14, 'ha': 'center'}.items() +
-                    rsp.graphics.GraphicsUtils.ann_kwargs.items())
+                    emboss().items())
     dtext_kw = dict(stext_kw.items() + {'color': 'darkred'}.items())
 
     assert ratio_data[0]['target'] == 'data', \
@@ -597,7 +605,7 @@ def main(argv):
     parser.add_argument('-n', '--narratio_file', type=str,
                         help='model narratio file')
 
-    parser.add_argument('-d', '--cmd', type=str,
+    parser.add_argument('-d', '--cmd',  action='store_true',
                         help='trilegal catalog to make a diagnostic cmd instead of plotting LFs')
 
     parser.add_argument('-v', '--Av', type=float, default=0.,

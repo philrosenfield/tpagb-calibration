@@ -259,7 +259,7 @@ def call_VarySFH(inputs, loud=False, nproc=8, outfile='trilegal_script.sh',
     if outfile is None:
         print(line)
     else:
-        logger.info('output file: {}'.format(outfile))
+        logger.info('appending to output file: {}'.format(outfile))
         with open(outfile, 'a') as out:
             out.write(line)
     return
@@ -283,6 +283,9 @@ def main(argv):
 
     parser.add_argument('-c', '--cmd_input_file', type=str, default='cmd_input_CAF09_V1.2S_M36_S12D_NS_NAS.dat',
                         help='trilegal cmd input file')
+
+    parser.add_argument('-o', '--outfile', type=str, default='trilegal_script.sh',
+                        help='Output file to run trilegal')
 
     parser.add_argument('sfh_file', type=str,
                         help='MATCH SFH file: must have the format target_filter1_filter2.extensions')
@@ -313,7 +316,7 @@ def main(argv):
               'target': target}
 
     call_VarySFH(indict, loud=args.verbose, nproc=args.nproc,
-                 overwrite=args.overwrite)
+                 overwrite=args.overwrite, outfile=args.outfile)
 
 
 if __name__ == '__main__':

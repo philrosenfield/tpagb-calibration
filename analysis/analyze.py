@@ -106,7 +106,6 @@ def compute_GMM(N, covariance_type='full', n_iter=1000):
 
 def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.5,
                   thresh=100):
-    pass
     # 1 if fits file (observation):
     # read
     # 2 if stellar pop (model):
@@ -137,6 +136,7 @@ def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.
     mseps = []
     #halfs = np.diff(mag_bins) / 2.
     #halfs = np.append(halfs, 0)
+    from sklearn.mixture import GMM
     fig, ax = plt.subplots()
     ax.plot(color[inds], mag2[inds], '.', color='gray')
     #for j, i in enumerate(np.unique(dinds)):
@@ -179,7 +179,8 @@ def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.
         #isect = np.argmin(np.abs(pdf_individual[:, 1] - pdf_individual[:, 0]))
         isect = rsp.utils.find_peaks(pdf)['minima_locations']
         #ax.plot(x[pdf.argmax() + isect], pdf[pdf.argmax() + isect], 'o')
-        cseps.append(x[isect])
+        if len(isect) > 0:
+            cseps.append(x[isect])
 
     #mseps = np.array(mag_bins)[:-1] + np.diff(mag_bins)/2.
     ax.plot(cseps, mseps, 'o')
