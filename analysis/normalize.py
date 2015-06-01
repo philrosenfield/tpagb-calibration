@@ -8,13 +8,11 @@ import os
 import sys
 import time
 
-import matplotlib.pyplot as plt
 import ResolvedStellarPops as rsp
 
 from astropy.io import ascii
 from .analyze import get_itpagb
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag
-from ..plotting.plotting import compare_to_gal
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_observation
 from ..utils import check_astcor
@@ -394,20 +392,25 @@ def main(argv):
                                                tricat=tricat,
                                                nrgbs=obs_nrgbs, Av=args.Av,
                                                regions_kw=regions_kw, **kws)
-        fig, ax = plt.subplots()
-        mag1, mag2 = load_observation(args.observation, col1, col2)
-        ax.plot(mag1-mag2, mag2, '.', color='k')
-        ax.plot(sgal.data[filter1] - sgal.data[filter2],
-                sgal.data[filter2], '.')
-        ax.plot(sgal.data[filter1][narratio_dict['idx_norm']] - \
-                sgal.data[filter2][narratio_dict['idx_norm']],
-                sgal.data[filter2][narratio_dict['idx_norm']], '.')
-        ax.plot(sgal.data[filter1][narratio_dict['sgal_rgb']] - \
-                sgal.data[filter2][narratio_dict['sgal_rgb']],
-                sgal.data[filter2][narratio_dict['sgal_rgb']], '.')
-        ax.set_ylim(ax.get_ylim()[::-1])
-
-        plt.savefig(sgal.name + 'diag.png')
+        try:
+            import matplotlib.pyplot as plt
+            fig, ax = plt.subplots()
+            mag1, mag2 = load_observation(args.observation, col1, col2)
+            ax.plot(mag1-mag2, mag2, '.', color='k')
+            ax.plot(sgal.data[filter1] - sgal.data[filter2],
+                    sgal.data[filter2], '.')
+            ax.plot(sgal.data[filter1][narratio_dict['idx_norm']] - \
+                    sgal.data[filter2][narratio_dict['idx_norm']],
+                    sgal.data[filter2][narratio_dict['idx_norm']], '.')
+            ax.plot(sgal.data[filter1][narratio_dict['sgal_rgb']] - \
+                    sgal.data[filter2][narratio_dict['sgal_rgb']],
+                    sgal.data[filter2][narratio_dict['sgal_rgb']], '.')
+            ax.set_ylim(ax.get_ylim()[::-1])
+    
+            plt.savefig(sgal.name + 'diag.png')
+        except:
+            pass
+        
         lf_line, narratio_line = gather_results(sgal, args.target,
                                                 narratio_dict=narratio_dict,                                                
                                                 narratio_line=narratio_line,
