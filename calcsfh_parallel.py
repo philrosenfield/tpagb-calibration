@@ -170,6 +170,7 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
             if run_calcsfh:
                 rdict['param'], rdict['match'], rdict['fake'] = calcsfh_existing_files(prefs[i])
                 rdict['out'], rdict['scrn'], rdict['sfh'] = calcsfh_new_files(prefs[i])
+                rdict['mcmc'] = hybridmc_new_files(prefs[i])[0]
                 if os.path.isfile(rdict['mcmc']):
                     logger.error('{} exists. Not re-runing calcsfh.'.format(rdict['sfh']))
                 else:

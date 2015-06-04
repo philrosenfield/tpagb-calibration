@@ -124,62 +124,105 @@ def load_observation(filename, colname1, colname2):
         mag1, mag2 = np.loadtxt(filename)
     return mag1, mag2
 
-def load_photometry(lf_file, observation, filter1='F814W_cor',
-                     filter2='F160W_cor', col1='MAG2_ACS',
-                     col2='MAG4_IR', yfilter='I', flatten=True,
-                     optfake=None, comp_frac=None, nirfake=None):
-    
+def load_from_lf_file(lf_file, filter1='F814W_cor', filter2='F160W_cor',
+                      flatten=True):
+
     # load models
     lf_dict = load_lf_file(lf_file)
     
     # idx_norm are the normalized indices of the simulation set to match RGB
     idx_norm = lf_dict['idx_norm']
-    
-    # nmodels corresponds to the number of trilegal simulations that are in
-    # the lf_file.
-    nmodels = len(idx_norm)
+    nmodels = 1
     
     # take all the scaled cmds in the file together and make an average hess
 
     smag1 = np.array([lf_dict[filter1][i][idx_norm[i]]
-                            for i in range(nmodels)])
+                            for i in range(len(idx_norm))])
     smag2 = np.array([lf_dict[filter2][i][idx_norm[i]]
-                            for i in range(nmodels)])
+                            for i in range(len(idx_norm))])
     if flatten:
         smag1 = np.concatenate(smag1)
         smag2 = np.concatenate(smag2)
-    
-    # load observation
-    mag1, mag2 = load_observation(observation, col1, col2)
+        nmodels = len(idx_norm)
+    return smag1, smag2, nmodels
 
-    # for opt_nir_matched data, take the obs limits from the data
-    inds, = np.nonzero((smag1 <= mag1.max()) & (smag2 <= mag2.max()) &
-                       (smag1 >= mag1.min()) & (smag2 >= mag2.min()))
+
+def load_photometry(lf_file, observation, filter1='F814W_cor',
+                     filter2='F160W_cor', col1='MAG2_ACS',
+                     col2='MAG4_IR', yfilter='I', flatten=True,
+                     optfake=None, comp_frac=None, nirfake=None):
+    """
+    Load photometry from a lf_file (see load_lf_file) and observation
+    (see load_observation) will also cut lf_file to be within observation mags
+    and cut both to be within comp_frac. 
+    If flatten is true, will concatenate all mags from the lf_file.
+    If it's false, mags coming back will be an array of arrays.
+    """
+    def limit_mags(mag1, mag2, smag1, smag2, comp2=90.):
+        # for opt_nir_matched data, take the obs limits from the data
+        inds, = np.nonzero((smag1 <= mag1.max()) & (smag2 <= mag2.max()) &
+                           (smag1 >= mag1.min()) & (smag2 >= mag2.min()))
+        
+        sinds, = np.nonzero((smag2 <= comp2))# & (smag1 <= comp1))
+        inds = list(set(sinds) & set(inds))
+        smag1 = smag1[inds]
+        smag2 = smag2[inds]
+
+        oinds, = np.nonzero((mag2 <= comp2))# & (mag1 <= comp1))
+        mag1 = mag1[oinds]
+        mag2 = mag2[oinds]
+
+        return mag1, mag2, smag1, smag2
+    
+    smag1, smag2, nmodels = load_from_lf_file(lf_file, flatten=flatten,
+                                              filter1=filter1, filter2=filter2)
+    
     if comp_frac is not None:
         if optfake is None:
             target = os.path.split(lf_file)[1].split('_')[0]
             optfake, nirfake = find_fakes(target)
-        _, comp1 = limiting_mag(optfake, comp_frac)
+        #_, comp1 = limiting_mag(optfake, comp_frac)
         _, comp2 = limiting_mag(nirfake, comp_frac)
-        sinds, = np.nonzero((smag2 <= comp2))# & (smag1 <= comp1))
-        inds = list(set(sinds) & set(inds))
-        oinds, = np.nonzero((mag2 <= comp2))# & (mag1 <= comp1))
-        mag1 = mag1[oinds]
-        mag2 = mag2[oinds]
+
+    # load observation
+    try:
+        mag1, mag2 = load_observation(observation, col1, col2)
+    except:
+        # maybe send another LF file?
+        mag1, mag2, nmodels = load_from_lf_file(observation, flatten=flatten)
+        inds, = np.nonzero((np.abs(mag1) < 90) & (np.abs(mag2) < 90))
+        mag1 = mag1[inds]
+        mag2 = mag2[inds]
+
+    if flatten:
+        mag1s, mag2s, smag1, smag2 = limit_mags(mag1, mag2, smag1, smag2, comp2)
+    else:
+        mag1s = []
+        mag2s = []
+        smag1s = []
+        smag2s = []
         
-    color = mag1 - mag2
+        for i in range(len(smag1)):
+            _mag1, _mag2, _smag1, _smag2 = limit_mags(mag1, mag2, smag1[i],
+                                                      smag2[i], comp2)
+            mag1s.append(_mag1)
+            mag2s.append(_mag2)
+            smag1s.append(_smag1)
+            smag2s.append(_smag2)
+        mag1s = np.array(mag1s)
+        mag2s = np.array(mag2s)
+        smag1 = np.array(smag1s)
+        smag2 = np.array(smag2s)
 
-    smag1 = smag1[inds]
-    smag2 = smag2[inds]
-
+    color = mag1s - mag2s
     scolor = smag1 - smag2
 
     # set the yaxis
     symag = smag2
-    ymag = mag2
+    ymag = mag2s
     if yfilter.upper() != 'I':
         symag = smag1
-        ymag = mag1
+        ymag = mag1s
     
     return color, ymag, scolor, symag, nmodels
 

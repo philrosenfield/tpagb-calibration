@@ -319,7 +319,7 @@ def main(argv):
     parser.add_argument('-m', '--maglimits', type=str, default=None,
                         help='comma separated faint and bright yaxis mag limits')
 
-    parser.add_argument('-o', '--colnames', type=str, default='MAG2_ACS,MAG4_IR',
+    parser.add_argument('-q', '--colnames', type=str, default='MAG2_ACS,MAG4_IR',
                         help='comma separated column names in observation data')
 
     parser.add_argument('-p', '--lfplot', action='store_true',
@@ -343,7 +343,7 @@ def main(argv):
     parser.add_argument('observation', type=str,
                         help='photometry to normalize against')
 
-    parser.add_argument('simpop', type=str, nargs='*',
+    parser.add_argument('simpop', nargs='*',
                         help='trilegal catalog(s) or directory if -d flag')
 
     # parser: args.observation is photometry
@@ -383,9 +383,15 @@ def main(argv):
     extra_str = ''
     if args.ast_cor:
         extra_str += '_ast_cor'
-
+        f1 = '{}_cor'.format(filter1)
+        f2 = '{}_cor'.format(filter2)
+    else:
+        f1 = filter1
+        f2 = filter2
+        
     kws = {'filter1': filter1, 'filter2': filter2, 'ast_cor': args.ast_cor}
 
+        
     for tricat in tricats:
         logger.debug('normalizing: {}'.format(tricat))
         sgal, narratio_dict = do_normalization(yfilter=args.yfilter,
@@ -396,17 +402,19 @@ def main(argv):
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots()
             mag1, mag2 = load_observation(args.observation, col1, col2)
-            ax.plot(mag1-mag2, mag2, '.', color='k')
-            ax.plot(sgal.data[filter1] - sgal.data[filter2],
-                    sgal.data[filter2], '.')
-            ax.plot(sgal.data[filter1][narratio_dict['idx_norm']] - \
-                    sgal.data[filter2][narratio_dict['idx_norm']],
-                    sgal.data[filter2][narratio_dict['idx_norm']], '.')
-            ax.plot(sgal.data[filter1][narratio_dict['sgal_rgb']] - \
-                    sgal.data[filter2][narratio_dict['sgal_rgb']],
-                    sgal.data[filter2][narratio_dict['sgal_rgb']], '.')
-            ax.set_ylim(ax.get_ylim()[::-1])
-    
+            
+            ax.plot(sgal.data[f1] - sgal.data[f2],
+                    sgal.data[f2], '.', label='sim')
+            ax.plot(mag1-mag2, mag2, '.', label='data')
+            ax.plot(sgal.data[f1][narratio_dict['idx_norm']] - \
+                    sgal.data[f2][narratio_dict['idx_norm']],
+                    sgal.data[f2][narratio_dict['idx_norm']], '.', label='scaled sim')
+            ax.plot(sgal.data[f1][narratio_dict['sgal_rgb']] - \
+                    sgal.data[f2][narratio_dict['sgal_rgb']],
+                    sgal.data[f2][narratio_dict['sgal_rgb']], '.', label='sim rgb')
+            ax.set_ylim(mag2.max()+0.2, mag2.min()-0.2)
+            ax.set_xlim(np.min(mag1-mag2)-0.1, np.max(mag1-mag2)+0.1)
+            plt.legend(loc='best', numpoints=1)
             plt.savefig(sgal.name + 'diag.png')
         except:
             pass

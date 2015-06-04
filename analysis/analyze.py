@@ -168,13 +168,13 @@ def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.
         # each gaussian shifted to the proper mag bin (1 mag width wide)
         ax.plot(x, -1. * mdiff * pdf_individual[:, 1] / np.max(pdf) + mseps[j], '--g')
         ax.plot(x, -1. * mdiff * pdf_individual[:, 0] / np.max(pdf) + mseps[j], '--k')
-
+        [ax.vlines(v, *ax.get_ylim()) for v in gmix.means_]
         #ax.plot(x, -1. * np.diff(mag_bins)[j] * pdf_individual[:, 1] / np.max(pdf) + mag_bins[i], '--g')
         #ax.plot(x, -1. * np.diff(mag_bins)[j] * pdf_individual[:, 0] / np.max(pdf) + mag_bins[i], '--k')
         #ax.set_title(mag_bins[i])
         # full probablity
         #ax.plot(x, -1. * np.exp(gmix.score_samples(x)[0])/np.max(np.exp(gmix.score_samples(x)[0])) + mag_bins[i], 'r') # draw GMM
-        ax.plot(x, -1. * mdiff * np.exp(gmix.score_samples(x)[0])/np.max(np.exp(gmix.score_samples(x)[0])) + mseps[j], 'r') # draw GMM
+        ax.plot(x, -1. * mdiff * pdf/np.max(pdf) + mseps[j], 'r') # draw GMM
         
         #isect = np.argmin(np.abs(pdf_individual[:, 1] - pdf_individual[:, 0]))
         isect = rsp.utils.find_peaks(pdf)['minima_locations']

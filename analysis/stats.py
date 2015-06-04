@@ -39,24 +39,7 @@ def chi2(obs, model):
     pval = 1. - stats.chi2.cdf(chisq, N)
     return chisq, pval
 
-
-def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
-                col1='MAG2_ACS', col2='MAG4_IR', dcol=0.1, dmag=0.1,
-                yfilter='I', narratio_file=None, make_plot=True,
-                outfile='compare_hess.txt'):
-    if not os.path.isfile(outfile):
-        header = '# target full_prob tpagb_prob notpagb_prob nmodels \n'
-        with open(outfile, 'w') as out:
-            out.write(header)
-
-    linefmt = '{:15s} {:.3f} {:.3f} {:.3f} {} \n'
-    target = os.path.split(lf_file)[1].split('_')[0]
-    
-    # load data
-    color, ymag, scolor, symag, nmodels = \
-        load_photometry(lf_file, observation, filter1=filter1, filter2=filter2,
-                         col1=col1, col2=col2, yfilter=yfilter,
-                         comp_frac=0.9)
+def hess_stats(target, color, ymag, scolor, symag, dcol, dmag, nmodels=1):
     # apply cmd cuts
     # just the tpagb:
     itpagb = get_itpagb(target, color, ymag)
@@ -70,68 +53,99 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
     icmd = [a for a in iall if not a in itpagb]
     sicmd = [a for a in siall if not a in sitpagb]
     # could also single out non-rheb and non-tpagb ...
+    
+    probs = []
+    extents = []
+    Zs = []
 
     for i, (inds, sinds) in enumerate(zip([itpagb, iall, icmd],
                                           [sitpagb, siall, sicmd])):
-        cbins = np.arange(*minmax(scolor[sinds], color[inds]), step=dcol)
-        mbins = np.arange(*minmax(symag[sinds], ymag[inds]), step=dmag)
+        if len(inds) > 0:
+            cbins = np.arange(*minmax(scolor[sinds], color[inds]), step=dcol)
+            mbins = np.arange(*minmax(symag[sinds], ymag[inds]), step=dmag)
 
-        shess, xe, ye = binned_statistic_2d(scolor[sinds], symag[sinds],
-                                            symag[sinds], 'count',
-                                            bins=[cbins, mbins])
+            shess, xe, ye = binned_statistic_2d(scolor[sinds], symag[sinds],
+                                                symag[sinds], 'count',
+                                                bins=[cbins, mbins])
         
-        # get the mean hess if many models are co-added.
-        shess /= float(nmodels)
+            # get the mean hess if many models are co-added.
+            shess /= float(nmodels)
         
-        hess, xe, ye = binned_statistic_2d(color[inds], ymag[inds], ymag[inds],
-                                           'count', bins=[cbins, mbins])
+            hess, xe, ye = binned_statistic_2d(color[inds], ymag[inds], ymag[inds],
+                                               'count', bins=[cbins, mbins])
+            extent = [xe[0], xe[-1], ye[-1], ye[0]]
+            prob, pct_dif, sig = rsp.match.likelihood.stellar_prob(hess, shess)
+    
+            dif = hess - shess
+        else:
+            prob = np.nan
+            extent = [0, 1, 0, 1]
+            hess.T, shess.T, dif.T, sig.T = np.array([]), np.array([]), np.array([]), np.array([])
+            
+        probs.append(prob)
+        extents.append(extent)
+        Zs.append([hess.T, shess.T, dif.T, sig.T])
 
-        prob, pct_dif, sig = rsp.match.likelihood.stellar_prob(hess, shess)
+    return probs, extents, Zs
 
-        dif = hess - shess
-        extent = [xe[0], xe[-1], ye[-1], ye[0]]
-        labels = ['data', 'model', r'$\rm{{data}} - \rm{{model}}$',
-                  r'$\chi^2={:.2f}$'.format(prob)]
+def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
+                col1='MAG2_ACS', col2='MAG4_IR', dcol=0.1, dmag=0.1,
+                yfilter='I', narratio_file=None, make_plot=True,
+                outfile='compare_hess.txt', flatten=True, agb_mod='agb_mod'):
+    
+    if not os.path.isfile(outfile):
+        header = '# target {0}_prob {0}_tpagb_prob {0}_notpagb_prob nmodels \n'.format(agb_mod.split('_')[-1])
+        with open(outfile, 'w') as out:
+            out.write(header)
+    linefmt = '{:15s} {:.3f} {:.3f} {:.3f} {} \n'
+    
+    target = os.path.split(lf_file)[1].split('_')[0]
+    
+    # load data
+    color, ymag, scolor, symag, nmodels = \
+        load_photometry(lf_file, observation, filter1=filter1, filter2=filter2,
+                         col1=col1, col2=col2, yfilter=yfilter,
+                         comp_frac=0.9, flatten=flatten)
+    if flatten:
+        color = [color]
+        ymag = [ymag]
+        scolor = [scolor]
+        symag = [symag]
+        nmodels = 1
 
+    for i in range(len(color)):
+        probs, extents, Zs = hess_stats(target, color[i], ymag[i], scolor[i], symag[i], dcol,
+                                        dmag, nmodels=nmodels)
+
+        line = linefmt.format(target, probs[1], probs[0], probs[2], nmodels)
+        with open(outfile, 'a') as out:
+            out.write(line)
+        logger.info('wrote to {}'.format(outfile))
+
+    if make_plot:
+        fmt0 = r'$N_{{\rm TP-AGB}}={:.0f}$'
+        fmt1 = r'$N_{{\rm RGB}}={:.0f}\ \frac{{N_{{TP-AGB}}}}{{N_{{RGB}}}}={:.3f}\pm{:.3f}$'
+        labels = ['data', 'model', r'$\rm{{data}} - \rm{{model}}$', 'sig']
+        
         if narratio_file is not None:
             nrgb, nagb, dratio, dratio_err, mrgb, magb, mratio, mratio_err = \
                 narratio(narratio_file, target)
+            labels[0] = fmt1.format(nrgb, dratio, dratio_err)
+            labels[1] = fmt1.format(mrgb, mratio, mratio_err)
 
-        if i == 0:
-            if narratio_file is None:
-                nagb = np.nansum(hess)
-                magb = np.nansum(shess)
-            tpagb_prob = prob
-            fmt = r'$N_{{\rm TP-AGB}}={}$'
-            labels[0] = fmt.format(nagb)
-            labels[1] = fmt.format(magb)
-            figname = lf_file.replace('lf', 'tpagb_hess').replace('.dat', '.png')
-            
-        if i == 1:
-            full_prob = prob
-            figname = lf_file.replace('lf', 'hess').replace('.dat', '.png')
-            if narratio_file is not None:
-                fmt = r'$N_{{\rm RGB}}={}\ \frac{{N_{{TP-AGB}}}}{{N_{{RGB}}}}={:.3f}\pm{:.3f}$'
-                labels[0] = fmt.format(nrgb, dratio, dratio_err)
-                labels[1] = fmt.format(mrgb, mratio, mratio_err)
-        
-        if i == 2:
-            notpgab_prob = prob
-            figname = lf_file.replace('lf', 'notpagb_hess').replace('.dat', '.png')
-            labels = ['data', 'model', r'$\rm{{data}} - \rm{{model}}$',
-                      r'$\chi^2={:.2f}$'.format(prob)]
 
-        if make_plot:
-            grid = rsp.match.graphics.match_plot([hess.T, shess.T, dif.T, sig.T],
-                                                 extent, labels=labels)
+        figname = lf_file.replace('.dat', '.png')
+        fignames = [figname.replace('lf', 'tpagb_hess'),
+                    figname.replace('lf', 'hess'),
+                    figname.replace('lf', 'notpagb_hess')]
+
+        for i in range(len(probs)):
+            labels[-1] = r'$\chi^2={:.2f}$'.format(probs[i])
+            grid = rsp.match.graphics.match_plot(Zs[i], extents[i], labels=labels)
             [ax.set_ylabel(r'$\rm F160W$') for ax in grid.axes_column[0]]
             [ax.set_xlabel(r'$\rm F160W - F814W$') for ax in grid.axes_row[1]]
-            plt.savefig(figname)
+            plt.savefig(fignames[i])
         
-    line = linefmt.format(target, tpagb_prob, full_prob, notpgab_prob, nmodels)
-    with open(outfile, 'a') as out:
-        out.write(line)
-    logger.info('wrote to {}'.format(outfile))
       
 # 1d analysis - per galaxy
 # see compare_to_gal in plotting.py
@@ -190,6 +204,9 @@ def main(argv):
     parser.add_argument('-y', '--yfilter', type=str, default='I',
                         help='V or I filter to use as y axis of CMD')
 
+    parser.add_argument('-f', '--flatten', action='store_false',
+                        help='treat model LFs individually (not mean)')
+
     parser.add_argument('lf_file', type=str,
                         help='luminosity function file')
 
@@ -209,7 +226,7 @@ def main(argv):
     compare_hess(args.lf_file, args.observation, filter1=filter1,
                  filter2=filter2, col1=col1, col2=col2, dcol=dcol, dmag=dmag,
                  yfilter=args.yfilter, narratio_file=args.narratio_file,
-                 outfile=outfile)
+                 outfile=outfile, agb_mod=args.agb_mod, flatten=args.flatten)
     
     # just use plotting.main...
     #compare_to_gal(args.lf_file, args.observation, filter1=filter1,
