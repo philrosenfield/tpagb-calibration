@@ -187,6 +187,7 @@ class StarFormationHistories(object):
         if random_z is False:
             mh = self.data.mh
             self.interp_null_values()
+            mh = self.mh_interp
             #mh[mh == 0.0] = np.nan
         else:
             # HACK. Not using mh errs from MATCH. Untrustworthy.
