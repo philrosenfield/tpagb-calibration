@@ -210,7 +210,7 @@ class StarFormationHistories(object):
                     # this is just a waste of lines in TRILEGAL
                     continue
                 if mh[i] == 0:
-                    print 'should Z=0.02?'
+                    print('should Z=0.02?')
                     import pdb; pdb.set_trace()
                 out.write(fmt % (age1a[i], 0.0, metalicity[i], zdisp[i]))
                 out.write(fmt % (age1p[i], sfr[i], metalicity[i], zdisp[i]))
