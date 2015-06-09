@@ -189,13 +189,13 @@ def main(argv):
     description = ("stats...")
     parser = argparse.ArgumentParser(description=description)
 
-    parser.add_argument('-o', '--colnames', type=str, default='MAG2_ACS,MAG4_IR',
+    parser.add_argument('-c', '--colnames', type=str, default='MAG2_ACS,MAG4_IR',
                         help='comma separated column names in observation data')
 
     parser.add_argument('-s', '--scolnames', type=str, default='F814W_cor,F160W_cor',
                         help='comma separated column names in trilegal catalog')
 
-    parser.add_argument('-d', '--dcolmag', type=str, default='0.1,0.1',
+    parser.add_argument('-d', '--dcolmag', type=str, default='0.05,0.1',
                         help='comma separated dcol, dmag for binning')
 
     parser.add_argument('-n', '--narratio_file', type=str,
@@ -207,6 +207,12 @@ def main(argv):
     parser.add_argument('-f', '--flatten', action='store_false',
                         help='treat model LFs individually (not mean)')
 
+    parser.add_argument('-p', '--make_plot', action='store_false',
+                        help='do not save plots')
+
+    parser.add_argument('-o', '--outfile', type=str, default='default',
+                        help='outfile name')
+    
     parser.add_argument('lf_file', type=str,
                         help='luminosity function file')
 
@@ -216,26 +222,33 @@ def main(argv):
     parser.add_argument('agb_mod', type=str,
                         help='agb model name')
 
+
     args = parser.parse_args(argv)
-    
+    print args
     col1, col2 = args.colnames.split(',')
     filter1, filter2 = args.scolnames.split(',')
     dcol, dmag = map(float, args.dcolmag.split(','))
-    outfile = 'compare_hess_{}.txt'.format(args.agb_mod)
-    
+    if args.outfile == 'default':
+        args.outfile = 'compare_hess_{}.txt'.format(args.agb_mod)
+    else:
+        args.outfile = args.outfile.strip()
+
     compare_hess(args.lf_file, args.observation, filter1=filter1,
                  filter2=filter2, col1=col1, col2=col2, dcol=dcol, dmag=dmag,
                  yfilter=args.yfilter, narratio_file=args.narratio_file,
-                 outfile=outfile, agb_mod=args.agb_mod, flatten=args.flatten)
+                 outfile=args.outfile, agb_mod=args.agb_mod, flatten=args.flatten,
+                 make_plot=args.make_plot)
     
     # just use plotting.main...
     #compare_to_gal(args.lf_file, args.observation, filter1=filter1,
     #               filter2=filter2, col1=col1, col2=col2,
     #               dmag=dmag, narratio_file=args.narratio_file, make_plot=True,
-    #               regions_kw=None, agb_mod=args.agb_mod)  
+    #               regions_kw=None, agb_mod=args.agb_mod)
 
 
-def chi2plot(chi2table, outfile_loc=None):
+    
+
+def chi2plot(chi2table, outfile_loc=None, flatten=True):
     """
     this works by pasting tables together and deleting the target names
     (except for the first column) and nmodel columns.
@@ -253,11 +266,24 @@ def chi2plot(chi2table, outfile_loc=None):
     cols = [u'#E24A33', u'#348ABD', u'#988ED5', u'#777777', u'#FBC15E',
             u'#8EBA42', u'#FFB5B8']
     
-    assert len(cols) >= nagb_mods, 'need more colors!'
+    all_targets = chi2tab['target']
+    targets, uinds = np.unique(chi2tab['target'], True)
     
-    offsets = np.linspace(0, 1, len(chi2tab['target']))
-    targets = chi2tab['target']
+    offsets = np.linspace(0, 1, len(targets))
     tnames = ['$%s$' % t.replace('-deep', '').replace('-halo-6', '').replace('-', '\!-\!').upper() for t in targets]
+    nmeasurements = False
+    if len(targets) * nagb_mods > len(all_targets):
+        uinds = np.append(uinds, len(chi2tab['target']))
+        isets = [np.arange(uinds[i], uinds[i+1]) for i in range(len(uinds)-1)]
+        if flatten:
+            print 'take a mean'
+        else:
+            nmeasurements = True
+            assert len(cols) >= len(targets), 'need more colors!'
+            code
+    else:
+        assert len(cols) >= nagb_mods, 'need more colors!'
+
     # key plots still missing:
     # chi2 versus fraction of y<1 Gyr ages? and agains metallicity?
     # or against both, e.g chi2 X age with dots coloured according to metallicity
@@ -267,8 +293,11 @@ def chi2plot(chi2table, outfile_loc=None):
         fig, axs = plt.subplots(ncols=3, sharex=True, sharey=False,
                                 figsize=(15, 6))
         isort = np.argsort(chi2tab[ycol])
-        axs[0].plot(chi2tab['chi2eff'][isort], chi2tab[ycol][isort], 'o', color='k',
-                label='chi2eff')
+        try:
+            axs[0].plot(chi2tab['chi2eff'][isort], chi2tab[ycol][isort], 'o', color='k',
+                        label='chi2eff')
+        except:
+            pass
         for colmn in probs:
             col = cols[agb_mods.index(colmn.split('_')[0])]
             iax = 0
@@ -297,6 +326,8 @@ def chi2plot(chi2table, outfile_loc=None):
 
     for ioff, colmn in enumerate(probs):
         col = cols[agb_mods.index(colmn.split('_')[0])]
+        if nmeasurements:
+            col = cols[target.index(3)] ### 
         iax = 0
         if 'tpagb' in colmn:
             iax = 1
@@ -310,10 +341,10 @@ def chi2plot(chi2table, outfile_loc=None):
         
         ax.hlines(np.median(chi2tab[colmn]), -0.1, 1.1, color=col,
                   label=colmn.split('_')[0], alpha=0.5, lw=2)
-        ax.xaxis.set_ticks(offsets)
-        ax.set_xticklabels(tnames)
-        [t.set_rotation(30) for t in ax.get_xticklabels()]
-        #plt.tick_params(labelsize=16)
+    ax.xaxis.set_ticks(offsets)
+    ax.set_xticklabels(tnames)
+    [t.set_rotation(30) for t in ax.get_xticklabels()]
+    #plt.tick_params(labelsize=16)
     fig.subplots_adjust(hspace=0.1, bottom=0.15, left=0.1, right=0.95)
     
     xlims = ax.get_xlim()

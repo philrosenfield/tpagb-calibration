@@ -144,7 +144,7 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
     rdict = {'calcsfh': calcsfh, 'zcombine': zcombine,'hybridmc': hybridmc}
     # calcsfh
     # calcsfh, param, match, fake, out, scrn
-    cmd1 = '{calcsfh} {param} {match} {fake} {out} -PARSEC -mcdata -kroupa -zinc -sub=v2 > {scrn}'
+    cmd1 = '{calcsfh} {param} {match} {fake} {out} -PARSEC -mcdata -kroupa -zinc -sub=v1.2s_lt > {scrn}'
     # zcombine
     #zcombine, out, sfh
     cmd2 = '{zcombine} {out} -bestonly > {sfh}'
@@ -254,7 +254,7 @@ def main(argv):
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     
-    logger.info('command:', argv)
+    logger.info('command: {}'.format(argv))
 
     if args.simplify:
         uniform_filenames(prefs, dry_run=args.dry_run)

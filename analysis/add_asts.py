@@ -35,10 +35,11 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
     logger.info('fake files found: {}'.format(fakes))
     asts = [rsp.ASTs(f) for f in fakes]
     logger.debug('{}'.format(trilegal_catalogs))
+
     for i, trilegal_catalog in enumerate(trilegal_catalogs):
         logger.info('working on {}'.format(trilegal_catalog))
         header = open(trilegal_catalog, 'r').readline()
-        
+
         sgal = rsp.SimGalaxy(trilegal_catalog)
         # "overwrite" (append columns) to the existing catalog by default
         if outfmt == 'default':
@@ -48,8 +49,10 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
         # do the ast corrections
         for ast in asts:
             if ast.filter1 + '_cor' in header.split():
+                logger.debug('{}_cor already in header'.format(ast.filter1))
                 continue
             if ast.filter2 + '_cor' in header.split():
+                logger.debug('{}_cor already in header'.format(ast.filter2))
                 continue
             rsp.ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
                                  outfile=outfile, diag_plot=diag_plot,
@@ -71,7 +74,7 @@ def main(argv):
                                                   trilegal catalog")
 
     parser.add_argument('-d', '--directory', action='store_true',
-                        help='opperate on *.dat files in a directory')
+                        help='opperate on *_???.dat files in a directory')
 
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose mode')

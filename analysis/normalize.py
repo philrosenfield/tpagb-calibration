@@ -401,19 +401,25 @@ def main(argv):
         try:
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots()
-            mag1, mag2 = load_observation(args.observation, col1, col2)
             
+            kw = {'alpha': 0.3, 'mec': 'none'}
             ax.plot(sgal.data[f1] - sgal.data[f2],
-                    sgal.data[f2], '.', label='sim')
+                    sgal.data[f2], '.', label='sim', **kw)
+            
+            mag1, mag2 = load_observation(args.observation, col1, col2)
             ax.plot(mag1-mag2, mag2, '.', label='data')
-            ax.plot(sgal.data[f1][narratio_dict['idx_norm']] - \
-                    sgal.data[f2][narratio_dict['idx_norm']],
-                    sgal.data[f2][narratio_dict['idx_norm']], '.', label='scaled sim')
-            ax.plot(sgal.data[f1][narratio_dict['sgal_rgb']] - \
-                    sgal.data[f2][narratio_dict['sgal_rgb']],
-                    sgal.data[f2][narratio_dict['sgal_rgb']], '.', label='sim rgb')
-            ax.set_ylim(mag2.max()+0.2, mag2.min()-0.2)
-            ax.set_xlim(np.min(mag1-mag2)-0.1, np.max(mag1-mag2)+0.1)
+    
+            ind = narratio_dict['idx_norm']
+            ax.plot(sgal.data[f1][ind] - sgal.data[f2][ind],
+                    sgal.data[f2][ind], '.', label='scaled sim', **kw)
+            
+            ind = narratio_dict['sgal_rgb']
+            ax.plot(sgal.data[f1][ind] - sgal.data[f2][ind],
+                    sgal.data[f2][ind], '.', label='sim rgb', **kw)
+            
+            ax.set_ylim(mag2.max() + 0.2, mag2.min() - 0.2)
+            ax.set_xlim(np.min(mag1 - mag2) - 0.1, np.max(mag1 - mag2) + 0.1)
+    
             plt.legend(loc='best', numpoints=1)
             plt.savefig(sgal.name + 'diag.png')
         except:

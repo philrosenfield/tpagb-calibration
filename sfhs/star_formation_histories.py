@@ -186,6 +186,7 @@ class StarFormationHistories(object):
 
         if random_z is False:
             mh = self.data.mh
+            #mh[mh == 0.0] = np.nan
         else:
             # HACK. Not using mh errs from MATCH. Untrustworthy.
             # Shifting instead from within dispersion.
@@ -208,6 +209,9 @@ class StarFormationHistories(object):
                 if sfr[i] == 0:
                     # this is just a waste of lines in TRILEGAL
                     continue
+                if mh[i] == 0:
+                    print 'should Z=0.02?'
+                    import pdb; pdb.set_trace()
                 out.write(fmt % (age1a[i], 0.0, metalicity[i], zdisp[i]))
                 out.write(fmt % (age1p[i], sfr[i], metalicity[i], zdisp[i]))
                 out.write(fmt % (age2a[i], sfr[i], metalicity[i], zdisp[i]))

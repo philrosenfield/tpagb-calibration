@@ -187,12 +187,12 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
     # load observation
     try:
         mag1, mag2 = load_observation(observation, col1, col2)
+        lf2 = False
     except:
         # maybe send another LF file?
-        mag1, mag2, nmodels = load_from_lf_file(observation, flatten=flatten)
-        inds, = np.nonzero((np.abs(mag1) < 90) & (np.abs(mag2) < 90))
-        mag1 = mag1[inds]
-        mag2 = mag2[inds]
+        mag1, mag2, nmodels = load_from_lf_file(observation, flatten=flatten,
+                                                filter1=filter1, filter2=filter2)
+        lf2 = True
 
     if flatten:
         mag1s, mag2s, smag1, smag2 = limit_mags(mag1, mag2, smag1, smag2, comp2)
@@ -203,7 +203,13 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
         smag2s = []
         
         for i in range(len(smag1)):
-            _mag1, _mag2, _smag1, _smag2 = limit_mags(mag1, mag2, smag1[i],
+            m1 = mag1
+            m2 = mag2
+            if lf2:
+                m1 = mag1[0]
+                m2 = mag2[0]
+            
+            _mag1, _mag2, _smag1, _smag2 = limit_mags(m1, m2, smag1[i],
                                                       smag2[i], comp2)
             mag1s.append(_mag1)
             mag2s.append(_mag2)
