@@ -190,7 +190,7 @@ class StarFormationHistories(object):
             mh = self.mh_interp
             #mh[mh == 0.0] = np.nan
         else:
-            # HACK. Not using mh errs from MATCH. Untrustworthy.
+            # Not using mh errs from MATCH. Untrustworthy.
             # Shifting instead from within dispersion.
             self.interp_null_values()
             disp = np.median(self.data.mh_disp[np.nonzero(self.data.mh_disp)])/2.

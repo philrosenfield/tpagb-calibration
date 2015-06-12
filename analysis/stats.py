@@ -74,17 +74,18 @@ def hess_stats(target, color, ymag, scolor, symag, dcol, dmag, nmodels=1):
             hess, xe, ye = binned_statistic_2d(color[inds], ymag[inds], ymag[inds],
                                                'count', bins=[cbins, mbins])
             extent = [xe[0], xe[-1], ye[-1], ye[0]]
-            prob, pct_dif, sig = rsp.match.likelihood.stellar_prob(hess, shess)
-    
+            _, pct_dif, sig = rsp.match.likelihood.stellar_prob(hess, shess)
+            #import pdb; pdb.set_trace()
+            prob = np.sum(np.abs(pct_dif[np.isfinite(pct_dif)]))/float(len(hess.flatten()))        
             dif = hess - shess
         else:
             prob = np.nan
             extent = [0, 1, 0, 1]
-            hess.T, shess.T, dif.T, sig.T = np.array([]), np.array([]), np.array([]), np.array([])
-            
+            hess, shess, pct_dif, sig = np.array([]), np.array([]), np.array([]), np.array([])
+        print prob
         probs.append(prob)
         extents.append(extent)
-        Zs.append([hess.T, shess.T, dif.T, sig.T])
+        Zs.append([hess.T, shess.T, pct_dif.T, sig.T])
 
     return probs, extents, Zs
 
@@ -125,7 +126,7 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
     if make_plot:
         fmt0 = r'$N_{{\rm TP-AGB}}={:.0f}$'
         fmt1 = r'$N_{{\rm RGB}}={:.0f}\ \frac{{N_{{TP-AGB}}}}{{N_{{RGB}}}}={:.3f}\pm{:.3f}$'
-        labels = ['data', 'model', r'$\rm{{data}} - \rm{{model}}$', 'sig']
+        labels = ['data', 'model', r'$\% diff.$', 'sig.']
         
         if narratio_file is not None:
             nrgb, nagb, dratio, dratio_err, mrgb, magb, mratio, mratio_err = \
@@ -140,7 +141,7 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
                     figname.replace('lf', 'notpagb_hess')]
 
         for i in range(len(probs)):
-            labels[-1] = r'$\chi^2={:.2f}$'.format(probs[i])
+            labels[-2] = r'$mean \% diff={:.2f}$'.format(probs[i])
             grid = rsp.match.graphics.match_plot(Zs[i], extents[i], labels=labels)
             [ax.set_ylabel(r'$\rm F160W$') for ax in grid.axes_column[0]]
             [ax.set_xlabel(r'$\rm F160W - F814W$') for ax in grid.axes_row[1]]
@@ -288,7 +289,7 @@ def chi2plot(chi2table, outfile_loc=None, flatten=True):
     # chi2 versus fraction of y<1 Gyr ages? and agains metallicity?
     # or against both, e.g chi2 X age with dots coloured according to metallicity
     
-    ycols = [y for y in chi2tab.dtype.names[1:] if not y.endswith('prob')]
+    ycols = []#[y for y in chi2tab.dtype.names[1:] if not y.endswith('prob')]
     for ycol in ycols:
         fig, axs = plt.subplots(ncols=3, sharex=True, sharey=False,
                                 figsize=(15, 6))
@@ -310,7 +311,7 @@ def chi2plot(chi2table, outfile_loc=None, flatten=True):
                     label=colmn.split('_')[0])
         for i in range(len(targets)):
             ax.annotate(tnames[i], (0, chi2tab[ycol][i]))
-        [ax.set_xlabel('$\chi^2$', fontsize=20) for ax in axs]
+        [ax.set_xlabel('$\% diff$', fontsize=20) for ax in axs]
         [ax.set_ylabel('${}$'.format(ycol), fontsize=20) for ax in axs]
         
         axs[0].legend(loc=0, numpoints=1)
@@ -337,20 +338,22 @@ def chi2plot(chi2table, outfile_loc=None, flatten=True):
         
         #ax.errorbar(offsets[ioff], val, yerr=errval, marker=sym, color=col, ms=12,
         #            mfc=mfc, ecolor='black', mew=1.5, elinewidth=2)
-        ax.scatter(offsets, chi2tab[colmn], marker='o', s=60, c=col)
+        ax.scatter(offsets, chi2tab[colmn], marker='o', s=60, c=col, alpha=0.5,
+                   edgecolors='none')
         
         ax.hlines(np.median(chi2tab[colmn]), -0.1, 1.1, color=col,
                   label=colmn.split('_')[0], alpha=0.5, lw=2)
-    ax.xaxis.set_ticks(offsets)
-    ax.set_xticklabels(tnames)
-    [t.set_rotation(30) for t in ax.get_xticklabels()]
+
+        ax.xaxis.set_ticks(offsets)
+        ax.set_xticklabels(tnames)
+        [t.set_rotation(30) for t in ax.get_xticklabels()]
     #plt.tick_params(labelsize=16)
     fig.subplots_adjust(hspace=0.1, bottom=0.15, left=0.1, right=0.95)
     
     xlims = ax.get_xlim()
     off = np.diff(offsets)[0]
     ax.set_xlim(xlims[0] - off / 2, xlims[1] + off / 2)
-    [ax.set_ylabel('$\chi^2$', fontsize=20) for ax in axs]
+    [ax.set_ylabel('$\% diff$', fontsize=20) for ax in axs]
     #[ax.set_ylim(0, 25) for ax in axs[:, 0]]
     #[ax.set_ylim(0, 10) for ax in axs[:, 1]]
 

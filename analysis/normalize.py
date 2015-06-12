@@ -197,7 +197,9 @@ def load_table(filename, target, optfilter1=None, opt=True):
     return tbl[indx]
 
 
-def parse_regions(args):
+def parse_regions(args):    
+    if not hasattr(args, 'table'):
+        args.table = None
     # need the following in opt and nir
     colmin, colmax = None, None
     magfaint, magbright = None, None
@@ -214,7 +216,7 @@ def parse_regions(args):
         row = load_table(args.table, args.target, optfilter1=args.optfilter1,
                          opt=opt)
         if args.offset is None or row['mag_by_eye'] != 0:
-            logger.info('mags to norm to rgb are set by eye from table')
+            logger.debug('mags to norm to rgb are set by eye from table')
             magbright = row['magbright']
             magfaint = row['magfaint']
         else:
@@ -225,7 +227,7 @@ def parse_regions(args):
             else:
                 msg = 'trgb + offset'
                 magfaint = trgb + offset
-            logger.info('faint mag limit for rgb norm set to {}'.format(msg))
+            logger.debug('faint mag limit for rgb norm set to {}'.format(msg))
 
         colmin = row['colmin']
         colmax = row['colmax']
@@ -234,7 +236,7 @@ def parse_regions(args):
             colmin, colmax = map(float, args.colorlimits.split(','))
             if colmax < colmin:
                 colmax = colmin + colmax
-                logger.info('colmax was less than colmin, assuming it is dcol, colmax is set to colmin + dcol')
+                logger.debug('colmax was less than colmin, assuming it is dcol, colmax is set to colmin + dcol')
 
         if args.maglimits is not None:
             magfaint, magbright = map(float, args.maglimits.split(','))
@@ -252,8 +254,8 @@ def parse_regions(args):
                                                                 comp_mag2)
                     magfaint = comp_mag2
                 else:
-                    logger.info('magfaint: {} comp_mag2: {} using magfaint'.format(magfaint, comp_mag2))
-            logger.info('faint mag limit for rgb norm set to {}'.format(msg))
+                    logger.debug('magfaint: {} comp_mag2: {} using magfaint'.format(magfaint, comp_mag2))
+            logger.debug('faint mag limit for rgb norm set to {}'.format(msg))
 
     regions_kw = {'offset': args.trgboffset,
                   'trgb_exclude': args.trgbexclude,
@@ -262,7 +264,7 @@ def parse_regions(args):
                   'col_max': colmax,
                   'mag_bright': magbright,
                   'mag_faint': magfaint}
-    logger.info('regions: {}'.format(regions_kw))
+    logger.debug('regions: {}'.format(regions_kw))
     return regions_kw
 
 
@@ -362,11 +364,14 @@ def main(argv):
     logfile = os.path.join(outfile_loc, 'normalize.log')
     handler = logging.FileHandler(logfile)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+
+    handler.setLevel(logging.WARNING)
     logger.setLevel(logging.DEBUG)
 
-    logger.info('command: {}'.format(' '.join(argv)))
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    logger.debug('command: {}'.format(' '.join(argv)))
 
     regions_kw = parse_regions(args)
     
@@ -419,7 +424,7 @@ def main(argv):
             
             ax.set_ylim(mag2.max() + 0.2, mag2.min() - 0.2)
             ax.set_xlim(np.min(mag1 - mag2) - 0.1, np.max(mag1 - mag2) + 0.1)
-    
+            import pdb; pbd.set_trace()
             plt.legend(loc='best', numpoints=1)
             plt.savefig(sgal.name + 'diag.png')
         except:
