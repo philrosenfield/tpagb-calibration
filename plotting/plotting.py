@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 try:
     plt.style.use('presentation')
+except:
+    pass
 
 def emboss():
     from matplotlib.patheffects import withStroke
