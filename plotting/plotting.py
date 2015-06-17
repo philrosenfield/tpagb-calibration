@@ -403,9 +403,9 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
         #    xmax = ax.get_xlim()[-1]
         #    xmin = np.min([np.min(mag2), np.min(np.concatenate(mag2s))])
         #    ax.set_xlim(xmin, xmax)
-
-        if regions_kw is not None:
-            ax = add_lines_to_plot(ax, **regions_kw)
+        if filt == filter2:
+            if regions_kw is not None:
+                ax = add_lines_to_plot(ax, **regions_kw)
         
         ax.legend(loc='lower right')
         ax.set_xlabel('${}$'.format(filt.replace('_cor', '')), fontsize=20)

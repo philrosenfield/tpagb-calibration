@@ -58,7 +58,7 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
 
     """
     # define RGB regions
-    if offset is not None:
+    if offset is not None and np.isfinite(trgb):
         low = trgb + offset
         mid = trgb + trgb_exclude
     else:

@@ -34,10 +34,14 @@ def tpagb_rheb_line(color, mag, dmod=0.):
 
 def get_itpagb(target, color, mag):
     # careful! get_snap assumes F160W
-    mtrgb, Av, dmod = angst_data.get_snap_trgb_av_dmod(target.upper())
+    try:
+        mtrgb, Av, dmod = angst_data.get_snap_trgb_av_dmod(target.upper())
+    except:
+        return [np.nan]
     redward_of_rheb, = tpagb_rheb_line(color, mag, dmod=dmod)
     brighter_than_trgb, = np.nonzero(mag < mtrgb)
-    return list(set(redward_of_rheb) & set(brighter_than_trgb))
+    itpagb = list(set(redward_of_rheb) & set(brighter_than_trgb))
+    return itpagb
 
 # Someday this will call all the codes in order
 # add_asts

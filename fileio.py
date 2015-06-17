@@ -121,7 +121,7 @@ def load_observation(filename, colname1, colname2):
         mag1 = data[colname1]
         mag2 = data[colname2]
     else:
-        mag1, mag2 = np.loadtxt(filename)
+        mag1, mag2 = np.loadtxt(filename, unpack=True)
     return mag1, mag2
 
 def load_from_lf_file(lf_file, filter1='F814W_cor', filter2='F160W_cor',

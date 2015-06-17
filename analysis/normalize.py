@@ -16,10 +16,12 @@ from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limi
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_observation
 from ..utils import check_astcor
+from ..plotting import plotting
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+from argparse import RawTextHelpFormatter
 
 def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
                      sgal=None, tricat=None, nrgbs=None, regions_kw={}, Av=0.):
@@ -104,7 +106,8 @@ def gather_results(sgal, target, filter1=None, filter2=None, ast_cor=False,
     if ast_cor:
         filt1, filt2 = check_astcor([filter1, filter2])
 
-    lf_line = tpagb_lf(sgal, narratio_dict, filt1, filt2, lf_line=lf_line)
+    if len(narratio_dict['sim_agb']) > 0:
+        lf_line = tpagb_lf(sgal, narratio_dict, filt1, filt2, lf_line=lf_line)
 
     rgb = narratio_dict['sim_rgb']
     agb = narratio_dict['sim_agb']
@@ -203,15 +206,18 @@ def parse_regions(args):
     # need the following in opt and nir
     colmin, colmax = None, None
     magfaint, magbright = None, None
+    filter1, filter2 = args.scolnames.split(',')
     
     opt = True
     if args.yfilter == 'V':
         opt = False
-    filter1, filter2 = args.scolnames.split(',')
+
     if args.trgb is None:
-        # def filter2
-        trgb = get_trgb(args.target, filter2=filter2)
-    
+        try:
+            trgb = get_trgb(args.target, filter2=filter2)
+        except:
+            trgb = np.nan
+
     if args.table is not None:
         row = load_table(args.table, args.target, optfilter1=args.optfilter1,
                          opt=opt)
@@ -240,8 +246,7 @@ def parse_regions(args):
 
         if args.maglimits is not None:
             magfaint, magbright = map(float, args.maglimits.split(','))
-        
-        if args.trgbexclude is not None:    
+        else:
             magbright = trgb + args.trgbexclude
             magfaint = trgb + args.trgboffset
             msg = 'trgb + offset'
@@ -286,16 +291,18 @@ def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={}):
 
 
 def main(argv):
-    description = ("Scale trilegal catalog to a CMD region of that data",
-                 "To define the CMD region, set colorlimits (optional)",
-                 "For the mag limits, either directly set maglimits or",
-                 "Set the trgb (or if ANGST will try to find it)",
-                 "a trgboffset (mags below trgb), and trgbexclude",
-                 " (region around the trgb to not consider).",
-                 "Can also set fake_file to a matchfake file and a completeness ",
-                 "to a fraction completeness and it will choose the fainter between",
-                 " ")
-    parser = argparse.ArgumentParser(description=description)
+    description = """Scale trilegal catalog to a CMD region of that data.
+
+To define the CMD region, set colorlimits (optional) and mag limits.
+
+For the mag limits either:
+   a) directly set maglimits
+   b) set the trgb (or if ANGST, will try to find it), trgboffset, and trgbexclude.
+   c) set fake_file to a matchfake file and a completeness to a fraction
+      completeness and it will choose the fainter between the two.
+"""
+    parser = argparse.ArgumentParser(description=description,
+                                     formatter_class=RawTextHelpFormatter)
 
     parser.add_argument('-a', '--ast_cor', action='store_true',
                         help='use ast corrected mags already in trilegal catalog')
@@ -316,7 +323,10 @@ def main(argv):
                         help='AST file if -b flag should match filter2 with yfilter')
 
     parser.add_argument('-g', '--trgboffset', type=float, default=1.,
-                        help='trgb offset')
+                        help='trgb offset, mags below trgb')
+
+    parser.add_argument('-o', '--output', type=str, default=None,
+                        help='create a trilegal catalog with only normalized selection')
 
     parser.add_argument('-m', '--maglimits', type=str, default=None,
                         help='comma separated faint and bright yaxis mag limits')
@@ -374,7 +384,7 @@ def main(argv):
     logger.debug('command: {}'.format(' '.join(argv)))
 
     regions_kw = parse_regions(args)
-    
+
     col1, col2 = args.colnames.split(',')
     filter1, filter2 = args.scolnames.split(',')
 
@@ -403,7 +413,9 @@ def main(argv):
                                                tricat=tricat,
                                                nrgbs=obs_nrgbs, Av=args.Av,
                                                regions_kw=regions_kw, **kws)
-        try:
+        
+        
+        if 1:
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots()
             
@@ -412,7 +424,7 @@ def main(argv):
                     sgal.data[f2], '.', label='sim', **kw)
             
             mag1, mag2 = load_observation(args.observation, col1, col2)
-            ax.plot(mag1-mag2, mag2, '.', label='data')
+            ax.plot(mag1 - mag2, mag2, '.', label='data')
     
             ind = narratio_dict['idx_norm']
             ax.plot(sgal.data[f1][ind] - sgal.data[f2][ind],
@@ -424,17 +436,58 @@ def main(argv):
             
             ax.set_ylim(mag2.max() + 0.2, mag2.min() - 0.2)
             ax.set_xlim(np.min(mag1 - mag2) - 0.1, np.max(mag1 - mag2) + 0.1)
-            import pdb; pbd.set_trace()
+            
             plt.legend(loc='best', numpoints=1)
-            plt.savefig(sgal.name + 'diag.png')
-        except:
-            pass
-        
+            plt.savefig(sgal.name.replace('.dat', '_diag.png'))
+
+
+            
+
+            ind = list(set(np.nonzero(sgal.data[f1] < 30)[0]) &
+                       set(np.nonzero(sgal.data[f2] < 30)[0]) &
+                       set(narratio_dict['idx_norm']))
+
+            zdict = {'stage': [(0, 9), 10, (1, 8)],
+                     'logAge': [(6, 10.1), 20, (6, 10.1)],
+                     'm_ini':  [(0.9, 8.), 10, (0.9, 8.)],
+                     '[M/H]': [(-2, 2), 10, (-2, 2)],
+                     'C/O': [(0.48, 4), 10, (0.48, 4)],
+                     'logML': [(-11, -4), 10, (-11, -4)]}
+            
+            fig, (axs) = plt.subplots(ncols=4, nrows=2, sharex=True,
+                                      sharey=True, figsize=(16, 12))
+            
+            for ax in axs[:, 0]:
+                ax.plot(mag1 - mag2, mag2, '.', color='k')
+                ax.set_xlabel((r'${}-{}$'.format(f1,f2)).replace('_', '\_'))
+                ax.set_ylabel((r'${}$'.format(f2)).replace('_', '\_'))
+            xlim = (regions_kw['col_min'], ax.get_xlim()[1])
+            ylim = (regions_kw['mag_faint'], ax.get_ylim()[0])
+            
+            axs = axs[:, 1:].flatten()
+            for i, (zcol, dat) in enumerate(zdict.items()):
+                ax = axs[i]
+                clim, bins, vlims = dat
+                # data model CMD plot                
+                ax = sgal.color_by_arg(sgal.data[f1] - sgal.data[f2], sgal.data[f2],
+                                       zcol, ax=ax, clim=clim, xlim=xlim, bins=bins,
+                                       slice_inds=ind,
+                                       skw={'vmin': vlims[0], 'vmax': vlims[1]})
+                ax = plotting.add_lines_to_plot(ax, lf=False, **regions_kw)
+            
+            ax.set_ylim(ylim)
+            
+            plt.savefig(sgal.name.replace('.dat', '_diagcmd.png'))
+        #except:
+        #    pass
         lf_line, narratio_line = gather_results(sgal, args.target,
                                                 narratio_dict=narratio_dict,                                                
                                                 narratio_line=narratio_line,
                                                 lf_line=lf_line, **kws)
         # does this save time?
+        if args.output is not None:
+            sgal.write_data(args.output, overwrite=True,
+                            slice_inds=narratio_dict['idx_norm'])
         del sgal
     
     result_dict = {'lf_line': lf_line, 'narratio_line': narratio_line}
@@ -442,9 +495,16 @@ def main(argv):
     #                                                     sgal_agb, filter2)
     
     # write the output files
-    write_results(result_dict, args.target, filter1, filter2, outfile_loc,
-                  extra_str=extra_str)
-
+    fdict = write_results(result_dict, args.target, filter1, filter2, outfile_loc,
+                          extra_str=extra_str)
+    
+    if args.lfplot:        
+        agb_mod = tricat.split('_')[6]
+        #import pdb; pdb.set_trace()
+        plotting.compare_to_gal(fdict['lf_file'], args.observation,
+                       narratio_file=fdict['narratio_file'],
+                       agb_mod=agb_mod, regions_kw=regions_kw)
+        
     return
 
 
