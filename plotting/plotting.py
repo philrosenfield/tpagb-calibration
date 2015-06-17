@@ -27,7 +27,8 @@ data_loc = os.path.join(snap_src, 'data', 'opt_ir_matched_v2')
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-plt.style.use('presentation')
+try:
+    plt.style.use('presentation')
 
 def emboss():
     from matplotlib.patheffects import withStroke
