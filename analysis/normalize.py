@@ -503,7 +503,8 @@ For the mag limits either:
         #import pdb; pdb.set_trace()
         plotting.compare_to_gal(fdict['lf_file'], args.observation,
                        narratio_file=fdict['narratio_file'],
-                       agb_mod=agb_mod, regions_kw=regions_kw)
+                       agb_mod=agb_mod, regions_kw=regions_kw,
+                       col1=col1, col2=col2)
         
     return
 

@@ -28,12 +28,13 @@ def load_sim_masses(target):
     '''
     if target in ['ugc4459', 'ngc2976-deep', 'ddo71']:
         mass = 1.0e+09
-    elif target in ['ddo82', 'ic2574-sgs', 'ddo78', 'ugc5139']:
+    elif target in ['ic2574-sgs', 'ddo78', 'ugc5139', 'ngc300-wide1', 'ngc3741',
+                    'ngc0404', 'ngc404']:
         mass = 2.5e+09
-    elif target in ['ugc4305-1', 'ngc4163']:
+    elif target in ['ugc4305-1', 'ugc4305-2', 'ngc4163', 'ddo82']:
         mass = 5.0e+09
     else:
-        mass = 5.0e+08
+        mass = 1.0e+08
         logger.warning('no info on object mass for {}, assuming {} Msun'.format(target, mass))
 
     return mass
