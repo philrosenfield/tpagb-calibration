@@ -8,7 +8,7 @@ import ResolvedStellarPops as rsp
 from astropy.table import Table
 from TPAGBparams import snap_src, phat_src
 
-from pop_synth.stellar_pops import limiting_mag
+from pop_synth.stellar_pops import limiting_mag, exclude_gate_inds
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -115,13 +115,56 @@ def load_lf_file(lf_file):
     return lfd
 
 
-def load_observation(filename, colname1, colname2):
+def load_observation(filename, colname1, colname2, match_param=None,
+                     exclude_gates=None):
+    """
+    Convienince routine for loading mags from a fits file or photometry file
+    
+    Note on using exclude gates:
+    Be sure the filters sent to exclude_gate_inds match the filters in the
+    match_param file. 
+    
+    Parameters
+    ----------
+    filename : string
+        path to observation
+    
+    colname1, colname2 : string, string
+        name of mag1, mag2 column (if fits file)
+    
+    match_param : string
+        path to match_param file to extract exclude_gates
+    
+    exculde_gates : N,2 np.array exclude_gates (color, mag1), N probably is 5 to
+        match MATCH, but doesn't need to be if this is re-purposed. 
+    
+    Returns
+    -------
+    mag1, mag2 : np.arrays
+        could be sliced to exclude the indices within the exclude gates.
+    """
     if filename.endswith('fits'):
         data = Table.read(filename, format='fits')
         mag1 = data[colname1]
         mag2 = data[colname2]
+        if 'MAG2' in colname1 and match_param is not None:
+            # this is likely a 4-filter matched catalog MAG1_ACS, MAG3_IR...
+            cam = colname1.split('_')[1]
+            if not cam in ['ACS', 'WFPC2']:
+                logger.warning('Using {} for exclude gates! Probably should be optical!'.format(cam))
+            m1 = data['MAG1_{}'.format(cam)]
+            m2 = data['MAG2_{}'.format(cam)]
+            inds = exclude_gate_inds(m1, m2, match_param=match_param)
+            mag1 = mag1[inds]
+            mag2 = mag2[inds]
+            logger.info('using exclude gates')
     else:
         mag1, mag2 = np.loadtxt(filename, unpack=True)
+        if match_param is not None:
+            inds = exclude_gate_inds(mag1, mag2, match_param=match_param)
+            mag1 = mag1[inds]
+            mag2 = mag2[inds]
+            logger.info('using exclude gates')
     return mag1, mag2
 
 def load_from_lf_file(lf_file, filter1='F814W_cor', filter2='F160W_cor',

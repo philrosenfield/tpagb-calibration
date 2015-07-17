@@ -34,7 +34,7 @@ def load_sim_masses(target):
     elif target in ['ugc4305-1', 'ugc4305-2', 'ngc4163', 'ddo82']:
         mass = 5.0e+09
     else:
-        mass = 1.0e+08
+        mass = 1.0e+09
         logger.warning('no info on object mass for {}, assuming {} Msun'.format(target, mass))
 
     return mass
@@ -134,7 +134,7 @@ class VarySFHs(SFH):
         msfh = rsp.match.utils.MatchSFH(self.sfh_file)
         
         if msfh.IMF == 0:
-            file_imf = 'tab_imf/imf_kroupa_match.dat'
+            file_imf = 'tab_imf/imf_kroupa02.dat'
         
         gal_dict = \
             {'mag_limit_val': limiting_mag(self.fake_file, 0.1)[1],

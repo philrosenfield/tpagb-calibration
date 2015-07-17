@@ -376,10 +376,11 @@ def narratio_table(nartables):
 
         targets = [t for t in ratio_data['target'] if not 'data' in t]
         fmt = r'${:.3f}\pm{:.3f}$'
-        line += nartable
+        line += '% '+ nartable
         line += '\n'
+        print 'target data_ratio model_ratio frac_diff'
         for target in targets:
-            dindx, = np.nonzero(ratio_data['target'] == '{}_data'.format(target))
+            dindx = np.nonzero(ratio_data['target'] == 'data'.format(target))[0][0]
             indx, = np.nonzero(ratio_data['target'] == target)
             
             nagb = float(ratio_data[dindx]['nagb'])
@@ -397,8 +398,8 @@ def narratio_table(nartables):
             pct_diff = (mratio / dratio)
             pct_diff_err = np.abs(pct_diff * (mratio_err / mratio + dratio_err / dratio))
     
-            #print 'target data_ratio model_ratio frac_diff'
-            if i == 0:
+            
+            if 1:
                 line += ' & '.join([target.upper(), fmt.format(dratio, dratio_err), fmt.format(mratio, mratio_err), fmt.format(pct_diff, pct_diff_err)])
                 line += '\n'
             else:

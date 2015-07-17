@@ -136,7 +136,6 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
         
     for i in range(len(mag2s)):
         if inorm is not None:
-            #import pdb; pdb.set_trace()
             mag2 = mag2s[i][inorm[i]]
             norm = 1.
         else:
@@ -222,7 +221,8 @@ def mag2Mag(mag2, target, filter2):
 
 
 def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
-                col1='MAG2_ACS', col2='MAG4_IR', dmag=0.1, extra_str=''):
+                col1='MAG2_ACS', col2='MAG4_IR', dmag=0.1, extra_str='',
+                match_param=None):
     """
     3 panel plot of LF, (data-model)/model, data-model
     doesn't work on lf files with many runs...
@@ -245,7 +245,8 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
         lfd = load_lf_file(lf_file)
         target = os.path.split(lf_file)[1].split('_')[0]
         observation, = [g for g in galaxies if target.upper() in g]
-        mag1, mag2 = load_observation(observation, col1, col2)
+        mag1, mag2 = load_observation(observation, col1, col2,
+                                      match_param=match_param)
         color = mag1 - mag2
         
         search_str = '*{}*.matchfake'.format(target.upper())    
@@ -351,7 +352,8 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
                    filter2='F160W_cor', col1='MAG2_ACS', col2='MAG4_IR',
                    dmag=0.1, narratio_file=None, make_plot=True,
                    regions_kw=None, xlim=None, ylim=None, extra_str='',
-                   agb_mod=None, mplt_kw={}, dplot_kw={}):
+                   agb_mod=None, mplt_kw={}, dplot_kw={},
+                   match_param=None):
     '''
     Plot the LFs and galaxy LF.
 
@@ -365,7 +367,8 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
     '''
     target = os.path.split(lf_file)[1].split('_')[0]
 
-    mag1, mag2 = load_observation(observation, col1, col2)
+    mag1, mag2 = load_observation(observation, col1, col2,
+                                  match_param=match_param)
     #color = mag1 - mag2
     #ogal, ngal = load_obs(target)
     #mag1 = ogal.data['MAG2_ACS']
@@ -419,7 +422,7 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
         plt.tick_params(labelsize=16)
         outfile = '{}_{}{}_lfs.png'.format(lf_file.split('_lf')[0], filt, extra_str)
         plt.savefig(outfile)
-        print 'wrote {}'.format(outfile)
+        logger.info('wrote {}'.format(outfile))
     return
 
 
@@ -483,7 +486,6 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
         sgal.data['F475W'] += sgal.apply_dAv(dAv, 'F475W', 'phat', Av=Av)
         sgal.data['F814W'] += sgal.apply_dAv(dAv, 'F814W', 'phat', Av=Av)
     filter1, filter2 = [f for f in sgal.name.split('_') if f.startswith('F')]
-    #import pdb; pdb.set_trace()
     if type(zcolumns) is str:
         zcolumns = [zcolumns]
     
@@ -590,6 +592,9 @@ def main(argv):
     parser.add_argument('-e', '--trgbexclude', type=str, default='0.1,0.2',
                         help='comma separated regions around trgb to exclude')
 
+    parser.add_argument('-g', '--matchparam', type=str, default=None,
+                        help='if using exclude gates, match param file')
+
     parser.add_argument('-f', '--optfilter1', type=str,
                         help='optical V filter')
 
@@ -635,11 +640,13 @@ def main(argv):
         diag_cmd(args.cmd, args.lf_file, opt=False, regions_kw=nirregions_kw,
                  use_exclude=args.use_exclude, zcolumns=zcols, Av=args.Av)
     elif len(args.lf_file) > 1:
-        compare_lfs(args.lf_file, extra_str=args.agb_mod)
+        compare_lfs(args.lf_file, extra_str=args.agb_mod,
+                    match_param=args.matchparam)
     else:
         compare_to_gal(args.lf_file[0], args.observation,
                        narratio_file=args.narratio_file,
-                       agb_mod=args.agb_mod, xlim=None, ylim=None)
+                       agb_mod=args.agb_mod, xlim=None, ylim=None,
+                       match_param=args.matchparam)
 
 if __name__ == '__main__':
     main(sys.argv[1:])

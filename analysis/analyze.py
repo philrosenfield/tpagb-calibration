@@ -32,13 +32,20 @@ def tpagb_rheb_line(color, mag, dmod=0.):
     # redder than the line
     return np.nonzero(color > ((mag - b - dmod) / m))
 
-def get_itpagb(target, color, mag):
+def get_itpagb(target, color, mag, col):
+    
     # careful! get_snap assumes F160W
-    try:
-        mtrgb, Av, dmod = angst_data.get_snap_trgb_av_dmod(target.upper())
-    except:
-        return [np.nan]
-    redward_of_rheb, = tpagb_rheb_line(color, mag, dmod=dmod)
+    if '160' in col or '110' in col or 'IR' in col:
+        try:
+            mtrgb, Av, dmod = angst_data.get_snap_trgb_av_dmod(target.upper())
+        except:
+            return [np.nan]
+        redward_of_rheb, = tpagb_rheb_line(color, mag, dmod=dmod)
+    else:
+        mtrgb, Av, dmod = angst_data.get_tab5_trgb_av_dmod(target.upper(),
+                                                           filters=col)
+        redward_of_rheb = np.arange(len(color))
+    
     brighter_than_trgb, = np.nonzero(mag < mtrgb)
     itpagb = list(set(redward_of_rheb) & set(brighter_than_trgb))
     return itpagb
