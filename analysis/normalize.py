@@ -1,6 +1,8 @@
 """
 Utilities to analyze trilegal output catalogs of TPAGB models
 """
+import matplotlib as mpl
+mpl.use('Agg')
 import argparse
 import logging
 import numpy as np
