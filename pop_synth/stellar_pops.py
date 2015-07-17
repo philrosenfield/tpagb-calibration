@@ -80,7 +80,8 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
     high = 10
 
     # Recovered stars in simulated AGB region.
-    sagb = stars_in_region(mag, mid, high)
+    sagb = stars_in_region(mag, mid, high, col_min=col_min, col_max=10,
+                           mag1=mag1, color=color)
 
     return srgb, sagb
 
@@ -187,7 +188,7 @@ def completeness_corrections(fakefile, mag_bins, mag2=True):
     return ast_c
 
 def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
-                      ms_color_cut=False):
+                      ms_color_cut=True):
     """
     return an array of all points outside the exclude gates region if
     find_ms_color_cut is set, will include all points bluer than the median
@@ -197,7 +198,7 @@ def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
         exclude_gates = get_exclude_gates(match_param)
         if False in np.isfinite(exclude_gates):
             return exclude_gates
-        
+    
     color = mag1 - mag2
     mag = mag1
     points = np.column_stack((color, mag))

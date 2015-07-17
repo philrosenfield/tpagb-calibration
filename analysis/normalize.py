@@ -12,7 +12,7 @@ import ResolvedStellarPops as rsp
 
 from astropy.io import ascii
 from .analyze import get_itpagb
-from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag
+from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag, exclude_gate_inds
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_observation
 from ..utils import check_astcor
@@ -23,8 +23,13 @@ logger = logging.getLogger(__name__)
 
 from argparse import RawTextHelpFormatter
 
+from ..TPAGBparams import snap_src
+matchfake_loc = os.path.join(snap_src, 'data', 'galaxies')
+
+
 def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
-                     sgal=None, tricat=None, nrgbs=None, regions_kw={}, Av=0.):
+                     sgal=None, tricat=None, nrgbs=None, regions_kw={}, Av=0.,
+                     match_param=None):
     '''Do the normalization: call rgb_agb_regions and normalize_simulations.'''
 
     if sgal is None:
@@ -39,18 +44,36 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
         filter1 += '_cor'
         filter2 += '_cor'
 
-    ymag = sgal.data[filter2]
-    if yfilter == 'V':
-        ymag = sgal.data[filter1]
+    if match_param is not None:
+        target, (f1, f2) = rsp.asts.parse_pipeline(match_param)
+        logger.info('using exclude gates on simulation')
+        if ast_cor:
+            f1a = '{}_cor'.format(f1)
+            f2a = '{}_cor'.format(f2)
+            try:
+                m1 = sgal.data[f1a]
+                m2 = sgal.data[f2a]
+            except:
+                logger.warning('not using optical asts for exclude gates')
+                m1 = sgal.data[f1]
+                m2 = sgal.data[f2]
+        inds = exclude_gate_inds(m1, m2, match_param=match_param)
+    else:
+        inds = np.arange(len(sgal.data[filter2]))
 
-    regions_kw['color'] = sgal.data[filter1] - sgal.data[filter2]
+    ymag = sgal.data[filter2][inds]
+    if yfilter == 'V':
+        ymag = sgal.data[filter1][inds]
+
+    regions_kw['color'] = sgal.data[filter1][inds] - sgal.data[filter2][inds]
 
     # select rgb and agb regions
-    sgal_rgb, x = rgb_agb_regions(ymag, **regions_kw)
-    
     target = os.path.split(tricat)[1].split('_')[1]
-    sgal_agb = get_itpagb(target, regions_kw['color'], ymag)
-    
+
+    sgal_rgb, sgal_agb = rgb_agb_regions(ymag, **regions_kw)
+    if 'IR' in filter2 or '110' in filter2 or '160' in filter2:
+        sgal_agb = get_itpagb(target, regions_kw['color'], ymag, filter2)
+
     # normalization
     norm, idx_norm, sim_rgb, sim_agb = normalize_simulation(ymag, nrgbs,
                                                             sgal_rgb, sgal_agb)
@@ -59,10 +82,10 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
                  'sgal_rgb': sgal_rgb, 'sgal_agb': sgal_agb,
                  'idx_norm': idx_norm}
 
-    return sgal, norm_dict
+    return sgal, norm_dict, inds
 
 
-def tpagb_lf(sgal, narratio_dict, filt1, filt2, lf_line=''):
+def tpagb_lf(sgal, narratio_dict, inds, filt1, filt2, lf_line=''):
     """format a narratio_dict for a line in the LF output file"""
 
     header = '# {} {} '.format(filt1, filt2)
@@ -70,10 +93,11 @@ def tpagb_lf(sgal, narratio_dict, filt1, filt2, lf_line=''):
     
     if len(lf_line) == 0:
         lf_line = header
-    lf_line += '\n'.join([' '.join(['%g' % m for m in sgal.data[filt1]]),
-                          ' '.join(['%g' % m for m in sgal.data[filt2]]),
-                          ' '.join(['%g' % m for m in sgal.data['logAge']]),
-                          ' '.join(['%g' % m for m in sgal.data['[M/H]']]),
+    
+    lf_line += '\n'.join([' '.join(['%g' % m for m in sgal.data[filt1][inds]]),
+                          ' '.join(['%g' % m for m in sgal.data[filt2][inds]]),
+                          ' '.join(['%g' % m for m in sgal.data['logAge'][inds]]),
+                          ' '.join(['%g' % m for m in sgal.data['[M/H]'][inds]]),
                           ' '.join(['%i' % m for m in narratio_dict['sim_rgb']]),
                           ' '.join(['%i' % m for m in narratio_dict['sim_agb']]),
                           ' '.join(['%i' % m for m in narratio_dict['sgal_rgb']]),
@@ -99,15 +123,16 @@ def narratio(target, nrgb, nagb, filt1, filt2, narratio_line=''):
     return narratio_line
 
 
-def gather_results(sgal, target, filter1=None, filter2=None, ast_cor=False,
+def gather_results(sgal, target, inds, filter1=None, filter2=None, ast_cor=False,
                    narratio_dict=None, lf_line='', narratio_line=''):
     '''gather results into strings: call tpagb_lf and narratio'''
+    
     filt1, filt2 = [filter1, filter2]
     if ast_cor:
         filt1, filt2 = check_astcor([filter1, filter2])
 
     if len(narratio_dict['sim_agb']) > 0:
-        lf_line = tpagb_lf(sgal, narratio_dict, filt1, filt2, lf_line=lf_line)
+        lf_line = tpagb_lf(sgal, narratio_dict, inds, filt1, filt2, lf_line=lf_line)
 
     rgb = narratio_dict['sim_rgb']
     agb = narratio_dict['sim_agb']
@@ -161,7 +186,7 @@ def write_results(res_dict, target, filter1, filter2, outfile_loc, extra_str='')
     return fdict
 
 
-def get_trgb(target, filter2='F160W'):
+def get_trgb(target, filter2='F160W', filter1=None):
     import difflib
     angst_data = rsp.angst_tables.angst_data
     if 'm31' in target.lower() or 'B' in target:
@@ -172,8 +197,13 @@ def get_trgb(target, filter2='F160W'):
                                                      angst_data.targets)[0].replace('-', '_')
             
             target_row = angst_data.__getattribute__(angst_target)
-            key, = [k for k in target_row.keys() if ',' in k]
-            trgb = target_row[key]['mTRGB']
+            key = [k for k in target_row.keys() if ',' in k]
+            if len(key) > 1:
+                if filter1 is not None:
+                    key = [k for k in key if filter1 in k]
+                else:
+                    logger.error('Need another filter to find trgb')
+            trgb = target_row[key[0]]['mTRGB']
         else:
             trgb = angst_data.get_snap_trgb_av_dmod(target.upper())[0]
     return trgb
@@ -214,7 +244,7 @@ def parse_regions(args):
 
     if args.trgb is None:
         try:
-            trgb = get_trgb(args.target, filter2=filter2)
+            trgb = get_trgb(args.target, filter2=filter2, filter1=filter1)
         except:
             trgb = np.nan
 
@@ -252,8 +282,14 @@ def parse_regions(args):
             msg = 'trgb + offset'
 
             if args.comp_frac is not None:
-                comp_mag1, comp_mag2 = limiting_mag(args.fake_file,
-                                                    args.comp_frac) 
+                search_str = '*{}*.matchfake'.format(args.target.upper())
+                fakes = rsp.fileio.get_files(matchfake_loc, search_str)
+                
+                fake = [f for f in fakes if filter2 in f][0]
+                
+                _, comp_mag2 = limiting_mag(fake, args.comp_frac) 
+                #comp_mag1, comp_mag2 = limiting_mag(args.fake_file,
+                #                                    args.comp_frac) 
                 if comp_mag2 < trgb + args.trgboffset:
                     msg = '{} completeness fraction: {}'.format(args.comp_frac,
                                                                 comp_mag2)
@@ -273,9 +309,10 @@ def parse_regions(args):
     return regions_kw
 
 
-def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={}):
+def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={},
+                  match_param=None):
     target = os.path.split(filename)[1].split('_')[1]
-    mag1, mag2 = load_observation(filename, col1, col2)
+    mag1, mag2 = load_observation(filename, col1, col2, match_param=match_param)
     ymag = mag2
     if yfilter == 'V':
         ymag = mag1
@@ -283,9 +320,11 @@ def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={}):
     # as long as col_min is not None, it will use magbright and col_min etc
     # as verts, so leave mag2 and mag1 as is, and if CMD has V for yaxis,
     # just relfect that in
+
     regions_kw['color'] = mag1 - mag2
-    gal_rgb, _ = rgb_agb_regions(ymag, **regions_kw)
-    gal_agb = get_itpagb(target, regions_kw['color'], ymag)
+    gal_rgb, gal_agb = rgb_agb_regions(ymag, **regions_kw)
+    if 'IR' in col2:
+        gal_agb = get_itpagb(target, regions_kw['color'], ymag, col2)
     
     return float(len(gal_rgb)), float(len(gal_agb))
 
@@ -319,9 +358,6 @@ For the mag limits either:
     parser.add_argument('-e', '--trgbexclude', type=float, default=0.1,
                         help='comma separated regions around trgb to exclude')
 
-    parser.add_argument('-f', '--fake_file', type=str, default=None,
-                        help='AST file if -b flag should match filter2 with yfilter')
-
     parser.add_argument('-g', '--trgboffset', type=float, default=1.,
                         help='trgb offset, mags below trgb')
 
@@ -352,6 +388,9 @@ For the mag limits either:
     parser.add_argument('-y', '--yfilter', type=str, default='I',
                         help='V or I filter to use as y axis of CMD')
 
+    parser.add_argument('-z', '--match_param', type=str, default=None,
+                        help='exclude gates? supply match_param')
+
     parser.add_argument('observation', type=str,
                         help='photometry to normalize against')
 
@@ -375,7 +414,7 @@ For the mag limits either:
     handler = logging.FileHandler(logfile)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    handler.setLevel(logging.WARNING)
+    handler.setLevel(logging.DEBUG)
     logger.setLevel(logging.DEBUG)
 
     handler.setFormatter(formatter)
@@ -387,10 +426,11 @@ For the mag limits either:
 
     col1, col2 = args.colnames.split(',')
     filter1, filter2 = args.scolnames.split(',')
-
+    
     obs_nrgbs, obs_nagbs = count_rgb_agb(args.observation, col1, col2,
                                          yfilter=args.yfilter,
-                                         regions_kw=regions_kw)
+                                         regions_kw=regions_kw,
+                                         match_param=args.match_param)
     
     narratio_line = narratio('data', obs_nrgbs, obs_nagbs, filter1, filter2)
 
@@ -403,36 +443,38 @@ For the mag limits either:
     else:
         f1 = filter1
         f2 = filter2
-        
+
     kws = {'filter1': filter1, 'filter2': filter2, 'ast_cor': args.ast_cor}
 
-        
     for tricat in tricats:
         logger.debug('normalizing: {}'.format(tricat))
-        sgal, narratio_dict = do_normalization(yfilter=args.yfilter,
-                                               tricat=tricat,
-                                               nrgbs=obs_nrgbs, Av=args.Av,
-                                               regions_kw=regions_kw, **kws)
-        
-        
+        sgal, narratio_dict, inds = \
+            do_normalization(yfilter=args.yfilter, Av=args.Av, tricat=tricat,
+                             nrgbs=obs_nrgbs, regions_kw=regions_kw,
+                             match_param=args.match_param, **kws)
+
         if 1:
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots()
             
             kw = {'alpha': 0.3, 'mec': 'none'}
             ax.plot(sgal.data[f1] - sgal.data[f2],
-                    sgal.data[f2], '.', label='sim', **kw)
+                    sgal.data[f2], '.', label='no exclude')
+
+            ax.plot(sgal.data[f1][inds] - sgal.data[f2][inds],
+                    sgal.data[f2][inds], '.', label='sim')
             
-            mag1, mag2 = load_observation(args.observation, col1, col2)
+            mag1, mag2 = load_observation(args.observation, col1, col2,
+                                          match_param=args.match_param)
             ax.plot(mag1 - mag2, mag2, '.', label='data')
     
             ind = narratio_dict['idx_norm']
-            ax.plot(sgal.data[f1][ind] - sgal.data[f2][ind],
-                    sgal.data[f2][ind], '.', label='scaled sim', **kw)
+            ax.plot(sgal.data[f1][inds][ind] - sgal.data[f2][inds][ind],
+                    sgal.data[f2][inds][ind], '.', label='scaled sim')
             
             ind = narratio_dict['sgal_rgb']
-            ax.plot(sgal.data[f1][ind] - sgal.data[f2][ind],
-                    sgal.data[f2][ind], '.', label='sim rgb', **kw)
+            ax.plot(sgal.data[f1][inds][ind] - sgal.data[f2][inds][ind],
+                    sgal.data[f2][inds][ind], '.', label='sim rgb')
             
             ax.set_ylim(mag2.max() + 0.2, mag2.min() - 0.2)
             ax.set_xlim(np.min(mag1 - mag2) - 0.1, np.max(mag1 - mag2) + 0.1)
@@ -440,11 +482,8 @@ For the mag limits either:
             plt.legend(loc='best', numpoints=1)
             plt.savefig(sgal.name.replace('.dat', '_diag.png'))
 
-
-            
-
-            ind = list(set(np.nonzero(sgal.data[f1] < 30)[0]) &
-                       set(np.nonzero(sgal.data[f2] < 30)[0]) &
+            ind = list(set(np.nonzero(sgal.data[f1][inds] < 30)[0]) &
+                       set(np.nonzero(sgal.data[f2][inds] < 30)[0]) &
                        set(narratio_dict['idx_norm']))
 
             zdict = {'stage': [(0, 9), 10, (1, 8)],
@@ -469,7 +508,8 @@ For the mag limits either:
                 ax = axs[i]
                 clim, bins, vlims = dat
                 # data model CMD plot                
-                ax = sgal.color_by_arg(sgal.data[f1] - sgal.data[f2], sgal.data[f2],
+                ax = sgal.color_by_arg(sgal.data[f1][inds] - sgal.data[f2][inds],
+                                       sgal.data[f2][inds],
                                        zcol, ax=ax, clim=clim, xlim=xlim, bins=bins,
                                        slice_inds=ind,
                                        skw={'vmin': vlims[0], 'vmax': vlims[1]})
@@ -480,7 +520,7 @@ For the mag limits either:
             plt.savefig(sgal.name.replace('.dat', '_diagcmd.png'))
         #except:
         #    pass
-        lf_line, narratio_line = gather_results(sgal, args.target,
+        lf_line, narratio_line = gather_results(sgal, args.target, inds,
                                                 narratio_dict=narratio_dict,                                                
                                                 narratio_line=narratio_line,
                                                 lf_line=lf_line, **kws)
@@ -500,11 +540,10 @@ For the mag limits either:
     
     if args.lfplot:        
         agb_mod = tricat.split('_')[6]
-        #import pdb; pdb.set_trace()
         plotting.compare_to_gal(fdict['lf_file'], args.observation,
                        narratio_file=fdict['narratio_file'],
                        agb_mod=agb_mod, regions_kw=regions_kw,
-                       col1=col1, col2=col2)
+                       col1=col1, col2=col2, match_param=args.match_param)
         
     return
 

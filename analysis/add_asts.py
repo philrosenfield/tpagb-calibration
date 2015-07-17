@@ -35,7 +35,7 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
     logger.info('fake files found: {}'.format(fakes))
     asts = [rsp.ASTs(f) for f in fakes]
     logger.debug('{}'.format(trilegal_catalogs))
-
+    import pdb; pdb.set_trace()
     for i, trilegal_catalog in enumerate(trilegal_catalogs):
         logger.info('working on {}'.format(trilegal_catalog))
 
@@ -47,16 +47,14 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
             outfile = outfiles[i]
         # do the ast corrections
         for ast in asts:
-            header = open(trilegal_catalog, 'r').readline()            
-            if ast.filter1 + '_cor' in header.split():
-                logger.debug('{}_cor already in header'.format(ast.filter1))
+            header = open(trilegal_catalog, 'r').readline()
+            if ast.filter1 + '_cor' in header.split() and ast.filter2 + '_cor' in header.split():
+                logger.debug('{}_cor and {}_cor already in header'.format(ast.filter1, ast.filter2))
+                continue
 
-            elif ast.filter2 + '_cor' in header.split():
-                logger.debug('{}_cor already in header'.format(ast.filter2))
-            else:
-                rsp.ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
-                                        outfile=outfile, diag_plot=diag_plot,
-                                        hdf5=hdf5)
+            rsp.ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
+                                    outfile=outfile, diag_plot=diag_plot,
+                                    hdf5=hdf5)
     return
 
 
@@ -79,12 +77,18 @@ def main(argv):
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose mode')
 
+    parser.add_argument('-o', '--outfile', type=str, help='outfile name',
+                        default=None)
+
     parser.add_argument('-t', '--target', type=str, help='target name')
 
     parser.add_argument('name', type=str, nargs='*',
                         help='trilegal catalog or directory if -d flag')
 
     args = parser.parse_args(argv)
+
+    if args.outfile is None:
+        args.outfile = args.name
 
     if not args.target:
         if args.directory:
@@ -116,7 +120,7 @@ def main(argv):
     if args.verbose:
         logger.info('working on target: {}'.format(target))
         
-    make_ast_corrections(tricats, target)
+    make_ast_corrections(tricats, target, outfiles=[args.outfile])
     return
 
 if __name__ == "__main__":

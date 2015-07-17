@@ -102,6 +102,7 @@ def find_gates(target):
     params = glob.glob1('.', '*param')
     for i, param in enumerate(params):
         # read param file
+        print phot[i]
         mag1, mag2 = np.genfromtxt(phot[i], unpack=True)
         col = mag1 - mag2
 
@@ -242,11 +243,18 @@ if __name__ == "__main__":
         import pdb
         pdb.set_trace()
     if args.exgates:
-        assert args.target is not None, \
-            'Must supply target if finding exclude gates'
-        find_gates(args.target)
+        assert args.target is not None, 'need target!'
+        find_gates(target)
     elif args.norm:
-        find_normalization_limits(args.target, optfilter1='')
+        if args.target is None:
+            sg = os.path.join(snap_src, 'tables/{}'.format(args.data_file))
+            targets, filter1s = np.genfromtxt(sg, usecols=(0,13), dtype='S', unpack=True)
+        else:
+            targets = [args.target]
+            filter1s = [args.filter1]
+        for i in range(len(targets)):
+            print targets[i], filter1s[i]
+            find_normalization_limits(targets[i], optfilter1=filter1s[i])
     else:
         match_limits(color_only=color_only, data_file=args.data_file, target=args.target)
     # add this!! match_diagnostic(param, phot)

@@ -24,4 +24,5 @@ phat_src = os.path.join(tpcalib_dir, 'PHAT')
 dirs = [tpcalib_dir, snap_src, phat_src]
 for d in dirs:
     if not os.path.isdir(d):
-        print 'Warning. Can not find %s.' % d
+        #print 'Warning. Can not find %s.' % d
+        pass
