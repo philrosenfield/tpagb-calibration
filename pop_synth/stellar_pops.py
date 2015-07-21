@@ -86,7 +86,7 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
     return srgb, sagb
 
 
-def normalize_simulation(mag, nrgb, srgb, sagb):
+def normalize_simulation(mag, nrgb, srgb, sagb, norm=None):
     """
     scale simulation to have the same number of nrgb (data) as srgb (from mag)
     
@@ -113,7 +113,8 @@ def normalize_simulation(mag, nrgb, srgb, sagb):
         random sample of sagb scaled to nrgb
     
     """
-    norm = nrgb / float(len(srgb))
+    if norm is None:
+        norm = nrgb / float(len(srgb))
 
     logger.info('Normalization: %f' % norm)
     if norm >= 0.5:
