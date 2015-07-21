@@ -29,7 +29,7 @@ matchfake_loc = os.path.join(snap_src, 'data', 'galaxies')
 
 def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
                      sgal=None, tricat=None, nrgbs=None, regions_kw={}, Av=0.,
-                     match_param=None):
+                     match_param=None, norm=None):
     '''Do the normalization: call rgb_agb_regions and normalize_simulations.'''
 
     if sgal is None:
@@ -76,7 +76,8 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
 
     # normalization
     norm, idx_norm, sim_rgb, sim_agb = normalize_simulation(ymag, nrgbs,
-                                                            sgal_rgb, sgal_agb)
+                                                            sgal_rgb, sgal_agb,
+                                                            norm=norm)
 
     norm_dict = {'norm': norm, 'sim_rgb': sim_rgb, 'sim_agb': sim_agb,
                  'sgal_rgb': sgal_rgb, 'sgal_agb': sgal_agb,
@@ -367,6 +368,9 @@ For the mag limits either:
     parser.add_argument('-m', '--maglimits', type=str, default=None,
                         help='comma separated faint and bright yaxis mag limits')
 
+    parser.add_argument('-n', '--norm', type=float, default=None,
+                        help='override finding normalization constant with this fraction')
+
     parser.add_argument('-q', '--colnames', type=str, default='MAG2_ACS,MAG4_IR',
                         help='comma separated column names in observation data')
 
@@ -451,7 +455,8 @@ For the mag limits either:
         sgal, narratio_dict, inds = \
             do_normalization(yfilter=args.yfilter, Av=args.Av, tricat=tricat,
                              nrgbs=obs_nrgbs, regions_kw=regions_kw,
-                             match_param=args.match_param, **kws)
+                             norm=args.norm, match_param=args.match_param,
+                             **kws)
 
         if 1:
             import matplotlib.pyplot as plt
