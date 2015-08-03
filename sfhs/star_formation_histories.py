@@ -6,7 +6,7 @@ import sys
 import matplotlib.pylab as plt
 import numpy as np
 import ResolvedStellarPops as rsp
-
+import match
 from ResolvedStellarPops.convertz import convertz
 
 logging.basicConfig(level=logging.INFO)
@@ -36,13 +36,13 @@ def parse_sfh_data(sfh_file, hmc_file=None):
     np.recarray of the sfh file with hmc_file uncertainties overwritten.
     '''
     try:   
-        data = rsp.match.utils.read_binned_sfh(sfh_file)
+        data = match.utils.read_binned_sfh(sfh_file)
     except:
         logger.error('please add a new data reader')
         sys.exit(2)
 
     if hmc_file is not None:
-        hmc_data = rsp.match.utils.read_binned_sfh(hmc_file)
+        hmc_data = match.utils.read_binned_sfh(hmc_file)
         data.sfr_errp = hmc_data.sfr_errp
         data.sfr_errm = hmc_data.sfr_errm
     return data
