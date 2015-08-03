@@ -548,6 +548,7 @@ For the mag limits either:
         plotting.compare_to_gal(fdict['lf_file'], args.observation,
                        narratio_file=fdict['narratio_file'],
                        agb_mod=agb_mod, regions_kw=regions_kw,
+                       xlims=[(19,28), (18, 25)],
                        col1=col1, col2=col2, match_param=args.match_param)
         
     return

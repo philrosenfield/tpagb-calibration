@@ -38,6 +38,7 @@ def emboss():
     ann_kwargs = dict(path_effects=[myeffect])
     return ann_kwargs
 
+
 def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
     stext_kw = dict({'color': 'black', 'fontsize': 14, 'ha': 'center'}.items() +
                     emboss().items())
@@ -193,7 +194,6 @@ def plot_models(lf_file, bins, filt, maglimit=None, ax=None, plt_kw=None,
     plt_kw['color'] = 'darkgreen'
     ax = plot_model(mag2s=mags, bins=bins, inorm=lfd['sim_agb'],
                     maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod='TP-AGB')
-
     return ax
 
 
@@ -351,7 +351,7 @@ def load_data(opt=True, optfilter1=None, target=None, extra_str='',
 def compare_to_gal(lf_file, observation, filter1='F814W_cor',
                    filter2='F160W_cor', col1='MAG2_ACS', col2='MAG4_IR',
                    dmag=0.1, narratio_file=None, make_plot=True,
-                   regions_kw=None, xlim=None, ylim=None, extra_str='',
+                   regions_kw=None, xlims=[None, None], ylims=[None, None], extra_str='',
                    agb_mod=None, mplt_kw={}, dplot_kw={},
                    match_param=None):
     '''
@@ -387,9 +387,16 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
             extra_str += '_ast_cor'
 
     for filt, fake_file in zip([filter1, filter2], [optfake, nirfake]):
-        mag = mag2 
+
         if filt == filter1:
             mag = mag1
+            xlim = xlims[0]
+            ylim = ylims[0]
+        else:
+            mag = mag2 
+            xlim = xlims[1]
+            ylim = ylims[1]
+
         bins = np.arange(mag.min(), mag.max(), step=dmag)
         ax = plot_models(lf_file, bins, filt, plt_kw=mplt_kw, agb_mod=agb_mod)
 
@@ -645,7 +652,7 @@ def main(argv):
     else:
         compare_to_gal(args.lf_file[0], args.observation,
                        narratio_file=args.narratio_file,
-                       agb_mod=args.agb_mod, xlim=None, ylim=None,
+                       agb_mod=args.agb_mod,
                        match_param=args.matchparam)
 
 if __name__ == '__main__':

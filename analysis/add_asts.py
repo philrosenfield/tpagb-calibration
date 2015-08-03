@@ -1,6 +1,5 @@
 """
 Add AST corrections to trilegal catalogs
-Note: single catalog mode is untested (assumes a directory full of trilegal outputs)
 """
 import argparse
 import logging
@@ -18,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
-                         diag_plot=False, overwrite=True, hdf5=False):
+                         diag_plot=False, overwrite=True, hdf5=False,
+                         fake=None):
     """
     apply ast corrections from fake files found in matchfake_loc/*[target]*
     see rsp.ast_correct_starpop
@@ -28,14 +28,18 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
     else:
         outfmt = 'supplied'
 
-    # search string for fake files
-    search_str = '*{}*.matchfake'.format(target.upper())
+    if fake is None:
+        # search string for fake files
+        search_str = '*{}*.matchfake'.format(target.upper())
     
-    fakes = rsp.fileio.get_files(matchfake_loc, search_str)
-    logger.info('fake files found: {}'.format(fakes))
+        fakes = rsp.fileio.get_files(matchfake_loc, search_str)
+        logger.info('fake files found: {}'.format(fakes))
+    else:
+        fakes = [fake]
+
     asts = [rsp.ASTs(f) for f in fakes]
     logger.debug('{}'.format(trilegal_catalogs))
-    import pdb; pdb.set_trace()
+
     for i, trilegal_catalog in enumerate(trilegal_catalogs):
         logger.info('working on {}'.format(trilegal_catalog))
 
@@ -48,8 +52,10 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
         # do the ast corrections
         for ast in asts:
             header = open(trilegal_catalog, 'r').readline()
-            if ast.filter1 + '_cor' in header.split() and ast.filter2 + '_cor' in header.split():
-                logger.debug('{}_cor and {}_cor already in header'.format(ast.filter1, ast.filter2))
+            if ast.filter1 + '_cor' in header.split() and \
+                ast.filter2 + '_cor' in header.split():
+                msg = '{}_cor and {}_cor already in header'
+                logger.debug(msg.format(ast.filter1, ast.filter2))
                 continue
 
             rsp.ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
@@ -65,8 +71,9 @@ def main(argv):
     usage:
     python add_asts.py -vd ~/research/TP-AGBcalib/SNAP/varysfh/kkh37
     
-    if the target directory name is different than it is in the matchfake file name:
-    python add_asts.py -vd -t ugc4459 ~/research/TP-AGBcalib/SNAP/varysfh/ugc-04459
+    if the target directory name is different than it is in the matchfake file
+    name:
+    python add_asts.py -vd -t ugc4459 [path to]/ugc-04459
     """
     parser = argparse.ArgumentParser(description="Cull useful info from \
                                                   trilegal catalog")
@@ -81,6 +88,8 @@ def main(argv):
                         default=None)
 
     parser.add_argument('-t', '--target', type=str, help='target name')
+
+    parser.add_argument('-f', '--fake', type=str, help='fake file name')
 
     parser.add_argument('name', type=str, nargs='*',
                         help='trilegal catalog or directory if -d flag')
@@ -104,7 +113,8 @@ def main(argv):
         handler.setLevel(logging.DEBUG)
     else:
         handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fmttr = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    formatter = logging.Formatter(fmttr)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.info('using matchfake location: {}'.format(matchfake_loc))
@@ -120,7 +130,8 @@ def main(argv):
     if args.verbose:
         logger.info('working on target: {}'.format(target))
         
-    make_ast_corrections(tricats, target, outfiles=[args.outfile])
+    make_ast_corrections(tricats, target, outfiles=args.outfile,
+                         fake=args.fake)
     return
 
 if __name__ == "__main__":
