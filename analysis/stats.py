@@ -186,7 +186,7 @@ def narratio(narratio_file, target, nagb=None, magb=None):
     return nrgb, nagb, dratio, dratio_err, mrgb, magb, mratio, mratio_err
 
 
-def main(argv):
+def main2(argv):
     description = ("stats...")
     parser = argparse.ArgumentParser(description=description)
 
@@ -246,8 +246,26 @@ def main(argv):
     #               dmag=dmag, narratio_file=args.narratio_file, make_plot=True,
     #               regions_kw=None, agb_mod=args.agb_mod)
 
+def main(argv):
+    parser = argparse.ArgumentParser(description='make narratio table')
 
+    parser.add_argument('-n', '--narratio_file', type=str,
+                        help='nagb/nrgb ratio file')
     
+    parser.add_argument('-s', '--search_str', type=str, default='*nar*dat')
+    
+
+    args = parser.parse_args(argv)
+
+    if args.narratio_file:
+        assert os.path.isfile(args.narratio_file), 'file not found'
+        ratios = [args.narratio_file]
+    else:
+        ratios = rsp.fileio.get_files(os.getcwd(), args.search_str)
+        if len(ratios) == 0:
+            print('files not found {}'.format(os.path.join(os.getcwd(), args.search_str)))
+    
+    narratio_table(ratios)
 
 def chi2plot(chi2table, outfile_loc=None, flatten=True):
     """
@@ -393,9 +411,9 @@ def narratio_table(nartables):
             magb = np.mean(map(float, ratio_data[indx]['nagb']))
     
             mratio = magb / mrgb
-            mratio_err = rsp.utils.count_uncert_ratio(magb, mrgb)        
+            mratio_err = rsp.utils.count_uncert_ratio(magb, mrgb)
     
-            pct_diff = (mratio / dratio)
+            pct_diff = 1 - (mratio / dratio)
             pct_diff_err = np.abs(pct_diff * (mratio_err / mratio + dratio_err / dratio))
     
             
