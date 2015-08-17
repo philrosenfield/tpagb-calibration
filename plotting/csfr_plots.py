@@ -3,6 +3,7 @@ import os
 import sys
 
 import matplotlib.pyplot as plt
+import match
 import ResolvedStellarPops as rsp
 
 plt.style.use('presentation')
@@ -22,17 +23,17 @@ def main(argv):
                         help='add errors')
 
     args = parser.parse_args(argv)
-    
-    sfhs = [rsp.match.utils.MatchSFH(s) for s in args.name]
+
+    sfhs = [match.utils.MatchSFH(s) for s in args.name]
     targets = [s.name.split('_')[0] for s in sfhs]
-    
+
     if args.one_plot:
         fig, ax = plt.subplots()
         colors = rsp.graphics.discrete_colors(len(sfhs), cmap=plt.cm.RdYlBu)
     else:
         ax = None
         colors = ['k'] * len(sfhs)
-    
+
     for i, sfh in enumerate(sfhs):
         ax = sfh.plot_csfr(ax=ax, errors=args.errors,
                            plt_kw={'color': colors[i],
@@ -46,6 +47,6 @@ def main(argv):
         plt.legend(loc=0, frameon=False)
         plt.savefig('all_csfr.png')
 
-    
+
 if __name__ == '__main__':
     main(sys.argv[1:])

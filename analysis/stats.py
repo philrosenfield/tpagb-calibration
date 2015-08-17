@@ -27,6 +27,8 @@ def chi2_stats(targets, cmd_inputs, outfile_dir='default', extra_str=''):
                                             extra_str=extra_str,
                                             just_gauss=True)
     return
+
+
 def contamination_files(filenames):
     opt_eagb_contam = np.array([])
     opt_rheb_contam = np.array([])
