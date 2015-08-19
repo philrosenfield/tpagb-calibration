@@ -208,7 +208,7 @@ def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
     for exg in exclude_gates:
         ind, = np.nonzero(points_inside_poly(points, exg))
         inds = np.append(inds, ind)
-    inds = np.unique(inds.flatten())
+    inds = list(np.unique(inds.flatten()))
 
     decontam = np.arange(len(mag))
     decontam = np.delete(decontam, inds)
