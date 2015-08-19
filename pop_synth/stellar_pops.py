@@ -20,32 +20,32 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
     ----------
     mag : array
         (probably should be filter2) list of magnitudes
-    
+
     offset : float
         magnitude offset below the trgb to include as rgb stars
-    
+
     trgb_exclude : float
         +/- magnitude around the trgb to exclude from rgb and agb star
         determination
-    
+
     trgb : float
         magnitude (same filter as mag) of the rgb tip
-    
+
     col_min : float
         blue color cut (need mag1)
-    
+
     col_max : float
         red color cut (need mag1)
-    
+
     mag1 : array
         filter1 magnitude list
-    
+
     mag_bright : float
         brightest mag to include as rgb (agb is set to mag=10)
-    
+
     mag_faint : float
         faintest mag to include as rgb
-        
+
     Returns
     -------
     srgb, sagb : array, array
@@ -89,7 +89,7 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
 def normalize_simulation(mag, nrgb, srgb, sagb, norm=None):
     """
     scale simulation to have the same number of nrgb (data) as srgb (from mag)
-    
+
     Parameters
     ----------
     mag : array
@@ -111,7 +111,7 @@ def normalize_simulation(mag, nrgb, srgb, sagb, norm=None):
         random sample of srgb scaled to nrgb
     agb : array
         random sample of sagb scaled to nrgb
-    
+
     """
     if norm is None:
         norm = nrgb / float(len(srgb))
@@ -199,32 +199,43 @@ def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
         exclude_gates = get_exclude_gates(match_param)
         if False in np.isfinite(exclude_gates):
             return exclude_gates
-    
+
     color = mag1 - mag2
     mag = mag1
     points = np.column_stack((color, mag))
-    inds, = np.nonzero(points_inside_poly(points, exclude_gates))
-    
+    inds = np.array([])
+
+    for exg in exclude_gates:
+        ind, = np.nonzero(points_inside_poly(points, exg))
+        inds = np.append(inds, ind)
+    inds = np.unique(inds.flatten())
+
     decontam = np.arange(len(mag))
     decontam = np.delete(decontam, inds)
-    
+
     if ms_color_cut:
         color_cut = np.median(color[inds])
         blue = np.nonzero(color[decontam] < color_cut)
         decontam = np.delete(decontam, blue)
-    
+
     return decontam
 
 
 def get_exclude_gates(match_param):
-    exg = np.ndarray(shape=(10,)) * np.nan
+
     ex_line = open(match_param, 'r').readlines()[7]
     nexgs = np.int(ex_line[0])
     if nexgs == 0:
         logger.warning('no exclude gates')
-    elif nexgs > 1:
-        logger.error('get_exclude_gates only works on 1 gate... code!')
+        exgs = np.inf
     else:
-        exg = np.array(ex_line.split()[1:-1], dtype=float)
-        exg = np.append(exg, exg[:2])
-    return exg.reshape(5, 2)
+        ex_data = np.array(ex_line.split()[1:-1], dtype=float)
+        npts = len(ex_data)
+        splits = np.arange(0, npts + 1, 8)
+        exgs = [ex_data[splits[i]: splits[i+1]] for i in range(len(splits)-1)]
+        # complete the polygon
+        for i in range(len(exgs)):
+            exgs[i] = np.append(exgs[i], exgs[i][:2])
+            exgs[i] = exgs[i].reshape(5, 2)
+
+    return exgs

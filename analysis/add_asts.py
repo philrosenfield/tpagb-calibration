@@ -129,7 +129,7 @@ def main(argv):
 
     if args.verbose:
         logger.info('working on target: {}'.format(target))
-        
+    import pdb; pdb.set_trace()
     make_ast_corrections(tricats, target, outfiles=args.outfile,
                          fake=args.fake)
     return
