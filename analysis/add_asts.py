@@ -31,7 +31,7 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
     if fake is None:
         # search string for fake files
         search_str = '*{}*.matchfake'.format(target.upper())
-    
+
         fakes = rsp.fileio.get_files(matchfake_loc, search_str)
         logger.info('fake files found: {}'.format(fakes))
     else:
@@ -67,10 +67,10 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
 def main(argv):
     """
     Make AST corrections to trilegal catalog(s)
-    
+
     usage:
     python add_asts.py -vd ~/research/TP-AGBcalib/SNAP/varysfh/kkh37
-    
+
     if the target directory name is different than it is in the matchfake file
     name:
     python add_asts.py -vd -t ugc4459 [path to]/ugc-04459
@@ -129,7 +129,7 @@ def main(argv):
 
     if args.verbose:
         logger.info('working on target: {}'.format(target))
-    import pdb; pdb.set_trace()
+
     make_ast_corrections(tricats, target, outfiles=args.outfile,
                          fake=args.fake)
     return

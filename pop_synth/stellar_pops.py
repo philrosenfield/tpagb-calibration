@@ -86,7 +86,7 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
     return srgb, sagb
 
 
-def normalize_simulation(mag, nrgb, srgb, sagb, norm=None):
+def normalize_simulation(mag, nrgb, srgb, sagb, norm=None, tol=0.5):
     """
     scale simulation to have the same number of nrgb (data) as srgb (from mag)
 
@@ -117,8 +117,9 @@ def normalize_simulation(mag, nrgb, srgb, sagb, norm=None):
         norm = nrgb / float(len(srgb))
 
     logger.info('Normalization: %f' % norm)
-    if norm >= 0.5:
-        logger.warning('Not many simulated stars, need larger region or larger simulation')
+    if norm >= tol:
+        logger.warning('Not many simulated stars, '
+                       'need larger region or larger simulation')
 
     # random sample the data distribution
     rands = np.random.random(len(mag))
@@ -203,8 +204,8 @@ def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
     color = mag1 - mag2
     mag = mag1
     points = np.column_stack((color, mag))
-    inds = np.array([])
 
+    inds = np.array([])
     for exg in exclude_gates:
         ind, = np.nonzero(points_inside_poly(points, exg))
         inds = np.append(inds, ind)
@@ -217,23 +218,26 @@ def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
         color_cut = np.median(color[inds])
         blue = np.nonzero(color[decontam] < color_cut)
         decontam = np.delete(decontam, blue)
-
+        logger.info('doing a color cut')
     return decontam
 
 
 def get_exclude_gates(match_param):
-
+    """
+    parse the exclude gates from a match param file.
+    Returns a list of arrays of verticies.
+    """
     ex_line = open(match_param, 'r').readlines()[7]
     nexgs = np.int(ex_line[0])
     if nexgs == 0:
         logger.warning('no exclude gates')
-        exgs = np.inf
+        exgs = [np.inf]
     else:
         ex_data = np.array(ex_line.split()[1:-1], dtype=float)
         npts = len(ex_data)
         splits = np.arange(0, npts + 1, 8)
         exgs = [ex_data[splits[i]: splits[i+1]] for i in range(len(splits)-1)]
-        # complete the polygon
+        # complete the polygon and reshape
         for i in range(len(exgs)):
             exgs[i] = np.append(exgs[i], exgs[i][:2])
             exgs[i] = exgs[i].reshape(5, 2)
