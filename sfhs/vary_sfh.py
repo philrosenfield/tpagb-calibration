@@ -28,14 +28,14 @@ def load_sim_masses(target):
     at least that number of stars based on the best fit sfh.
     '''
     if target in ['ugc4459', 'ngc2976-deep', 'ddo71']:
-        mass = 1.0e+09
+        mass = 1.0e+08
     elif target in ['ic2574-sgs', 'ddo78', 'ugc5139', 'ngc300-wide1', 'ngc3741',
                     'ngc0404', 'ngc404']:
-        mass = 2.5e+09
+        mass = 2.5e+08
     elif target in ['ugc4305-1', 'ugc4305-2', 'ngc4163', 'ddo82']:
-        mass = 5.0e+09
+        mass = 5.0e+08
     else:
-        mass = 1.0e+09
+        mass = 1.0e+07
         logger.warning('no info on object mass for {}, assuming {} Msun'.format(target, mass))
 
     return mass
@@ -49,30 +49,30 @@ class VarySFHs(SFH):
     '''run several variations of the age sfr z from SFH'''
     def __init__(self, indict):
         """Vary the SFH from MATCH for a trilegal simulations
-        
+
         Parameters
         ----------
         filter1, filter2 : str, str
         V, I filters. Used only in file name conventions
-            
+
         outfile_loc : str
             path to put the trilegal output files
-    
+
         target : str
             name of observation target for file name conventions
-    
+
         hmc_file : str
             path to the Hybrid MCMC file
-        
+
         sfh_file : str
             path to the MATCH SFH file
-            
+
         cmd_input_file : str
             path to the cmd input file to run TRILEGAL
-    
+
         object_mass : str, will be converted to float
             optional, overwrite the mass set in galaxy_input
-    
+
         nsfhs : str, will be converted to int
             number of sfhs to sample
         """
@@ -116,16 +116,16 @@ class VarySFHs(SFH):
 
         sfr_fmt = '{}_{}_%003i.trisfr'.format(self.target, self.filter1)
         self.sfr_fmt = os.path.join(self.outfile_loc, sfr_fmt)
-        
+
         galinp_fmt = '{}_{}_%003i.galinp'.format(self.target, self.filter1)
         self.galinp_fmt = os.path.join(self.outfile_loc, galinp_fmt)
-        
+
     def prepare_galaxy_input(self, object_mass=None, overwrite=False,
                              file_imf=None, binary_frac=0.35,
                              object_cutoffmass=0.8):
         '''
         write the galaxy input file
-        
+
         TO DO:
         BF could/should come from match param file... could make a mistake here
         also could do better with IMF...
@@ -133,10 +133,10 @@ class VarySFHs(SFH):
         '''
         self.galaxy_inputs = []
         msfh = match.utils.MatchSFH(self.sfh_file)
-        
+
         if msfh.IMF == 0:
             file_imf = 'tab_imf/imf_kroupa02.dat'
-        
+
         gal_dict = \
             {'mag_limit_val': limiting_mag(self.fake_file, 0.1)[1],
              'object_av': msfh.Av,
@@ -146,9 +146,9 @@ class VarySFHs(SFH):
              'file_imf': file_imf,
              'filter1': 'F814W',
              'object_cutoffmass': object_cutoffmass}
-    
+
         trigal_dict = rsp.trilegal.utils.galaxy_input_dict(**gal_dict)
-        
+
         for i in range(len(self.sfr_files)):
             trigal_dict['object_sfr_file'] =  self.sfr_files[i]
             if len(self.sfr_files) == 1:
@@ -191,7 +191,7 @@ class VarySFHs(SFH):
         if os.path.isfile(hdf5file) and not overwrite:
             logger.warning('{} already exists, not calling trilegal'.format(hdf5file))
             flag += 1
-        
+
         if flag < 1:
             call = 'nice -n +19 taskset -c {0} code_{1}/main'.format(ite, ver)
             call += ' -f {0} -a -l {1} {2} > {2}.scrn'.format(self.cmd_input_file,
@@ -237,7 +237,7 @@ def call_VarySFH(inputs, loud=False, nproc=8, outfile='trilegal_script.sh',
                  overwrite=False):
     """
     write a script to run trilegal in parallel sampling the sfh
-    
+
     overwrite may not work as expected:
     a) for trilegal input files (*.galinp, *.sfr): won't overwrite
     b) trilegal output: won't write the command to call trilegal if the .hdf5
@@ -302,7 +302,7 @@ def main(argv):
 
     target, filter1, filter2 = \
         os.path.split(args.sfh_file)[1].split('.')[0].split('_')
-    
+
     agb_mod = args.cmd_input_file.replace('cmd_input_', '').replace('.dat', '').lower()
     outfile_loc = os.path.join(os.getcwd(), agb_mod)
     rsp.fileio.ensure_dir(outfile_loc)
@@ -313,7 +313,7 @@ def main(argv):
               'filter2': filter2,
               'hmc_file': args.hmc_file,
               'nsfhs': args.nsfhs,
-              'outfile_loc': outfile_loc,              
+              'outfile_loc': outfile_loc,
               'sfh_file': args.sfh_file,
               'target': target}
 

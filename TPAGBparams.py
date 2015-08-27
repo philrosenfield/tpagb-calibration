@@ -15,8 +15,8 @@ else:
             mpl.use('Agg')
     else:
         # mac
-        research_path = '/Users/rosenfield/research/'
-
+        #research_path = '/Users/rosenfield/research/'
+        research_path = '/Volumes/tehom/Dropbox/andromeda/research'
 tpcalib_dir = os.path.join(research_path, 'TP-AGBcalib')
 snap_src = os.path.join(tpcalib_dir, 'SNAP')
 phat_src = os.path.join(tpcalib_dir, 'PHAT')
