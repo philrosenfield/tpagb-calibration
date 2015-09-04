@@ -462,7 +462,7 @@ For the mag limits either:
                              norm=args.norm, match_param=args.match_param,
                              **kws)
 
-        if 0:
+        if 1:
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots()
 
