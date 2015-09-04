@@ -26,7 +26,7 @@ def load_phat(target):
 
 def find_phatfake(target):
     fake, = rsp.fileio.get_files(phat_match_run_loc,
-                                '*{}*.matchfake'.format(target))  
+                                '*{}*.matchfake'.format(target))
     return fake, fake
 
 def load_obs(target, optfilter1=''):
@@ -37,13 +37,13 @@ def load_obs(target, optfilter1=''):
     else:
         nirgalname, = rsp.fileio.get_files(data_loc,
                                            '*{}*fits'.format(target.upper()))
-    
+
         optgalname, = rsp.fileio.get_files(data_loc,
                                            ('*{}*{}*fits'.format(target, optfilter1).lower()))
-    
+
         nirgal = rsp.StarPop()
         nirgal.data = fits.getdata(nirgalname)
-    
+
         optgal = rsp.StarPop()
         optgal.data = fits.getdata(optgalname)
     return optgal, nirgal
@@ -55,10 +55,10 @@ def find_fakes(target, optfilter1=''):
     else:
         search_str = '*{}*.matchfake'.format(target.upper())
         fakes = rsp.fileio.get_files(data_loc, search_str)
-    
+
         nirfake, = [f for f in fakes if 'IR' in f]
         optfake = [f for f in fakes if not 'IR' in f]
-    
+
         if len(optfake) > 1:
             if optfilter1 != '':
                 optfake, = [o for o in optfake if optfilter1 in o]
@@ -91,13 +91,13 @@ def find_match_param(target, optfilter1=''):
 def load_lf_file(lf_file):
     """
     Read a strange formatted file... basically, the rows are transformed.
-    
+
     Each data row of the file corresponds to a header key.
-    
+
     For example, data row 1 corresponds to header key 1, data row 2 corresponds
     to header key 2 ... up to the number of header keys, and then repeats.
     So if there are 5 header keys, data row 6 corresponds to header key 1, etc.
-    
+
     It was done this way because some header keys correspond to a float,
     some correspond to an array of variable length.
     """
@@ -119,25 +119,25 @@ def load_observation(filename, colname1, colname2, match_param=None,
                      exclude_gates=None):
     """
     Convienince routine for loading mags from a fits file or photometry file
-    
+
     Note on using exclude gates:
     Be sure the filters sent to exclude_gate_inds match the filters in the
-    match_param file. 
-    
+    match_param file.
+
     Parameters
     ----------
     filename : string
         path to observation
-    
+
     colname1, colname2 : string, string
         name of mag1, mag2 column (if fits file)
-    
+
     match_param : string
         path to match_param file to extract exclude_gates
-    
+
     exculde_gates : N,2 np.array exclude_gates (color, mag1), N probably is 5 to
-        match MATCH, but doesn't need to be if this is re-purposed. 
-    
+        match MATCH, but doesn't need to be if this is re-purposed.
+
     Returns
     -------
     mag1, mag2 : np.arrays
@@ -172,11 +172,11 @@ def load_from_lf_file(lf_file, filter1='F814W_cor', filter2='F160W_cor',
 
     # load models
     lf_dict = load_lf_file(lf_file)
-    
+
     # idx_norm are the normalized indices of the simulation set to match RGB
     idx_norm = lf_dict['idx_norm']
     nmodels = 1
-    
+
     # take all the scaled cmds in the file together and make an average hess
 
     smag1 = np.array([lf_dict[filter1][i][idx_norm[i]]
@@ -197,7 +197,7 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
     """
     Load photometry from a lf_file (see load_lf_file) and observation
     (see load_observation) will also cut lf_file to be within observation mags
-    and cut both to be within comp_frac. 
+    and cut both to be within comp_frac.
     If flatten is true, will concatenate all mags from the lf_file.
     If it's false, mags coming back will be an array of arrays.
     """
@@ -205,7 +205,7 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
         # for opt_nir_matched data, take the obs limits from the data
         inds, = np.nonzero((smag1 <= mag1.max()) & (smag2 <= mag2.max()) &
                            (smag1 >= mag1.min()) & (smag2 >= mag2.min()))
-        
+
         sinds, = np.nonzero((smag2 <= comp2))# & (smag1 <= comp1))
         inds = list(set(sinds) & set(inds))
         smag1 = smag1[inds]
@@ -216,10 +216,10 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
         mag2 = mag2[oinds]
 
         return mag1, mag2, smag1, smag2
-    
+
     smag1, smag2, nmodels = load_from_lf_file(lf_file, flatten=flatten,
                                               filter1=filter1, filter2=filter2)
-    
+
     if comp_frac is not None:
         if optfake is None:
             target = os.path.split(lf_file)[1].split('_')[0]
@@ -244,14 +244,14 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
         mag2s = []
         smag1s = []
         smag2s = []
-        
+
         for i in range(len(smag1)):
             m1 = mag1
             m2 = mag2
             if lf2:
                 m1 = mag1[0]
                 m2 = mag2[0]
-            
+
             _mag1, _mag2, _smag1, _smag2 = limit_mags(m1, m2, smag1[i],
                                                       smag2[i], comp2)
             mag1s.append(_mag1)
@@ -272,6 +272,5 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
     if yfilter.upper() != 'I':
         symag = smag1
         ymag = mag1s
-    
-    return color, ymag, scolor, symag, nmodels
 
+    return color, ymag, scolor, symag, nmodels

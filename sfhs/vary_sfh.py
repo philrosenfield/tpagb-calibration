@@ -9,6 +9,7 @@ import sys
 import time
 
 import ResolvedStellarPops as rsp
+import trilegal
 import match
 
 from .star_formation_histories import StarFormationHistories as SFH
@@ -27,16 +28,17 @@ def load_sim_masses(target):
     the CMD as are in the data. Set here are object_mass that should give
     at least that number of stars based on the best fit sfh.
     '''
-    if target in ['ugc4459', 'ngc2976-deep', 'ddo71']:
+    if target in ['ugc4459',  'ddo71', 'hs117', 'kkh37', 'm81-deep',
+                  'ddo78']:
         mass = 1.0e+08
-    elif target in ['ic2574-sgs', 'ddo78', 'ugc5139', 'ngc300-wide1', 'ngc3741',
+    elif target in ['ic2574-sgs', 'ngc2976-deep', 'ugc5139', 'ngc300-wide1', 'ngc3741',
                     'ngc0404', 'ngc404']:
         mass = 2.5e+08
     elif target in ['ugc4305-1', 'ugc4305-2', 'ngc4163', 'ddo82']:
         mass = 5.0e+08
     else:
         mass = 1.0e+07
-        logger.warning('no info on object mass for {}, assuming {} Msun'.format(target, mass))
+        logger.warning('no info on object mass for {}, assuming {:.2e} Msun'.format(target, mass))
 
     return mass
 
@@ -147,7 +149,7 @@ class VarySFHs(SFH):
              'filter1': 'F814W',
              'object_cutoffmass': object_cutoffmass}
 
-        trigal_dict = rsp.trilegal.utils.galaxy_input_dict(**gal_dict)
+        trigal_dict = trilegal.utils.galaxy_input_dict(**gal_dict)
 
         for i in range(len(self.sfr_files)):
             trigal_dict['object_sfr_file'] =  self.sfr_files[i]
@@ -160,7 +162,7 @@ class VarySFHs(SFH):
             self.galaxy_inputs.append(new_out)
             if not os.path.isfile(new_out) or overwrite:
                 gal_inp = rsp.fileio.InputParameters(default_dict=trigal_dict)
-                gal_inp.write_params(new_out, rsp.trilegal.utils.galaxy_input_fmt())
+                gal_inp.write_params(new_out, trilegal.utils.galaxy_input_fmt())
             else:
                 logger.info('not overwritting {}'.format(new_out))
 
