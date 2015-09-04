@@ -28,11 +28,11 @@ def load_sim_masses(target):
     the CMD as are in the data. Set here are object_mass that should give
     at least that number of stars based on the best fit sfh.
     '''
-    if target in ['ugc4459',  'ddo71', 'hs117', 'kkh37', 'm81-deep',
-                  'ddo78']:
+    if target in ['ddo71', 'hs117', 'kkh37', 'm81-deep',
+                  'ddo78', 'scl-de1', 'ugc8508', 'ngc2403-halo-6', 'ngc2403-deep']:
         mass = 1.0e+08
     elif target in ['ic2574-sgs', 'ngc2976-deep', 'ugc5139', 'ngc300-wide1', 'ngc3741',
-                    'ngc0404', 'ngc404']:
+                    'ngc404-deep', 'ugc4459']:
         mass = 2.5e+08
     elif target in ['ugc4305-1', 'ugc4305-2', 'ngc4163', 'ddo82']:
         mass = 5.0e+08
