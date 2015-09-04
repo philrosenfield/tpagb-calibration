@@ -71,7 +71,7 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
     srgb = stars_in_region(mag, low, mid, col_min=col_min, col_max=col_max,
                            mag1=mag1, color=color)
     if len(srgb) == 0:
-        import pdb; pdb.set_trace()
+        logger.error('There are no simulated RGB stars in the given regions.')
     # define AGB regions
     if offset is not None:
         mid = trgb - trgb_exclude
@@ -190,7 +190,7 @@ def completeness_corrections(fakefile, mag_bins, mag2=True):
     return ast_c
 
 def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
-                      ms_color_cut=True):
+                      ms_color_cut=False):
     """
     return an array of all points outside the exclude gates region if
     find_ms_color_cut is set, will include all points bluer than the median

@@ -56,8 +56,8 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
                 m2 = sgal.data[f2a]
             except:
                 logger.warning('not using optical asts for exclude gates')
-                m1 = sgal.data[f1]
-                m2 = sgal.data[f2]
+        m1 = sgal.data[f1]
+        m2 = sgal.data[f2]
         inds = exclude_gate_inds(m1, m2, match_param=match_param)
     else:
         inds = np.arange(len(sgal.data[filter2]))
