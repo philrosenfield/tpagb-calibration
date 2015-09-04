@@ -452,7 +452,7 @@ For the mag limits either:
         f1 = filter1
         f2 = filter2
 
-    kws = {'filter1': filter1, 'filter2': filter2, 'ast_cor': args.ast_cor}
+    kws = {'filter1': f1, 'filter2': f2, 'ast_cor': args.ast_cor}
 
     for tricat in tricats:
         logger.debug('normalizing: {}'.format(tricat))
@@ -544,15 +544,15 @@ For the mag limits either:
     #                                                     sgal_agb, filter2)
 
     # write the output files
-    fdict = write_results(result_dict, args.target, filter1, filter2, outfile_loc,
+    fdict = write_results(result_dict, args.target, f1, f2, outfile_loc,
                           extra_str=extra_str)
 
     if args.lfplot:
         agb_mod = tricat.split('_')[6]
         plotting.compare_to_gal(fdict['lf_file'], args.observation,
-                       narratio_file=fdict['narratio_file'],
+                       narratio_file=fdict['narratio_file'], filter1=f1,
                        agb_mod=agb_mod, regions_kw=regions_kw,
-                       xlims=[(19,28), (18, 25)],
+                       xlims=[(19,28), (18, 25)], filter2=f2,
                        col1=col1, col2=col2, match_param=args.match_param)
 
     return
