@@ -117,26 +117,27 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
 
     ax: axes instance
         if axes instance supplied, will not create new one
-    
+
     Returns
     -------
     ax: axes instance
     '''
-    
+
     plt_kw = dict({'linestyle': 'steps-mid', 'color': 'black',
                    'alpha': 0.2}.items() + plt_kw.items())
-    
+
     if agb_mod is not None:
         label = r'$%s$' % agb_mod.split('_')[-1]
         plt_kw_lab = dict(plt_kw.items() + {'label': label}.items())
     else:
         plt_kw_lab = plt_kw
-    
+
     if ax is None:
         fig, (ax) = plt.subplots(figsize=(12, 6))
-        
+
     for i in range(len(mag2s)):
         if inorm is not None:
+            import pdb; pdb.set_trace()
             mag2 = mag2s[i][inorm[i]]
             norm = 1.
         else:
@@ -185,9 +186,9 @@ def plot_models(lf_file, bins, filt, maglimit=None, ax=None, plt_kw=None,
                 agb_mod=None):
     plt_kw = plt_kw or {}
     lfd = load_lf_file(lf_file)
-    
+
     mags = lfd[filt]
-        
+
     ax = plot_model(mag2s=mags, bins=bins, inorm=lfd['idx_norm'],
                     maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod=agb_mod)
 
@@ -216,7 +217,7 @@ def mag2Mag(mag2, target, filter2):
 
     mag = rsp.astronomy_utils.mag2Mag(mag2, filter2, 'wfc3snap', Av=av,
                                       dmod=dmod)
-    
+
     return mag
 
 
@@ -235,12 +236,12 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
     # model - data
     # plot all three
     galaxies = rsp.fileio.get_files(data_loc, '*fits')
-    
+
     fig1, opt_axs = plt.subplots(nrows=3, sharex=True, figsize=(6, 9))
     fig2, nir_axs = plt.subplots(nrows=3, sharex=True, figsize=(6, 9))
 
     bins = np.arange(16, 27, dmag)
-    
+
     for i, lf_file in enumerate(lf_files):
         lfd = load_lf_file(lf_file)
         target = os.path.split(lf_file)[1].split('_')[0]
@@ -248,8 +249,8 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
         mag1, mag2 = load_observation(observation, col1, col2,
                                       match_param=match_param)
         color = mag1 - mag2
-        
-        search_str = '*{}*.matchfake'.format(target.upper())    
+
+        search_str = '*{}*.matchfake'.format(target.upper())
         fakes = rsp.fileio.get_files(matchfake_loc, search_str)
         nirfake, = [f for f in fakes if 'IR' in f]
         optfake = [f for f in fakes if not 'IR' in f][0]
@@ -266,8 +267,8 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
 
             Mbins = mag2Mag(bins, target, filt.replace('_cor', ''))
             #ax.errorbar(bins[1:], hist, yerr=err, **plot_kw)
-    
-            
+
+
             comp_corr = stellar_pops.completeness_corrections(fake_file,
                                                               bins)
             data = np.array(np.histogram(mag2, bins=bins)[0], dtype=float)
@@ -277,21 +278,21 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
 
             data = mag2Mag(data, target, filt.replace('_cor', ''))
             err = np.sqrt(data)
-            
+
             smag = np.concatenate(lfd[filt])
             inorm = np.concatenate(lfd['idx_norm'])
             smag_scaled = smag[inorm]
-                        
+
             model = np.array(np.histogram(smag_scaled, bins=bins)[0],
                              dtype=float)
             # mask 0s or they will be turned to Abs Mag
             model[model == 0] = np.nan
-            
+
             model = mag2Mag(model, target, filt.replace('_cor', ''))
-            
+
             dmdiff = data - model
             sdiff = dmdiff / data
-            
+
             axs[0].errorbar(Mbins[1:], model, yerr=np.sqrt(err),
                             linestyle='steps-mid')
             axs[1].plot(Mbins[1:], dmdiff, drawstyle='steps-mid')
@@ -316,9 +317,9 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
 
 
 def load_data(opt=True, optfilter1=None, target=None, extra_str='',
-              optfilter2_limit=None, nirfilter2_limit=None, 
+              optfilter2_limit=None, nirfilter2_limit=None,
               optregions_kw={}, nirregions_kw={}):
-              
+
     optgal, nirgal = load_obs(target, optfilter1=optfilter1)
     optfake, nirfake = find_fakes(target)
     if opt:
@@ -326,7 +327,7 @@ def load_data(opt=True, optfilter1=None, target=None, extra_str='',
         fake_file = optfake
         extra_str += '_opt'
         regions_kw = optregions_kw
-        try:   
+        try:
             mag2 = optgal.data['MAG2_ACS']
         except:
             try:
@@ -344,7 +345,7 @@ def load_data(opt=True, optfilter1=None, target=None, extra_str='',
         extra_str = extra_str.replace('opt', 'nir')
         regions_kw = nirregions_kw
         filter2 = nirfilter2
-    
+
     return mag2, filter2, regions_kw, fake_file, maglimit, extra_str
 
 
@@ -373,12 +374,12 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
     #ogal, ngal = load_obs(target)
     #mag1 = ogal.data['MAG2_ACS']
     #mag2 = ngal.data['MAG2_IR']
-    
-    search_str = '*{}*.matchfake'.format(target.upper())    
+
+    search_str = '*{}*.matchfake'.format(target.upper())
     fakes = rsp.fileio.get_files(matchfake_loc, search_str)
     nirfake, = [f for f in fakes if 'IR' in f]
     optfake = [f for f in fakes if not 'IR' in f][0]
-    
+
     if narratio_file is not None:
         ratio_data = rsp.fileio.readfile(narratio_file, string_column=[0, 1, 2])
 
@@ -393,7 +394,7 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
             xlim = xlims[0]
             ylim = ylims[0]
         else:
-            mag = mag2 
+            mag = mag2
             xlim = xlims[1]
             ylim = ylims[1]
 
@@ -409,7 +410,7 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
             ax.set_ylim(ylim)
         else:
             ax.set_ylim(1, ax.get_ylim()[-1])
-    
+
         if xlim is not None:
             ax.set_xlim(xlim)
         #else:
@@ -419,7 +420,7 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
         if filt == filter2:
             if regions_kw is not None:
                 ax = add_lines_to_plot(ax, **regions_kw)
-        
+
         ax.legend(loc='lower right')
         ax.set_xlabel('${}$'.format(filt.replace('_cor', '')), fontsize=20)
 
@@ -436,7 +437,7 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
 def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None,
                       trgb=None, trgb_exclude=None, lf=True, col_min=None,
                       col_max=None, **kwargs):
-    
+
     if mag_bright is not None:
         low = mag_faint
         mid = mag_bright
@@ -445,15 +446,15 @@ def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None,
         'need either offset or mag limits'
         low = trgb + offset
         mid = trgb + trgb_exclude
-    
+
     yarr = np.linspace(*ax.get_ylim())
     if lf:
-        
+
         # vertical lines around the trgb exclude region
         ax.fill_betweenx(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
                          color='black', alpha=0.1)
         ax.vlines(trgb, *ax.get_ylim(), color='black', linestyle='--')
-        
+
         ax.vlines(low, *ax.get_ylim(), color='black', linestyle='--')
         #ax.fill_betweenx(yarr, mid, low, color='black', alpha=0.1)
         #if mag_limit_val is not None:
@@ -461,12 +462,12 @@ def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None,
         #                     color='black', alpha=0.5)
     else:
         xarr = np.linspace(*ax.get_xlim())
-        
+
         # vertical lines around the trgb exclude region
         ax.fill_between(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
                          color='black', alpha=0.1)
         ax.hlines(trgb, *ax.get_xlim(), color='black', linestyle='--')
-        
+
         ax.hlines(low, *ax.get_xlim(), color='black', linestyle='--')
         #ax.fill_betweenx(yarr, mid, low, color='black', alpha=0.1)
         #if mag_limit_val is not None:
@@ -495,9 +496,9 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
     filter1, filter2 = [f for f in sgal.name.split('_') if f.startswith('F')]
     if type(zcolumns) is str:
         zcolumns = [zcolumns]
-    
+
     optgal, nirgal = load_obs(target, optfilter1=optfilter1)
-    
+
     if opt:
         if 'm31' in trilegal_catalog or 'B' in trilegal_catalog:
             mag1 = 'F475W'
@@ -522,7 +523,7 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
         gal = nirgal
         band = 'nir'
         inds = nir_lfd['niridx_norm'][0]
-    
+
     outfmt = trilegal_catalog.replace('.dat', '')
     for zcolumn in zcolumns:
         zstr = zcolumn.translate(None, '/[]')
@@ -535,14 +536,14 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
             ylim = (-10.5, -4)
         elif zcolumn == 'logAge':
             ylim = (6, 10.1)
-            
+
         if filter2 == 'F814W':
             maglim = (28, 22)
             collim = (-2, 5)
         else:
             maglim = (25, 18)
             collim = (-0.5, 2)
-        
+
         # hist-scatter plot
         magbins = np.arange(16, 27, 0.1)
         axs = sgal.scatter_hist(filter2, zcolumn, coldata='stage', xbins=magbins,
@@ -556,15 +557,15 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
 
         outfile = '{}_{}_{}_scatterhist.png'.format(outfmt, zstr, band)
         plt.savefig(outfile)
-        logger.info('wrote {}'.format(outfile)) 
+        logger.info('wrote {}'.format(outfile))
 
         # data model CMD plot
         fig, (ax1, ax2) = plt.subplots(ncols=2, sharex=True, sharey=True,
                                        figsize=(12, 8))
-    
+
         ax1.plot(gal.data[mag1] - gal.data[mag2], gal.data[mag2], '.',
                  color='k', alpha=0.2, zorder=1)
-    
+
         ax2 = sgal.color_by_arg(sgal.data[filter1] - sgal.data[filter2],
                                 filter2, zcolumn, ax=ax2, ylim=ylim,
                                 slice_inds=inds)
@@ -579,10 +580,10 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
             ax.set_xlim(collim)
             ax.set_ylabel(r'${}$'.format(filter2))
             ax.set_xlabel(r'${}-{}$'.format(filter1, filter2))
-            
+
             if len(regions_kw) > 0:
                 ax = add_lines_to_plot(ax, lf=False, **regions_kw)
-        
+
         outfile = '{}_{}_{}.png'.format(outfmt, zstr, band)
         plt.savefig(outfile)
         logger.info('wrote {}'.format(outfile))
@@ -592,7 +593,7 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
 def main(argv):
     from ..analysis.normalize import parse_regions
     parser = argparse.ArgumentParser(description="Plot LFs against galaxy data")
-    
+
     parser.add_argument('-c', '--colorlimits', type=str, default=None,
                         help='comma separated color min, color max, opt then nir')
 
@@ -610,13 +611,13 @@ def main(argv):
 
     parser.add_argument('-o', '--trgboffsets', type=str, default=None,
                         help='comma separated trgb offsets')
-    
+
     parser.add_argument('-r', '--table', type=str,
                         help='read colorlimits, completness mags from a prepared table')
-    
+
     parser.add_argument('-u', '--use_exclude', action='store_true',
                         help='decontaminate LF by excluding stars within exclude_gates')
-    
+
     parser.add_argument('-n', '--narratio_file', type=str,
                         help='model narratio file')
 
@@ -625,20 +626,20 @@ def main(argv):
 
     parser.add_argument('-v', '--Av', type=float, default=0.,
                         help='visual extinction')
-    
+
     parser.add_argument('lf_file', type=str, nargs='*',
                         help='model LFs file')
 
     parser.add_argument('observation', type=str,
                         help='data file to compare to')
-        
+
     parser.add_argument('agb_mod', type=str,
                         help='agb model name')
 
     args = parser.parse_args(argv)
 
     #optregions_kw, nirregions_kw = parse_regions(args)
-    
+
 
     if args.cmd:
         zcols = ['stage', 'logAge', 'm_ini', '[M/H]', 'C/O', 'logML']
@@ -657,4 +658,3 @@ def main(argv):
 
 if __name__ == '__main__':
     main(sys.argv[1:])
-    
