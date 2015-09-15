@@ -316,7 +316,7 @@ def parse_regions(args):
 
 def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={},
                   match_param=None):
-    target = os.path.split(filename)[1].split('_')[1]
+    target, _ = rsp.asts.parse_pipeline(filename)
     mag1, mag2 = load_observation(filename, col1, col2, match_param=match_param)
     ymag = mag2
     if yfilter == 'V':
@@ -325,7 +325,6 @@ def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={},
     # as long as col_min is not None, it will use magbright and col_min etc
     # as verts, so leave mag2 and mag1 as is, and if CMD has V for yaxis,
     # just relfect that in
-
     regions_kw['color'] = mag1 - mag2
     gal_rgb, gal_agb = rgb_agb_regions(ymag, **regions_kw)
     if 'IR' in col2:
@@ -333,6 +332,42 @@ def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={},
 
     return float(len(gal_rgb)), float(len(gal_agb))
 
+
+def cmd_diag(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw):
+    def numlabel(n, string):
+        return '{} {}'.format(len(n), string)
+
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+
+    kw = {'alpha': 0.3, 'mec': 'none'}
+    ax.plot(sgal.data[f1] - sgal.data[f2],
+            sgal.data[f2], '.', label=numlabel(sgal.data[f2], 'no exclude'),
+            **kw)
+
+    ax.plot(sgal.data[f1][inds] - sgal.data[f2][inds],
+            sgal.data[f2][inds], '.', label=numlabel(inds, 'sim'), **kw)
+
+    mag1, mag2 = load_observation(args.observation, col1, col2,
+                                  match_param=args.match_param)
+    ax.plot(mag1 - mag2, mag2, '.', label=numlabel(mag1, 'data'), **kw)
+
+    ind = narratio_dict['idx_norm']
+    ax.plot(sgal.data[f1][inds][ind] - sgal.data[f2][inds][ind],
+            sgal.data[f2][inds][ind], '.', label=numlabel(inds[ind], 'scaled sim'), **kw)
+
+    ind = narratio_dict['sgal_rgb']
+    ax.plot(sgal.data[f1][inds][ind] - sgal.data[f2][inds][ind],
+            sgal.data[f2][inds][ind], '.', label=numlabel(inds[ind], 'sim rgb'), **kw)
+
+    ax.set_ylim(mag2.max() + 0.2, mag2.min() - 0.2)
+    ax.set_xlim(-0.5, np.max(mag1 - mag2) + 0.1)
+
+    plt.legend(loc='best', numpoints=1)
+    ax.set_xlabel('{}-{}'.format(f1,f2))
+    ax.set_ylabel('{}'.format(f2))
+    plotting.add_lines_to_plot(ax, lf=False, **regions_kw)
+    plt.savefig(sgal.name.replace('.dat', '_diag.png'))
 
 def main(argv):
     description = """Scale trilegal catalog to a CMD region of that data.
@@ -463,34 +498,8 @@ For the mag limits either:
                              **kws)
 
         if 1:
-            import matplotlib.pyplot as plt
-            fig, ax = plt.subplots()
-
-            kw = {'alpha': 0.3, 'mec': 'none'}
-            ax.plot(sgal.data[f1] - sgal.data[f2],
-                    sgal.data[f2], '.', label='no exclude')
-
-            ax.plot(sgal.data[f1][inds] - sgal.data[f2][inds],
-                    sgal.data[f2][inds], '.', label='sim')
-
-            mag1, mag2 = load_observation(args.observation, col1, col2,
-                                          match_param=args.match_param)
-            ax.plot(mag1 - mag2, mag2, '.', label='data')
-
-            ind = narratio_dict['idx_norm']
-            ax.plot(sgal.data[f1][inds][ind] - sgal.data[f2][inds][ind],
-                    sgal.data[f2][inds][ind], '.', label='scaled sim')
-
-            ind = narratio_dict['sgal_rgb']
-            ax.plot(sgal.data[f1][inds][ind] - sgal.data[f2][inds][ind],
-                    sgal.data[f2][inds][ind], '.', label='sim rgb')
-
-            ax.set_ylim(mag2.max() + 0.2, mag2.min() - 0.2)
-            ax.set_xlim(np.min(mag1 - mag2) - 0.1, np.max(mag1 - mag2) + 0.1)
-
-            plt.legend(loc='best', numpoints=1)
-            plt.savefig(sgal.name.replace('.dat', '_diag.png'))
-
+            cmd_diag(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw)
+            """
             ind = list(set(np.nonzero(sgal.data[f1][inds] < 30)[0]) &
                        set(np.nonzero(sgal.data[f2][inds] < 30)[0]) &
                        set(narratio_dict['idx_norm']))
@@ -527,8 +536,10 @@ For the mag limits either:
             ax.set_ylim(ylim)
 
             plt.savefig(sgal.name.replace('.dat', '_diagcmd.png'))
+            """
         #except:
         #    pass
+
         lf_line, narratio_line = gather_results(sgal, args.target, inds,
                                                 narratio_dict=narratio_dict,
                                                 narratio_line=narratio_line,
