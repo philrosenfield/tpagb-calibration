@@ -16,7 +16,6 @@ from .analyze import get_itpagb
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag, exclude_gate_inds
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_observation
-from ..utils import check_astcor
 from ..plotting import plotting
 
 logging.basicConfig(level=logging.DEBUG)
@@ -41,21 +40,9 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
             sgal.data['F475W'] += sgal.apply_dAv(dAv, 'F475W', 'phat', Av=Av)
             sgal.data['F814W'] += sgal.apply_dAv(dAv, 'F814W', 'phat', Av=Av)
 
-    if ast_cor:
-        filter1 += '_cor'
-        filter2 += '_cor'
-
     if match_param is not None:
         target, (f1, f2) = rsp.asts.parse_pipeline(match_param)
         logger.info('using exclude gates on simulation')
-        if ast_cor:
-            f1a = '{}_cor'.format(f1)
-            f2a = '{}_cor'.format(f2)
-            try:
-                m1 = sgal.data[f1a]
-                m2 = sgal.data[f2a]
-            except:
-                logger.warning('not using optical asts for exclude gates')
         m1 = sgal.data[f1]
         m2 = sgal.data[f2]
         inds = exclude_gate_inds(m1, m2, match_param=match_param)
@@ -128,16 +115,13 @@ def narratio(target, nrgb, nagb, filt1, filt2, narratio_line=''):
     return narratio_line
 
 
-def gather_results(sgal, target, inds, filter1=None, filter2=None, ast_cor=False,
+def gather_results(sgal, target, inds, filter1=None, filter2=None,
                    narratio_dict=None, lf_line='', narratio_line=''):
     '''gather results into strings: call tpagb_lf and narratio'''
 
-    filt1, filt2 = [filter1, filter2]
-    if ast_cor:
-        filt1, filt2 = check_astcor([filter1, filter2])
-
     if len(narratio_dict['sim_agb']) > 0:
-        lf_line = tpagb_lf(sgal, narratio_dict, inds, filt1, filt2, lf_line=lf_line)
+        lf_line = tpagb_lf(sgal, narratio_dict, inds, filter1, filter2,
+                           lf_line=lf_line)
 
     rgb = narratio_dict['sim_rgb']
     agb = narratio_dict['sim_agb']
@@ -145,7 +129,7 @@ def gather_results(sgal, target, inds, filter1=None, filter2=None, ast_cor=False
     nrgb = float(len(rgb))
     nagb = float(len(agb))
 
-    narratio_line = narratio(target, nrgb, nagb, filt1, filt2,
+    narratio_line = narratio(target, nrgb, nagb, filter1, filter2,
                              narratio_line=narratio_line)
 
     return lf_line, narratio_line
@@ -487,7 +471,7 @@ For the mag limits either:
         f1 = filter1
         f2 = filter2
 
-    kws = {'filter1': f1, 'filter2': f2, 'ast_cor': args.ast_cor}
+    kws = {'filter1': f1, 'filter2': f2}
 
     for tricat in tricats:
         logger.debug('normalizing: {}'.format(tricat))
@@ -543,7 +527,7 @@ For the mag limits either:
         lf_line, narratio_line = gather_results(sgal, args.target, inds,
                                                 narratio_dict=narratio_dict,
                                                 narratio_line=narratio_line,
-                                                lf_line=lf_line, **kws)
+                                                lf_line=lf_line)
         # does this save time?
         if args.output is not None:
             sgal.write_data(args.output, overwrite=True,
