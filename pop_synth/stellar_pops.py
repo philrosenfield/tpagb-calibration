@@ -6,8 +6,7 @@ from ResolvedStellarPops.galaxies.starpop import stars_in_region
 from ResolvedStellarPops.galaxies.asts import ASTs
 from ResolvedStellarPops.utils import points_inside_poly
 
-
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None,

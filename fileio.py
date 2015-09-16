@@ -5,18 +5,39 @@ import sys
 import numpy as np
 import ResolvedStellarPops as rsp
 
+from astropy.io import ascii
 from astropy.table import Table
 from TPAGBparams import snap_src, phat_src
 
 from pop_synth.stellar_pops import limiting_mag, exclude_gate_inds
 
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 data_loc = os.path.join(snap_src, 'data', 'galaxies')
 match_run_loc = os.path.join(snap_src, 'match')
 phat_data_loc =  os.path.join(phat_src, 'low_av', 'phot')
 phat_match_run_loc =  os.path.join(phat_src, 'low_av', 'fake')
+
+def load_table(filename, target, optfilter1=None, opt=True):
+
+    if opt:
+        filt1 = optfilter1
+        assert optfilter1 is not None
+    else:
+        filt1 = nirfilter1
+
+    tbl = ascii.read(filename)
+
+    ifilts = list(np.nonzero((tbl['filter1'] == filt1))[0])
+    itargs = [i for i in range(len(tbl['target'])) if target.upper() in tbl['target'][i]]
+    indx = list(set(ifilts) & set(itargs))
+
+    if len(indx) == 0:
+        logger.error('{}, {} not found in table'.format(target, filt1))
+        sys.exit(2)
+
+    return tbl[indx]
 
 def load_phat(target):
     galname, = rsp.fileio.get_files(phat_data_loc, '*{}*match'.format(target))
@@ -110,8 +131,7 @@ def load_lf_file(lf_file):
     lfd = {}
     for i, key in enumerate(header):
         lfd[key] = [np.array(map(rsp.utils.is_numeric, l.split()))
-                    for l in lines[i::ncols]]
-
+                    for l in lines[i::ncols] if len(l.split())>0]
     return lfd
 
 

@@ -15,16 +15,125 @@ import ResolvedStellarPops as rsp
 
 from astropy.io import ascii
 from IPython import parallel
-from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions
+from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_obs, find_fakes
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+
+from ..TPAGBparams import snap_src, matchfake_loc
 angst_data = rsp.angst_tables.angst_table.AngstTables()
 
-__all__ = ['get_itpagb']
+__all__ = ['get_itpagb', 'parse_regions']
+
+
+def get_trgb(target, filter2='F160W', filter1=None):
+    import difflib
+    angst_data = rsp.angst_tables.angst_data
+    if 'm31' in target.lower() or 'B' in target:
+        trgb = 22.
+    else:
+        if not '160' in filter2:
+            angst_target = difflib.get_close_matches(target.upper(),
+                                                     angst_data.targets)[0].replace('-', '_')
+
+            target_row = angst_data.__getattribute__(angst_target)
+            key = [k for k in target_row.keys() if ',' in k]
+            if len(key) > 1:
+                if filter1 is not None:
+                    key = [k for k in key if filter1 in k]
+                else:
+                    logger.error('Need another filter to find trgb')
+            trgb = target_row[key[0]]['mTRGB']
+        else:
+            trgb = angst_data.get_snap_trgb_av_dmod(target.upper())[0]
+    return trgb
+
+
+def parse_regions(args):
+    """
+    """
+    if not hasattr(args, 'table'):
+        args.table = None
+    # need the following in opt and nir
+    colmin, colmax = None, None
+    magfaint, magbright = None, None
+    filter1, filter2 = args.scolnames.split(',')
+
+    opt = True
+    if args.yfilter == 'V':
+        opt = False
+
+    if args.trgb is None:
+        try:
+            trgb = get_trgb(args.target, filter2=filter2, filter1=filter1)
+        except:
+            trgb = np.nan
+
+    if args.table is not None:
+        row = load_table(args.table, args.target, optfilter1=args.optfilter1,
+                         opt=opt)
+        if args.offset is None or row['mag_by_eye'] != 0:
+            logger.debug('mags to norm to rgb are set by eye from table')
+            magbright = row['magbright']
+            magfaint = row['magfaint']
+        else:
+            magbright = trgb + trgbexclude
+            if row['comp90mag2'] < trgb + args.trgboffset:
+                msg = '0.9 completeness fraction'
+                opt_magfaint = row['comp90mag2']
+            else:
+                msg = 'trgb + offset'
+                magfaint = trgb + offset
+            logger.debug('faint mag limit for rgb norm set to {}'.format(msg))
+
+        colmin = row['colmin']
+        colmax = row['colmax']
+    else:
+        if args.colorlimits is not None:
+            colmin, colmax = map(float, args.colorlimits.split(','))
+            if colmax < colmin:
+                colmax = colmin + colmax
+                logger.debug('colmax was less than colmin, assuming it is dcol, colmax is set to colmin + dcol')
+
+        if args.maglimits is not None:
+            magfaint, magbright = map(float, args.maglimits.split(','))
+        else:
+            magbright = trgb + args.trgbexclude
+            magfaint = trgb + args.trgboffset
+            msg = 'trgb + offset'
+
+            if args.comp_frac is not None:
+                search_str = '*{}*.matchfake'.format(args.target.upper())
+                fakes = rsp.fileio.get_files(matchfake_loc, search_str)
+
+                fake = [f for f in fakes if filter2 in f][0]
+
+                _, comp_mag2 = limiting_mag(fake, args.comp_frac)
+                #comp_mag1, comp_mag2 = limiting_mag(args.fake_file,
+                #                                    args.comp_frac)
+                if comp_mag2 < trgb + args.trgboffset:
+                    msg = '{} completeness fraction: {}'.format(args.comp_frac,
+                                                                comp_mag2)
+                    magfaint = comp_mag2
+                else:
+                    logger.debug('magfaint: {} comp_mag2: {} using magfaint'.format(magfaint, comp_mag2))
+            logger.debug('faint mag limit for rgb norm set to {}'.format(msg))
+
+    regions_kw = {'offset': args.trgboffset,
+                  'trgb_exclude': args.trgbexclude,
+                  'trgb': trgb,
+                  'col_min': colmin,
+                  'col_max': colmax,
+                  'mag_bright': magbright,
+                  'mag_faint': magfaint}
+    logger.debug('regions: {}'.format(regions_kw))
+    return regions_kw
+
+
+
 
 def tpagb_rheb_line(color, mag, dmod=0.):
     b = 1.17303
@@ -33,7 +142,7 @@ def tpagb_rheb_line(color, mag, dmod=0.):
     return np.nonzero(color > ((mag - b - dmod) / m))
 
 def get_itpagb(target, color, mag, col):
-    
+
     # careful! get_snap assumes F160W
     if '160' in col or '110' in col or 'IR' in col:
         try:
@@ -45,7 +154,7 @@ def get_itpagb(target, color, mag, col):
         mtrgb, Av, dmod = angst_data.get_tab5_trgb_av_dmod(target.upper(),
                                                            filters=col)
         redward_of_rheb = np.arange(len(color))
-    
+
     brighter_than_trgb, = np.nonzero(mag < mtrgb)
     itpagb = list(set(redward_of_rheb) & set(brighter_than_trgb))
     return itpagb
@@ -76,7 +185,7 @@ def main(argv):
                         help='MATCH SFH file: must have the format target_filter1_filter2.extensions')
 
     args = parser.parse_args(argv)
-    
+
     rsp.match.likelihood.match_stats(args.hmc_file, args.cmd_file, dry_run=False)
 
 
@@ -129,7 +238,7 @@ def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.
     inds, =  np.nonzero((color > cmin) & (mag2 < faint_mag) & (color < cmax) &
                         (mag2 > bright_mag))
     # 4 bin them
-    
+
     # 5 fit double gaussian
     # a) at all mags (is there strong evidence for 2 gaussians?)
     # b) at some mag step
@@ -140,7 +249,7 @@ def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.
         inds1 = smag2[:stars_per_bin]
         inds2 = smag2[stars_per_bin: 2 * stars_per_bin]
         inds3 = smag2[2 * stars_per_bin:]
-        
+
     #dinds = np.digitize(mag2[inds], mag_bins)
     # some check here if the dinds are well populated...
     cseps = []
@@ -167,14 +276,14 @@ def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.
         gmix = GMM(n_components=2, covariance_type='full', n_iter=1000)
         gmix.fit(sample)
         print gmix.means_
-        
+
         #ax2 = ax1.twinx()
         #ax1.hist(sample, 100) # draw samples
-        
+
         x = np.linspace(sample.min(), sample.max(), 100)
         logprob, responsibilities = gmix.score_samples(x)
         pdf = np.exp(logprob)
-        
+
         pdf_individual = responsibilities * pdf[:, np.newaxis]
         # each gaussian shifted to the proper mag bin (1 mag width wide)
         ax.plot(x, -1. * mdiff * pdf_individual[:, 1] / np.max(pdf) + mseps[j], '--g')
@@ -186,7 +295,7 @@ def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.
         # full probablity
         #ax.plot(x, -1. * np.exp(gmix.score_samples(x)[0])/np.max(np.exp(gmix.score_samples(x)[0])) + mag_bins[i], 'r') # draw GMM
         ax.plot(x, -1. * mdiff * pdf/np.max(pdf) + mseps[j], 'r') # draw GMM
-        
+
         #isect = np.argmin(np.abs(pdf_individual[:, 1] - pdf_individual[:, 0]))
         isect = rsp.utils.find_peaks(pdf)['minima_locations']
         #ax.plot(x[pdf.argmax() + isect], pdf[pdf.argmax() + isect], 'o')
@@ -202,7 +311,7 @@ def contamination(phot, faint_mag, bright_mag=21, mag_bins=None, cmin=1, cmax=2.
     # 7 refit to minimize contamination?
 
 # call contamination -- all galaxies, all old galaxies, one at a time
-# could use same SFH and apply ast corrections over and over and see how it changes.    
+# could use same SFH and apply ast corrections over and over and see how it changes.
 
 if __name__ == "__main__":
     main(sys.argv[1:])
@@ -274,4 +383,3 @@ def contamination_by_phases(sgal, srgb, sagb, filter2, diag_plot=False,
         ax.set_title(target)
         plt.savefig('contamination_%s.png' % target, dpi=150)
     return line
-

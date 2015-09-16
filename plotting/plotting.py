@@ -12,20 +12,24 @@ import numpy as np
 import ResolvedStellarPops as rsp
 angst_data = rsp.angst_tables.angst_data
 
-from ..analysis.analyze import get_itpagb
+from ..analysis.analyze import get_itpagb, parse_regions
+
 from ..fileio import load_obs, find_fakes, find_match_param, load_lf_file
 from ..fileio import load_observation
 from ..utils import minmax
 
 from ..pop_synth import stellar_pops
 from ..sfhs import star_formation_histories
+
 # where the matchfake files live
-from ..TPAGBparams import snap_src
-matchfake_loc = os.path.join(snap_src, 'data', 'galaxies')
-data_loc = os.path.join(snap_src, 'data', 'opt_ir_matched_v2')
+from ..TPAGBparams import snap_src, matchfake_loc, data_loc
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+tpagb_model_default_color = '#156692'
+data_default_color = '#853E43'
+model_default_color = 'k'
 
 try:
     plt.style.use('presentation')
@@ -40,9 +44,9 @@ def emboss():
 
 
 def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
-    stext_kw = dict({'color': 'black', 'fontsize': 14, 'ha': 'center'}.items() +
+    stext_kw = dict({'color': model_default_color, 'fontsize': 14, 'ha': 'center'}.items() +
                     emboss().items())
-    dtext_kw = dict(stext_kw.items() + {'color': 'darkred'}.items())
+    dtext_kw = dict(stext_kw.items() + {'color': data_default_color}.items())
 
     assert ratio_data[0]['target'] == 'data', \
         'the first line of the narratio file needs to be a data measurement'
@@ -76,14 +80,16 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
 
     drgb_text = r'$N_{\rm %s}=%i$' % (mid_txt, nrgb)
     dagb_text = r'$N_{\rm TP-AGB}=%i$' % nagb
-    dratio_text =  '$f = %.3f\pm%.3f$' % (dratio, dratio_err)
+    dratio_text = '$f = %.3f\pm%.3f$' % (dratio, dratio_err)
 
     textss = [[sagb_text, srgb_text, sratio_text],
-             [dagb_text, drgb_text, dratio_text]]
+              [dagb_text, drgb_text, dratio_text]]
     kws = [stext_kw, dtext_kw]
 
     for kw, texts in zip(kws, textss):
-        for xval, text in zip(xvals, texts):
+        for xval, text in zip(xvals[::-1], texts[::-1]):
+            if 'TP-AGB' in text and 'langle' in text:
+                kw['color'] = tpagb_model_default_color
             ax.text(xval, yval, text, **kw)
         yval -= .05  # stack the text
     return ax
@@ -123,7 +129,7 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
     ax: axes instance
     '''
 
-    plt_kw = dict({'linestyle': 'steps-mid', 'color': 'black',
+    plt_kw = dict({'linestyle': 'steps-mid', 'color': model_default_color,
                    'alpha': 0.2}.items() + plt_kw.items())
 
     if agb_mod is not None:
@@ -137,9 +143,12 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
 
     for i in range(len(mag2s)):
         if inorm is not None:
-            import pdb; pdb.set_trace()
-            mag2 = mag2s[i][inorm[i]]
-            norm = 1.
+            try:
+                mag2 = mag2s[i][inorm[i]]
+                norm = 1.
+            except:
+                import pdb; pdb.set_trace()
+
         else:
             mag2 = mag2s[i]
             norm = norms[i]
@@ -163,20 +172,21 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
 def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
-    plot_kw = dict({'drawstyle': 'steps-mid', 'color': 'darkred', 'lw': 1,
-                     'label': '$%s$' % target}.items() + plot_kw.items())
+
+    plot_kw = dict({'drawstyle': 'steps-mid', 'lw': 1,
+                    'color': data_default_color,
+                    'label': '$%s$' % target}.items() + plot_kw.items())
 
     hist = np.histogram(mag2, bins=bins)[0]
     err = np.sqrt(hist)
-    ax.errorbar(bins[1:], hist, yerr=err, **plot_kw)
 
     if fake_file is not None:
         comp_corr = stellar_pops.completeness_corrections(fake_file, bins)
+        hist = np.histogram(mag2, bins=bins)[0]
+        hist /= comp_corr[1:]
+        err = np.sqrt(hist)
+        plot_kw['lw'] += 1
 
-    hist = np.histogram(mag2, bins=bins)[0]
-    hist /= comp_corr[1:]
-    err = np.sqrt(hist)
-    plot_kw['lw'] += 1
     ax.errorbar(bins[1:], hist, yerr=err, **plot_kw)
 
     return ax
@@ -192,7 +202,7 @@ def plot_models(lf_file, bins, filt, maglimit=None, ax=None, plt_kw=None,
     ax = plot_model(mag2s=mags, bins=bins, inorm=lfd['idx_norm'],
                     maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod=agb_mod)
 
-    plt_kw['color'] = 'darkgreen'
+    plt_kw['color'] = tpagb_model_default_color
     ax = plot_model(mag2s=mags, bins=bins, inorm=lfd['sim_agb'],
                     maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod='TP-AGB')
     return ax
@@ -594,67 +604,80 @@ def main(argv):
     from ..analysis.normalize import parse_regions
     parser = argparse.ArgumentParser(description="Plot LFs against galaxy data")
 
+    parser.add_argument('-b', '--comp_frac', type=float, default=None,
+                        help='completeness fraction')
+
     parser.add_argument('-c', '--colorlimits', type=str, default=None,
                         help='comma separated color min, color max, opt then nir')
 
-    parser.add_argument('-e', '--trgbexclude', type=str, default='0.1,0.2',
+    parser.add_argument('-d', '--diag',  action='store_true',
+                        help='trilegal catalog to make a diagnostic cmd instead of plotting LFs')
+
+    parser.add_argument('-e', '--trgbexclude', type=float, default=0.1,
                         help='comma separated regions around trgb to exclude')
 
-    parser.add_argument('-g', '--matchparam', type=str, default=None,
-                        help='if using exclude gates, match param file')
-
-    parser.add_argument('-f', '--optfilter1', type=str,
-                        help='optical V filter')
+    parser.add_argument('-g', '--trgboffset', type=float, default=1.,
+                        help='trgb offset, mags below trgb')
 
     parser.add_argument('-m', '--maglimits', type=str, default=None,
-                        help='comma separated mag faint, mag bright, opt then nir')
-
-    parser.add_argument('-o', '--trgboffsets', type=str, default=None,
-                        help='comma separated trgb offsets')
-
-    parser.add_argument('-r', '--table', type=str,
-                        help='read colorlimits, completness mags from a prepared table')
-
-    parser.add_argument('-u', '--use_exclude', action='store_true',
-                        help='decontaminate LF by excluding stars within exclude_gates')
+                        help='comma separated faint and bright yaxis mag limits')
 
     parser.add_argument('-n', '--narratio_file', type=str,
                         help='model narratio file')
 
-    parser.add_argument('-d', '--cmd',  action='store_true',
-                        help='trilegal catalog to make a diagnostic cmd instead of plotting LFs')
+    parser.add_argument('-q', '--colnames', type=str, default='MAG2_ACS,MAG4_IR',
+                        help='comma separated column names in observation data')
+
+    parser.add_argument('-r', '--table', type=str,
+                        help='read colorlimits, completness mags from a prepared table')
+
+    parser.add_argument('-s', '--scolnames', type=str, default='F814W,F160W',
+                        help='comma separated column names in trilegal catalog')
+
+    parser.add_argument('-t', '--trgb', type=str, default=None,
+                        help='trgb mag')
 
     parser.add_argument('-v', '--Av', type=float, default=0.,
                         help='visual extinction')
 
-    parser.add_argument('lf_file', type=str, nargs='*',
-                        help='model LFs file')
+    parser.add_argument('-y', '--yfilter', type=str, default='I',
+                        help='V or I filter to use as y axis of CMD [V untested!]')
+
+    parser.add_argument('-z', '--match_param', type=str, default=None,
+                        help='exclude gates from calcsfh parameter file')
 
     parser.add_argument('observation', type=str,
                         help='data file to compare to')
 
-    parser.add_argument('agb_mod', type=str,
-                        help='agb model name')
+    parser.add_argument('lf_file', type=str,
+                        help='model LFs file')
 
     args = parser.parse_args(argv)
 
-    #optregions_kw, nirregions_kw = parse_regions(args)
+    args.target = args.lf_file.split('_')[0]  # maybe this should be command line?
 
+    regions_kw = parse_regions(args)
+    col1, col2 = args.colnames.split(',')
 
-    if args.cmd:
+    filter1, filter2 = args.scolnames.split(',')
+
+    if args.diag:
         zcols = ['stage', 'logAge', 'm_ini', '[M/H]', 'C/O', 'logML']
         diag_cmd(args.cmd, args.lf_file[0], regions_kw=optregions_kw,
                  use_exclude=args.use_exclude, zcolumns=zcols)
         diag_cmd(args.cmd, args.lf_file, opt=False, regions_kw=nirregions_kw,
                  use_exclude=args.use_exclude, zcolumns=zcols, Av=args.Av)
-    elif len(args.lf_file) > 1:
-        compare_lfs(args.lf_file, extra_str=args.agb_mod,
-                    match_param=args.matchparam)
     else:
-        compare_to_gal(args.lf_file[0], args.observation,
-                       narratio_file=args.narratio_file,
-                       agb_mod=args.agb_mod,
-                       match_param=args.matchparam)
+        if args.narratio_file is None:
+            narratio_file = args.lf_file.replace('lf', 'narratio')
+            if os.path.isfile(narratio_file):
+                args.narratio_file = narratio_file
+        agb_mod = args.lf_file.split('_')[3]
+        compare_to_gal(args.lf_file, args.observation,
+                       narratio_file=args.narratio_file, filter1=filter1,
+                       agb_mod=agb_mod, regions_kw=regions_kw,
+                       xlims=[(19,28), (18, 25)], filter2=filter2,
+                       col1=col1, col2=col2, match_param=args.match_param)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
