@@ -133,13 +133,16 @@ def parse_regions(args):
     return regions_kw
 
 
-
-
-def tpagb_rheb_line(color, mag, dmod=0.):
+def tpagb_rheb_line(color, mag, dmod=0., Av=0.0):
     b = 1.17303
     m = -5.20269
+    #ah = 0.20443 * Av
+    #ai = 0.69593 * Av
+    #c = ah + m * (ai - ah)
+    # easier in terms of Av
+    c = -2.352692 * Av
     # redder than the line
-    return np.nonzero(color > ((mag - b - dmod) / m))
+    return np.nonzero(color > ((mag - b - dmod - (c * Av)) / m))
 
 def get_itpagb(target, color, mag, col):
 
@@ -149,7 +152,7 @@ def get_itpagb(target, color, mag, col):
             mtrgb, Av, dmod = angst_data.get_snap_trgb_av_dmod(target.upper())
         except:
             return [np.nan]
-        redward_of_rheb, = tpagb_rheb_line(color, mag, dmod=dmod)
+        redward_of_rheb, = tpagb_rheb_line(color, mag, dmod=dmod, Av=Av)
     else:
         mtrgb, Av, dmod = angst_data.get_tab5_trgb_av_dmod(target.upper(),
                                                            filters=col)

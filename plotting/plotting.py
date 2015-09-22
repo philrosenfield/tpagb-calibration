@@ -28,8 +28,9 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 tpagb_model_default_color = '#156692'
+data_tpagb_default_color = '#E1999E'
 data_default_color = '#853E43'
-model_default_color = 'k'
+model_default_color = '#01141F'
 
 try:
     plt.style.use('presentation')
@@ -88,8 +89,11 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
 
     for kw, texts in zip(kws, textss):
         for xval, text in zip(xvals[::-1], texts[::-1]):
-            if 'TP-AGB' in text and 'langle' in text:
-                kw['color'] = tpagb_model_default_color
+            if 'TP-AGB' in text:
+                if 'langle' in text:
+                    kw['color'] = tpagb_model_default_color
+                else:
+                    kw['color'] = data_tpagb_default_color
             ax.text(xval, yval, text, **kw)
         yval -= .05  # stack the text
     return ax
@@ -133,7 +137,7 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
                    'alpha': 0.2}.items() + plt_kw.items())
 
     if agb_mod is not None:
-        label = r'$%s$' % agb_mod.split('_')[-1]
+        label = '${}$' % agb_mod
         plt_kw_lab = dict(plt_kw.items() + {'label': label}.items())
     else:
         plt_kw_lab = plt_kw
@@ -169,13 +173,14 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
     return ax
 
 
-def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None):
+def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
+             over_plot=None):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
-
+    target = target.replace('-', '\!-\!')
     plot_kw = dict({'drawstyle': 'steps-mid', 'lw': 1,
                     'color': data_default_color,
-                    'label': '$%s$' % target}.items() + plot_kw.items())
+                    'label': '${}$'.format(target)}.items() + plot_kw.items())
 
     hist = np.histogram(mag2, bins=bins)[0]
     err = np.sqrt(hist)
@@ -188,6 +193,15 @@ def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None):
         plot_kw['lw'] += 1
 
     ax.errorbar(bins[1:], hist, yerr=err, **plot_kw)
+
+    if over_plot is not None:
+        hist = np.histogram(mag2[over_plot], bins=bins)[0]
+        if fake_file is not None:
+            hist /= comp_corr[1:]
+        err = np.sqrt(hist)
+        plot_kw['color'] = data_tpagb_default_color
+        plot_kw['label'] = '${}\ TP\!-\!AGB$'.format(target)
+        ax.errorbar(bins[1:], hist, yerr=err, **plot_kw)
 
     return ax
 
@@ -204,7 +218,8 @@ def plot_models(lf_file, bins, filt, maglimit=None, ax=None, plt_kw=None,
 
     plt_kw['color'] = tpagb_model_default_color
     ax = plot_model(mag2s=mags, bins=bins, inorm=lfd['sim_agb'],
-                    maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod='TP-AGB')
+                    maglimit=maglimit, ax=ax, plt_kw=plt_kw,
+                    agb_mod='{}\ TP\!-\!AGB'.format(agb_mod))
     return ax
 
 
@@ -376,11 +391,12 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
     ax1, ax2: axes instances created for the plot.
 
     '''
+    agb_mod = translate_agbmod(agb_mod)
     target = os.path.split(lf_file)[1].split('_')[0]
 
     mag1, mag2 = load_observation(observation, col1, col2,
                                   match_param=match_param)
-    #color = mag1 - mag2
+    data_tpagb = get_itpagb(target, mag1 - mag2, mag2, col2)
     #ogal, ngal = load_obs(target)
     #mag1 = ogal.data['MAG2_ACS']
     #mag2 = ngal.data['MAG2_IR']
@@ -413,7 +429,7 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
 
         # plot galaxy data
         ax = plot_gal(mag, bins, ax=ax, target=target, fake_file=fake_file,
-                      plot_kw=dplot_kw)
+                      plot_kw=dplot_kw, over_plot=data_tpagb)
 
         ax.set_yscale('log')
         if ylim is not None:
@@ -599,6 +615,10 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
         logger.info('wrote {}'.format(outfile))
     return
 
+def translate_agbmod(agb_mod):
+    if 'm36' in agb_mod:
+        agb_mod = 'R14'
+    return agb_mod
 
 def main(argv):
     from ..analysis.normalize import parse_regions

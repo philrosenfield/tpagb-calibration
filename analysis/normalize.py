@@ -77,21 +77,20 @@ def tpagb_lf(sgal, narratio_dict, inds, filt1, filt2, lf_line=''):
     """format a narratio_dict for a line in the LF output file"""
 
     header = '# {} {} '.format(filt1, filt2)
-    header += 'logAge [M/H] sim_rgb sim_agb sgal_rgb sgal_agb idx_norm norm\n'
+    header += 'logAge [M/H] sim_rgb sim_agb sgal_rgb sgal_agb idx_norm norm'
 
     if len(lf_line) == 0:
         lf_line = header
 
-    lf_line += '\n'.join([' '.join(['%g' % m for m in sgal.data[filt1][inds]]),
-                          ' '.join(['%g' % m for m in sgal.data[filt2][inds]]),
-                          ' '.join(['%g' % m for m in sgal.data['logAge'][inds]]),
-                          ' '.join(['%g' % m for m in sgal.data['[M/H]'][inds]]),
-                          ' '.join(['%i' % m for m in narratio_dict['sim_rgb']]),
-                          ' '.join(['%i' % m for m in narratio_dict['sim_agb']]),
-                          ' '.join(['%i' % m for m in narratio_dict['sgal_rgb']]),
-                          ' '.join(['%i' % m for m in narratio_dict['sgal_agb']]),
-                          ' '.join(['%i' % m for m in narratio_dict['idx_norm']]),
-                          '%.4f\n' % narratio_dict['norm']])
+    lf_line += '\n' + '\n'.join([' '.join(['%g' % m for m in sgal.data[filt1][inds]]),
+                                 ' '.join(['%g' % m for m in sgal.data[filt2][inds]]),
+                                 ' '.join(['%g' % m for m in sgal.data['logAge'][inds]]),
+                                 ' '.join(['%g' % m for m in sgal.data['[M/H]'][inds]]),
+                                 ' '.join(['%i' % m for m in narratio_dict['sim_rgb']]),
+                                 ' '.join(['%i' % m for m in narratio_dict['sim_agb']]),
+                                 ' '.join(['%i' % m for m in narratio_dict['sgal_rgb']]),                                      ' '.join(['%i' % m for m in narratio_dict['sgal_agb']]),
+                                 ' '.join(['%i' % m for m in narratio_dict['idx_norm']]),
+                                 '%.4f' % narratio_dict['norm']])
     return lf_line
 
 
@@ -431,7 +430,7 @@ For the mag limits either:
         plotting.compare_to_gal(fdict['lf_file'], args.observation,
                        narratio_file=fdict['narratio_file'], filter1=f1,
                        agb_mod=agb_mod, regions_kw=regions_kw,
-                       xlims=[(19,28), (18, 25)], filter2=f2,
+                       xlims=[(19,26), (18, 25)], filter2=f2,
                        col1=col1, col2=col2, match_param=args.match_param)
 
     return

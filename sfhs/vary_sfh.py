@@ -123,8 +123,7 @@ class VarySFHs(SFH):
         self.galinp_fmt = os.path.join(self.outfile_loc, galinp_fmt)
 
     def prepare_galaxy_input(self, object_mass=None, overwrite=False,
-                             file_imf=None, binary_frac=0.35,
-                             object_cutoffmass=0.8):
+                             file_imf=None, object_cutoffmass=0.8):
         '''
         write the galaxy input file
 

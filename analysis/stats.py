@@ -391,12 +391,12 @@ def narratio_table(nartables):
     for i, nartable in enumerate(nartables):
         ratio_data = rsp.fileio.readfile(nartable, string_length=36,
                                          string_column=[0, 1, 2])
-
-        targets = [t for t in ratio_data['target'] if not 'data' in t]
+        targets = np.unique([t for t in ratio_data['target'] if not 'data' in t])
         fmt = r'${:.3f}\pm{:.3f}$'
         line += '% '+ nartable
         line += '\n'
         print 'target data_ratio model_ratio frac_diff'
+        #import pdb; pdb.set_trace()
         for target in targets:
             dindx = np.nonzero(ratio_data['target'] == 'data'.format(target))[0][0]
             indx, = np.nonzero(ratio_data['target'] == target)
