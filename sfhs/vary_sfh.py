@@ -133,7 +133,7 @@ class VarySFHs(SFH):
         wfc3snap and filter1 are hard coded...
         '''
         self.galaxy_inputs = []
-        msfh = match.utils.MatchSFH(self.sfh_file)
+        msfh = match.sfh.SFH(self.sfh_file)
 
         if msfh.IMF == 0:
             file_imf = 'tab_imf/imf_kroupa02.dat'
