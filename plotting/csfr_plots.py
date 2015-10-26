@@ -3,7 +3,8 @@ import os
 import sys
 
 import matplotlib.pyplot as plt
-import ResolvedStellarPops as rsp
+from .fileio import get_files
+from dweisz.match.scripts.sfh import SFH as MatchSFH
 
 plt.style.use('presentation')
 
@@ -22,17 +23,17 @@ def main(argv):
                         help='add errors')
 
     args = parser.parse_args(argv)
-    
+
     sfhs = [rsp.match.utils.MatchSFH(s) for s in args.name]
     targets = [s.name.split('_')[0] for s in sfhs]
-    
+
     if args.one_plot:
         fig, ax = plt.subplots()
         colors = rsp.graphics.discrete_colors(len(sfhs), cmap=plt.cm.RdYlBu)
     else:
         ax = None
         colors = ['k'] * len(sfhs)
-    
+
     for i, sfh in enumerate(sfhs):
         ax = sfh.plot_csfr(ax=ax, errors=args.errors,
                            plt_kw={'color': colors[i],
@@ -46,6 +47,15 @@ def main(argv):
         plt.legend(loc=0, frameon=False)
         plt.savefig('all_csfr.png')
 
-    
+
 if __name__ == '__main__':
     main(sys.argv[1:])
+    
+
+def default_run():
+    sfh_loc = '/Volumes/tehom/andromeda/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
+    sfh_files = get_files(sfh_loc, '*sfh')
+    targets = [os.path.split(l)[1].split('_')[0] for l in sfh_files]
+    hmc_files = [get_files(sfh_loc, '{}*.mcmc.zc'.format(t))[0] for t in targets]
+    sfhs = [MatchSFH(sfh_files[i], hmc_files[i]) for i in range(len(targets))]
+

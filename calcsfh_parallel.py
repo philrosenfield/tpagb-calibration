@@ -7,7 +7,7 @@ import sys
 
 import numpy as np
 
-from ResolvedStellarPops.match.utils import match_diagnostic
+from dweisz.match.scripts.utils import match_diagnostic
 from ResolvedStellarPops.fileio.fileIO import get_files
 
 logging.basicConfig(level=logging.DEBUG)
@@ -27,25 +27,25 @@ def match_table(sfh_files):
             target, filters = rsp.asts.parse_pipeline(filename)
         except:
             target, filters = '...', ['...', '...']
-        
+
         filters = ','.join(filters)
-        
+
         agegyr = 10 ** (mcmd.data.lagef - 9)
         isf1, = np.nonzero(agegyr < 1)
         isf13, = np.nonzero((agegyr >= 1) & (agegyr <= 3))
-        
+
         total_sfr = np.sum(mcmd.data.sfr)
 
         sfr1 = np.sum(mcmd.data.sfr[isf1]) / total_sfr
         sfr13 = np.sum(mcmd.data.sfr[isf13]) / total_sfr
-        
+
         mh1 = np.sum(mcmd.data.mh[isf1])/float(len(np.nonzero(mcmd.data.mh[isf1])[0]))
         mh13 = np.sum(mcmd.data.mh[isf13])/float(len(np.nonzero(mcmd.data.mh[isf13])[0]))
         z1 = ResolvedStellarPops.convertz.convertz(mh=mh1)[1]
         z13 = ResolvedStellarPops.convertz.convertz(mh=mh13)[1]
         feh1 = ResolvedStellarPops.convertz.convertz(mh=mh1)[-2]
         feh13 = ResolvedStellarPops.convertz.convertz(mh=mh13)[-2]
-        
+
         #print target, filters, mcmd.Av, mcmd.dmod, '%.2g' % sfr1, '%.3f' % z1, '%.2g' % sfr13, '%.3f' % z13, mcmd.bestfit
         row = rowfmt.format(target, filters, mcmd.Av, mcmd.dmod, sfr1, feh1,
                             sfr13, feh13, mcmd.bestfit)
@@ -162,7 +162,7 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
     for j, iset in enumerate(sets):
         # don't use not needed procs
         iset = iset[iset < len(prefs)]
-        
+
         # run calcsfh
         procs = []
         for i in iset:
@@ -185,12 +185,12 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
             if not dry_run:
                 procs.append(subprocess.Popen(cmd, shell=True))
             logger.info(cmd)
-        
+
         # wait for calcsfh
         if not dry_run:
             [p.wait() for p in procs]
             logger.debug('calcsfh or hybridMC set {} complete'.format(j))
-        
+
         # run zcombine
         procs = []
         for i in iset:
@@ -204,7 +204,7 @@ def run_parallel(prefs, dry_run=False, nproc=8, run_calcsfh=True):
             if not dry_run:
                 procs.append(subprocess.Popen(zcom, shell=True))
             logger.info(zcom)
-        
+
         # wait for zcombine
         if not dry_run:
             [p.wait() for p in procs]
@@ -244,7 +244,7 @@ def main(argv):
 
     args = parser.parse_args(argv)
     prefs = [l.strip() for l in args.pref_list.readlines()]
-    
+
     handler = logging.FileHandler(args.logfile)
     if args.verbose:
         handler.setLevel(logging.DEBUG)
@@ -253,7 +253,7 @@ def main(argv):
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    
+
     logger.info('command: {}'.format(argv))
 
     if args.simplify:

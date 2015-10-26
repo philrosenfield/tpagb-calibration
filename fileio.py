@@ -3,7 +3,7 @@ import os
 import sys
 
 import numpy as np
-import ResolvedStellarPops as rsp
+from ResolvedStellarPops import StarPop
 
 from astropy.io import ascii
 from astropy.table import Table
@@ -18,6 +18,42 @@ data_loc = os.path.join(snap_src, 'data', 'galaxies')
 match_run_loc = os.path.join(snap_src, 'match')
 phat_data_loc =  os.path.join(phat_src, 'low_av', 'phot')
 phat_match_run_loc =  os.path.join(phat_src, 'low_av', 'fake')
+
+
+def replace_ext(filename, ext):
+    '''
+    input
+    filename string with .ext
+    new_ext replace ext with new ext
+    eg:
+    $ replace_ext('data.02.SSS.v4.dat', '.log')
+    data.02.SSS.v4.log
+    '''
+    return split_file_extention(filename)[0] + ext
+
+
+def split_file_extention(filename):
+    '''
+    split the filename from its extension
+    '''
+    return '.'.join(filename.split('.')[:-1]), filename.split('.')[-1]
+
+
+def get_files(src, search_string):
+    '''
+    returns a list of files, similar to ls src/search_string
+    '''
+    if not src.endswith('/'):
+        src += '/'
+    try:
+        files = glob.glob1(src, search_string)
+    except IndexError:
+        logging.error('Can''t find %s in %s' % (search_string, src))
+        sys.exit(2)
+    files = [os.path.join(src, f)
+             for f in files if ensure_file(os.path.join(src, f), mad=False)]
+    return files
+
 
 def load_table(filename, target, optfilter1=None, opt=True):
 
@@ -40,13 +76,13 @@ def load_table(filename, target, optfilter1=None, opt=True):
     return tbl[indx]
 
 def load_phat(target):
-    galname, = rsp.fileio.get_files(phat_data_loc, '*{}*match'.format(target))
-    optgal = rsp.StarPop()
+    galname, = get_files(phat_data_loc, '*{}*match'.format(target))
+    optgal = StarPop()
     optgal.data = np.genfromtxt(galname, unpack=True, names=['F475W', 'F814W'])
     return optgal, optgal
 
 def find_phatfake(target):
-    fake, = rsp.fileio.get_files(phat_match_run_loc,
+    fake, = get_files(phat_match_run_loc,
                                 '*{}*.matchfake'.format(target))
     return fake, fake
 
@@ -56,16 +92,15 @@ def load_obs(target, optfilter1=''):
     if 'm31' in target or 'B' in target:
         optgal, nirgal = load_phat(target)
     else:
-        nirgalname, = rsp.fileio.get_files(data_loc,
-                                           '*{}*fits'.format(target.upper()))
+        nirgalname, = get_files(data_loc, '*{}*fits'.format(target.upper()))
 
-        optgalname, = rsp.fileio.get_files(data_loc,
-                                           ('*{}*{}*fits'.format(target, optfilter1).lower()))
+        optgalname, = get_files(data_loc,
+                                ('*{}*{}*fits'.format(target, optfilter1).lower()))
 
-        nirgal = rsp.StarPop()
+        nirgal = StarPop()
         nirgal.data = fits.getdata(nirgalname)
 
-        optgal = rsp.StarPop()
+        optgal = StarPop()
         optgal.data = fits.getdata(optgalname)
     return optgal, nirgal
 
@@ -75,7 +110,7 @@ def find_fakes(target, optfilter1=''):
         optfake, nirfake = find_phatfake(target)
     else:
         search_str = '*{}*.matchfake'.format(target.upper())
-        fakes = rsp.fileio.get_files(data_loc, search_str)
+        fakes = get_files(data_loc, search_str)
 
         nirfake, = [f for f in fakes if 'IR' in f]
         optfake = [f for f in fakes if not 'IR' in f]
@@ -99,7 +134,7 @@ def find_match_param(target, optfilter1=''):
         sys.exit(2)
 
     try:
-        mparam, = rsp.fileio.get_files(loc, search_str)
+        mparam, = get_files(loc, search_str)
     except ValueError:
         if optfilter1 == '':
             raise ValueError, 'Need to pass optfilter1'
@@ -124,13 +159,13 @@ def load_lf_file(lf_file):
     """
     header = open(lf_file).readline().replace('#', '').split()
     ncols = len(header)
-
+    lfd = {}
     with open(lf_file, 'r') as lf:
         lines = [l.strip() for l in lf.readlines() if not l.startswith('#')]
 
-    lfd = {}
+    dtypes = [float, float, float, float, int, int, int, int, int, float]
     for i, key in enumerate(header):
-        lfd[key] = [np.array(map(rsp.utils.is_numeric, l.split()))
+        lfd[key] = [np.array(l.split(), dtype=dtypes[i])
                     for l in lines[i::ncols] if len(l.split())>0]
     return lfd
 
@@ -175,8 +210,8 @@ def load_observation(filename, colname1, colname2, match_param=None,
             m1 = data['MAG1_{}'.format(cam)]
             m2 = data['MAG2_{}'.format(cam)]
             inds = exclude_gate_inds(m1, m2, match_param=match_param)
-            mag1 = mag1[inds]
-            mag2 = mag2[inds]
+            mag1 = m1[inds]
+            mag2 = m2[inds]
             logger.info('using exclude gates')
     else:
         mag1, mag2 = np.loadtxt(filename, unpack=True)

@@ -6,7 +6,7 @@ import sys
 import matplotlib.pylab as plt
 import numpy as np
 import ResolvedStellarPops as rsp
-import match
+from dweisz.match import scripts as match
 from ResolvedStellarPops.convertz import convertz
 
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +17,7 @@ __all__ = ['StarFormationHistories', 'parse_sfh_data']
 def parse_sfh_data(sfh_file, hmc_file=None):
     '''
     parse match sfh into a np.recarray
-    
+
     if hmc_file is given, use the SFR errors from there.
     Parameters
     ----------
@@ -35,7 +35,7 @@ def parse_sfh_data(sfh_file, hmc_file=None):
     -------
     np.recarray of the sfh file with hmc_file uncertainties overwritten.
     '''
-    try:   
+    try:
         data = match.utils.read_binned_sfh(sfh_file)
     except:
         logger.error('please add a new data reader')

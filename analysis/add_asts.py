@@ -118,7 +118,7 @@ def main(argv):
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.info('using matchfake location: {}'.format(matchfake_loc))
-    
+
     # assume trilegal was run with outfile ending with *_???.dat
     if args.directory:
         if args.name[0].endswith('/'):

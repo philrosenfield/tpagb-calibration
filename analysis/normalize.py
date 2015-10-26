@@ -81,14 +81,14 @@ def tpagb_lf(sgal, narratio_dict, inds, filt1, filt2, lf_line=''):
 
     if len(lf_line) == 0:
         lf_line = header
-
     lf_line += '\n' + '\n'.join([' '.join(['%g' % m for m in sgal.data[filt1][inds]]),
                                  ' '.join(['%g' % m for m in sgal.data[filt2][inds]]),
                                  ' '.join(['%g' % m for m in sgal.data['logAge'][inds]]),
                                  ' '.join(['%g' % m for m in sgal.data['[M/H]'][inds]]),
                                  ' '.join(['%i' % m for m in narratio_dict['sim_rgb']]),
                                  ' '.join(['%i' % m for m in narratio_dict['sim_agb']]),
-                                 ' '.join(['%i' % m for m in narratio_dict['sgal_rgb']]),                                      ' '.join(['%i' % m for m in narratio_dict['sgal_agb']]),
+                                 ' '.join(['%i' % m for m in narratio_dict['sgal_rgb']]),
+                                 ' '.join(['%i' % m for m in narratio_dict['sgal_agb']]),
                                  ' '.join(['%i' % m for m in narratio_dict['idx_norm']]),
                                  '%.4f' % narratio_dict['norm']])
     return lf_line
@@ -353,8 +353,8 @@ For the mag limits either:
     handler = logging.FileHandler(logfile)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    handler.setLevel(logging.WARNING)
-    logger.setLevel(logging.WARNING)
+    handler.setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG)
 
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -371,7 +371,7 @@ For the mag limits either:
                                          yfilter=args.yfilter,
                                          regions_kw=regions_kw,
                                          match_param=args.match_param)
-    filter1, filter2 = args.scolnames.split(',')
+    filter1, filter2 = args.scolnames.upper().split(',')
     narratio_line = narratio('data', obs_nrgbs, obs_nagbs, filter1, filter2)
 
     # allow for ast corrections instead of trilegal catalog

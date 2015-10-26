@@ -386,17 +386,41 @@ def chi2plot(chi2table, outfile_loc=None, flatten=True):
     return axs
 
 
-def narratio_table(nartables):
+def narratio_table(nartables, verbose=False, latex=True, full=True):
+    def quadriture(x):
+        xx = x * x
+        return np.sqrt(np.sum(xx))
+
+    dratios = np.array([])
+    mratios =  np.array([])
+    pct_diffs = np.array([])
+    dr_errs = np.array([])
+    mr_errs = np.array([])
+    pctd_errs =  np.array([])
     line = ''
+    if latex:
+        line += '# target data_ratio model_ratio frac_diff\n'
+        fmt = r'${:.3f}\pm{:.3f}$'
+        delimiter = ' & '
+    else:
+        line += '# target data_ratio data_ratio_err model_ratio model_ratio_err'
+        line += ' frac_diff frac_diff_err\n'
+        fmt = '{:.3f} {:.3f}'
+        delimiter = ' '
+
     for i, nartable in enumerate(nartables):
         ratio_data = rsp.fileio.readfile(nartable, string_length=36,
                                          string_column=[0, 1, 2])
-        targets = np.unique([t for t in ratio_data['target'] if not 'data' in t])
-        fmt = r'${:.3f}\pm{:.3f}$'
-        line += '% '+ nartable
-        line += '\n'
-        print 'target data_ratio model_ratio frac_diff'
-        #import pdb; pdb.set_trace()
+        try:
+            targets = np.unique([t for t in ratio_data['target']
+                                 if not 'data' in t])
+        except:
+            print('# Error: no data for {}.'.format(nartable))
+            continue
+
+        if verbose:
+            line += '% {}\n'.format(nartable)
+
         for target in targets:
             dindx = np.nonzero(ratio_data['target'] == 'data'.format(target))[0][0]
             indx, = np.nonzero(ratio_data['target'] == target)
@@ -416,76 +440,41 @@ def narratio_table(nartables):
             pct_diff = 1 - (mratio / dratio)
             pct_diff_err = np.abs(pct_diff * (mratio_err / mratio + dratio_err / dratio))
 
+            if full:
+                line += delimiter.join([target.upper(),
+                                        fmt.format(dratio, dratio_err),
+                                        fmt.format(mratio, mratio_err),
+                                        fmt.format(pct_diff, pct_diff_err)])
 
-            if 1:
-                line += ' & '.join([target.upper(), fmt.format(dratio, dratio_err), fmt.format(mratio, mratio_err), fmt.format(pct_diff, pct_diff_err)])
-                line += '\n'
             else:
-                line += ' & '.join([fmt.format(mratio, mratio_err), fmt.format(pct_diff, pct_diff_err)])
-                line += '\n'
+                line += delimiter.join([fmt.format(mratio, mratio_err),
+                                        fmt.format(pct_diff, pct_diff_err)])
+            line += '\n'
+
+            dratios = np.append(dratios, dratio)
+            mratios = np.append(mratios, mratio)
+            dr_errs = np.append(dr_errs, dratio_err)
+            mr_errs = np.append(mr_errs, mratio_err)
+
+    mmratios = np.mean(mratios)
+    mdratios = np.mean(dratios)
+    mmr_err = quadriture(mr_errs)
+    mdr_err = quadriture(dr_errs)
+
+    pct_diff_mean = 1 - (mmratios / mdratios)
+    pct_diff_mean_err = np.abs(pct_diff_mean * (mmr_err / mmratios + mdr_err / mdratios))
+
+    if full:
+        line += delimiter.join(['Mean',
+                                fmt.format(np.mean(dratios), mdr_err),
+                                fmt.format(np.mean(mratios), mmr_err),
+                                fmt.format(pct_diff_mean, pct_diff_mean_err)])
+    else:
+        line += delimiter.join([fmt.format(np.mean(mratios), mmr_err),
+                                fmt.format(pct_diff_mean, pct_diff_mean_err)])
+    line += '\n'
+
     print line
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-
-
-
-# old shit below
-
-def contamination_files(filenames):
-    opt_eagb_contam = np.array([])
-    opt_rheb_contam = np.array([])
-    ir_eagb_contam = np.array([])
-    ir_rheb_contam = np.array([])
-    opt_ms_contam = np.array([])
-    opt_bheb_contam = np.array([])
-    ir_ms_contam = np.array([])
-    ir_bheb_contam = np.array([])
-
-    if type(filenames) == str:
-        filenames = list(filenames)
-    for filename in filenames:
-        with open(filename, 'r') as fhandle:
-            lines = fhandle.readlines()
-        # rc contamination 12::13
-        rgb_opt = [l for l  in lines if l.startswith('rgb opt')]
-        rgb_data = zip(*[t.strip().split()[2:] for t in rgb_opt])
-        rgb_data = np.array(rgb_data, dtype=float)
-        eagb_in_rgb = rgb_data[5]/rgb_data[7]
-        rheb_in_rgb = rgb_data[4]/rgb_data[7]
-        opt_eagb_contam = np.append(opt_eagb_contam, np.max(eagb_in_rgb))
-        opt_rheb_contam = np.append(opt_rheb_contam, np.max(rheb_in_rgb))
-        #print filename, 'opt', np.max(eagb_in_rgb), np.max(rheb_in_rgb)
-
-        opt =  [l for l  in lines if l.startswith('rgb opt') or l.startswith('agb opt')]
-        data = zip(*[t.strip().split()[2:] for t in opt])
-        data = np.array(data, dtype=float)
-        ms_in_opt = data[0]/data[7]
-        bheb_in_opt = data[3]/data[7]
-        opt_bheb_contam = np.append(opt_bheb_contam, np.max(bheb_in_opt))
-        opt_ms_contam = np.append(opt_ms_contam, np.max(ms_in_opt))
-        print filename, 'opt', np.max(ms_in_opt), np.max(bheb_in_opt)
-
-        rgb_ir = [l for l  in lines if l.startswith('rgb ir')]
-        rgb_data = zip(*[t.strip().split()[2:] for t in rgb_ir])
-        rgb_data = np.array(rgb_data, dtype=float)
-        eagb_in_rgb = rgb_data[5]/rgb_data[7]
-        rheb_in_rgb = rgb_data[4]/rgb_data[7]
-        ir_eagb_contam = np.append(ir_eagb_contam, np.max(eagb_in_rgb))
-        ir_rheb_contam = np.append(ir_rheb_contam, np.max(rheb_in_rgb))
-        #print filename, 'ir', np.max(eagb_in_rgb), np.max(rheb_in_rgb)
-
-        ir =  [l for l  in lines if l.startswith('rgb ir') or l.startswith('agb ir')]
-        data = zip(*[t.strip().split()[2:] for t in ir])
-        data = np.array(data, dtype=float)
-        ms_in_ir = data[0]/data[7]
-        bheb_in_ir = data[3]/data[7]
-        #print filename, 'ir', np.max(eagb_in_rgb), np.max(rheb_in_rgb)
-
-        ir_bheb_contam = np.append(ir_bheb_contam, np.max(bheb_in_ir))
-        ir_ms_contam = np.append(ir_ms_contam, np.max(ms_in_ir))
-
-    print 'opt eagb, rheb', np.max(opt_eagb_contam), np.max(opt_rheb_contam)
-    print 'ir eagb, rheb', np.max(ir_eagb_contam), np.max(ir_rheb_contam)
-    print 'opt bheb, ms', np.max(opt_bheb_contam), np.max(opt_ms_contam)
-    print 'ir bheb, ms', np.max(ir_bheb_contam), np.max(ir_ms_contam)

@@ -10,7 +10,7 @@ import time
 
 import ResolvedStellarPops as rsp
 import trilegal
-import match
+from dweisz.match import scripts as match
 
 from .star_formation_histories import StarFormationHistories as SFH
 from ..pop_synth.stellar_pops import limiting_mag
@@ -34,7 +34,7 @@ def load_sim_masses(target):
     elif target in ['ic2574-sgs', 'ngc2976-deep', 'ugc5139', 'ngc300-wide1', 'ngc3741',
                     'ngc404-deep', 'ugc4459']:
         mass = 2.5e+08
-    elif target in ['ugc4305-1', 'ugc4305-2', 'ngc4163', 'ddo82']:
+    elif target in ['ugc4305-1', 'ugc4305-2', 'ngc4163', 'ddo82', 'eso540-030']:
         mass = 5.0e+08
     else:
         mass = 1.0e+07

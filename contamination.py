@@ -59,7 +59,7 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
                                                                dmod=dmod, Av=Av))
 
     else:
-        logger.warning('Not using TP-AGB RHEB line')
+        logger.warning('Not using TP-AGB RHeB line')
         if mtrgb is None:
             mtrgb, Av, dmod = angst_data.get_tab5_trgb_av_dmod(target.upper(),
                                                                filters=col)
@@ -226,8 +226,12 @@ class Contamination(object):
         # fraction of stars from the (l, r) gaussian in the (r, l) gaussian
         # compared to total stars in the (r ,l)
         # or: how much of a difference does the bleading over make to the recipient
-        lirpr = colsep_g1 / colsep_g2
-        rilpl = g2_colsep / g1_colsep
+        try:
+            lirpr = colsep_g1 / colsep_g2
+            rilpl = g2_colsep / g1_colsep
+        except ZeroDivisionError:
+            logger.error('Single gaussian integral is zero')
+            return rval
 
         return color_sep, [lir, ril, lirpl, lirpr, rilpr, rilpl]
 
@@ -416,26 +420,33 @@ class Contamination(object):
         ms = np.array([])
         carr = np.linspace(scolor.min(), scolor.max(), 10000)
         fig, ax = plt.subplots()
-        ax.plot(color, mag, '.', color='gray')
-        ax.set_ylim(ax.get_ylim()[::-1])
+        ax.scatter(color, mag, marker='.', s=8, c='k', alpha=1)
+        ax.set_ylim(-3, -10)
+        ax.set_xlim(-1, 4)
+        self.result = {}
+        self.mverts = mdverts
+        for i, mvert in enumerate(mdverts):
 
-        for mvert in mdverts:
             low = mvert[0, 1]
             dmag = mvert[0, 1] - mvert[1, 1]
-
             color_sep, mp_dg, result = \
                 self.double_gaussian_intersection(scolor, smag, verts=mvert,
                                                   test=test, diag_plot=diag_plot)
+            self.result['{}'.format(i)] = result
 
             if np.isfinite(color_sep):
                 lir, ril, lirpl, lirpr, rilpr, rilpl = result
                 double_gauss = utils.double_gaussian(carr, mp_dg.params)
                 norm = -1 * dmag / np.max(double_gauss)
+                ax.plot(mvert[:, 0], mvert[:, 1], color='k', alpha=0.5, lw=1)
                 ax.plot(carr, double_gauss * norm + low, lw=2, color='w')
                 ax.plot(carr, double_gauss * norm + low, lw=1, color='k')
                 #ax.plot(color_sep, np.mean(mvert[:, 1][:-1]), 'o', color='r')
-                ax.text(scolor.max(), low, '{:.2f} {:.2f}'.format(lirpl, rilpr),
-                        fontsize=10)
+                ax.text(scolor.max() + 0.02, low, r'${:.2f}$'.format(rilpr),
+                        fontsize=14)
+                ax.text(scolor.min() - 0.02, low, r'${:.2f}$'.format(lirpl),
+                        fontsize=14, ha='right')
+
                 cs = np.append(cs, color_sep)
                 ms = np.append(ms, np.mean(np.array(mvert)[:, 1][:-1]))
 
@@ -461,7 +472,7 @@ def load_data(fname, absmag=False):
         color = gal.data['MAG2_ACS'] - mag
     except:
         logger.error('WFPC2 not supported')
-        return np.nan
+        return [], [], [], np.nan
     if absmag:
         mtrgb = rsp.astronomy_utils.mag2Mag(mtrgb, 'F160W', 'wfc3ir', dmod=dmod, Av=Av)
         verts[1:3, 1] = -11
@@ -482,8 +493,8 @@ def test_contamination_line(filenames, diag_plot=False):
         sgal = rsp.SimGalaxy(fname)
         # find tpagb and rgb stars using the line
         try:
-            mag1 = sgal.data['F814W']
-            mag2 = sgal.data['F160W']
+            mag1 = sgal.data['F814W_cor']
+            mag2 = sgal.data['F160W_cor']
         except:
             logger.error('missing ast corrections: {}'.format(fname))
             continue
@@ -552,7 +563,7 @@ def test_contamination_line(filenames, diag_plot=False):
     return ftpinrhebs, frhebintps, ntpcontams, nrhebcontams
 
 
-def find_data_contamination(fitsfiles, search=False, diag_plot=False,
+def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=True,
                             threshlimit=True, nanlimit=True, result_plot=False):
     """
     The test suite... to get the b, m to try.
@@ -566,7 +577,6 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False,
         from TPAGBparams import snap_src
         data_loc = os.path.join(snap_src, 'data/opt_ir_matched_v2/copy/')
         fitsfiles = rsp.fileio.get_files(data_loc, '*fits')
-        test = test_line
         plist = ['sn-ngc2403-pr_f606w_f814w_f110w_f160w.fits',
                  'ngc7793-halo-6_f606w_f814w_f110w_f160w.fits',
                  'ngc404-deep_f606w_f814w_f110w_f160w.fits',
@@ -579,53 +589,64 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False,
                  'ngc4163_f606w_f814w_f110w_f160w.fits']
 
         [fitsfiles.pop(fitsfiles.index(p)) for p in plist if p in fitsfiles]
-    else:
         test = None
+    else:
+        test = test_line
+
+    filter1 = 'F814W'
+    filter2 = 'F160W'
+    xlabel = r'${}-{}$'.format(filter1, filter2)
+    ylabel = r'${}$'.format(filter2)
 
     if result_plot:
         fig1, ax1 = plt.subplots()
-        filter1 = 'F814W'
-        filter2 = 'F160W'
-        xlabel = '${}-{}$'.format(filter1, filter2)
-        ylabel = '${}$'.format(filter2)
 
     color_seps = []
     mean_mags = []
     fs = []
-
+    y = []
     for fitsfile in fitsfiles:
+        target = fitsfile.split('_')[0]
         logger.debug(fitsfile)
         ctm = Contamination()
-        color, mag, verts, mtrgb = load_data(fname, absmag=absmag)
+        color, mag, verts, mtrgb = load_data(fitsfile, absmag=absmag)
+        if len(color) == 0:
+            continue
+
         color_sep, mean_mag, f, ax, fig  = \
-            ctm.mag_steps(color, mag, verts=verts, test=test, nanlimit=nanlimit,
+            ctm.mag_steps(color, mag, verts=verts, nanlimit=nanlimit,
                           diag_plot=diag_plot, threshlimit=threshlimit)
+
         color_seps.append(color_sep)
         mean_mags.append(mean_mag)
         fs.append(f)
 
-        if len(color_sep) <= 2 and test is None:
+        if len(color_sep) <= 2:
             continue
-
-        logger.info('Mean:')
-        mean_color_sep, mean_mp_dg, result = \
-            ctm.double_gaussian_intersection(color, mag, verts=verts, test=test)
+        # result: lir, ril, lirpl, lirpr, rilpr,
+        tpagbs = np.sum([ctm.result[k][1]/ctm.result[k][4] for k in ctm.result.keys() if len(ctm.result[k]) > 0])
+        rhebs = np.sum([ctm.result[k][0]/ctm.result[k][-1] for k in ctm.result.keys() if len(ctm.result[k]) > 0])
+        rheb_in_tpagb = np.sum([ctm.result[k][0] for k in ctm.result.keys() if len(ctm.result[k]) > 0])
+        tpagb_in_rheb = np.sum([ctm.result[k][1] for k in ctm.result.keys() if len(ctm.result[k]) > 0])
+        rheb_contam = rheb_in_tpagb / tpagbs
+        tpagb_bleed = tpagb_in_rheb / tpagbs
+        tpagb_contam = tpagb_in_rheb / rhebs
+        logger.info('TOTAL CONTAMINATION RheB: {:.2f} TP-AGB contam {:.2f} TP-AGB bleed: {:.2f} {}'.format(rheb_contam, tpagb_contam, tpagb_bleed, fitsfile))
 
         if diag_plot:
-            ax.set_title(gal.target)
+            #ax.set_title(gal.target)
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
-            if test is not None:
-                ax.plot(test_line(mag[mag < mtrgb]), mag[mag < mtrgb], lw=2)
-            fig.savefig('{}_{}-{}_contam.png'.format(gal.target, filter1, filter2))
+            #if test is not None:
+            #    ax.plot(test(mag[mag < mtrgb]), mag[mag < mtrgb], lw=2)
+            fig.savefig('{}_{}-{}_contam.png'.format(target, filter1, filter2), dpi=600)
 
         if result_plot and f[0] > 0:
             xarr = np.arange(color.min(), color.max(), step=0.1)
             yarr = f[0] * xarr + f[1]
             ax1.plot(color, mag, ',', color='k', alpha=0.3)
             ax1.plot(color_sep, mean_mag, 'o', zorder=100, color='r', mec='none')
-            ax1.plot(xarr, yarr, lw=2, label=gal.target)
-
+            ax1.plot(xarr, yarr, lw=2, label=target)
 
     cs = np.concatenate(color_seps)
     ms = np.concatenate(mean_mags)
@@ -641,6 +662,7 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False,
         ax1.set_ylabel(ylabel)
         ax1.legend(loc='best')
         fig1.savefig('tp-agb_rheb_contam.png')
+
     return color_seps, mean_mags, fs, y
 
 
@@ -649,11 +671,14 @@ def main(argv):
     description="Run contamination tests."
     parser = argparse.ArgumentParser(description=description)
 
+    parser.add_argument('-a', '--absmag', action='store_true',
+                        help='use absmag')
+
     parser.add_argument('-m', '--model', action='store_true',
                         help='run model contamination tests')
 
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='set logger more verbose')
+    parser.add_argument('-p', '--diag_plot', action='store_true',
+                        help='make diag plots')
 
     parser.add_argument('-d', '--data', action='store_true',
                         help='run data contamination tests')
@@ -662,9 +687,9 @@ def main(argv):
                         help='with -d find the RHeB-TPAGB line')
 
     parser.add_argument('-r', '--result_plot', action='store_true',
-                        help='with -d make result plot')
+                        help='with -d and -s make result plot')
 
-    parser.add_argument('input_files', type=str,
+    parser.add_argument('input_files', type=str, nargs='*',
                         help='fits files if -d trilegal simulatoins if -m')
 
     args = parser.parse_args(argv)
@@ -673,12 +698,9 @@ def main(argv):
     handler = logging.FileHandler(logfile)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
-    handler.setLevel(logging.DEBUG)
     logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
     logger.debug('command: {}'.format(' '.join(argv)))
-
-    if args.verbose:
-        logger.setLevel(logging.INFO)
 
     if args.model:
         test_contamination_line(args.input_files, diag_plot=args.diag_plot)

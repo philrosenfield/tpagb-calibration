@@ -132,18 +132,33 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
     -------
     ax: axes instance
     '''
-
-    plt_kw = dict({'linestyle': 'steps-mid', 'color': model_default_color,
-                   'alpha': 0.2}.items() + plt_kw.items())
+    plt_kw = dict({'color': model_default_color}.items() + plt_kw.items())
 
     if agb_mod is not None:
-        label = '${}$' % agb_mod
+        label = '${}$'.format(agb_mod)
         plt_kw_lab = dict(plt_kw.items() + {'label': label}.items())
     else:
         plt_kw_lab = plt_kw
 
     if ax is None:
         fig, (ax) = plt.subplots(figsize=(12, 6))
+
+    if inorm is not None:
+        ms = [mag2s[i][inorm[i]] for i in range(len(mag2s))]
+    else:
+        ms =[mag2s[i] * norms[i] for i in range(len(mag2s))]
+
+    hists = [np.histogram(m, bins=bins)[0] for m in ms]
+    minhists = np.min(np.array(hists).T, axis=1)
+    maxhists = np.max(np.array(hists).T, axis=1)
+    meanhists = np.mean(np.array(hists).T, axis=1)
+    ax.fill_between(bins[1:], minhists, maxhists, color=plt_kw_lab['color'], alpha='0.2')
+    ax.plot(bins[1:], minhists, linestyle='steps-mid', color=plt_kw_lab['color'], lw=2)
+    ax.plot(bins[1:], maxhists, linestyle='steps-mid', color=plt_kw_lab['color'], lw=2)
+    ax.plot(bins[1:], meanhists, linestyle='steps-mid', lw=3, **plt_kw_lab)
+    """
+    plt_kw = dict({'linestyle': 'steps-mid', 'color': model_default_color,
+                   'alpha': 0.2}.items() + plt_kw.items())
 
     for i in range(len(mag2s)):
         if inorm is not None:
@@ -170,6 +185,7 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
             kw = plt_kw_lab
 
         ax.plot(bins[1:], hist * norm, **kw)
+        """
     return ax
 
 
