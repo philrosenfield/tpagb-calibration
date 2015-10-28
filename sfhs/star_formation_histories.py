@@ -36,9 +36,9 @@ def parse_sfh_data(sfh_file, hmc_file=None):
     np.recarray of the sfh file with hmc_file uncertainties overwritten.
     '''
     try:
-        data = match.utils.read_binned_sfh(sfh_file)
+        data = match.fileio.read_binned_sfh(sfh_file)
     except:
-        logger.error('please add a new data reader')
+        logger.error('please add a new data reader, {}'.format(sys.exc_info()))
         sys.exit(2)
 
     if hmc_file is not None:

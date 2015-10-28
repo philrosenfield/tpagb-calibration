@@ -38,33 +38,44 @@ def csfr_masshist():
     data_hmc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/ugc8508_f475w_f814w.mcmc.zc'
     sfh = SFH(data_sfh, hmc_file=data_hmc)
 
-    model_sfh = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/ugc8508_f475w_f814w.sfh'
+    test_base = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/'
+    model_sfh = test_base + 'ugc8508_f475w_f814w.sfh'
     tsfh = SFH(model_sfh)
-    sgal_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/'
-    sgal_file, = get_files(sgal_loc, 'ugc8508*cor*dat')
-    fake_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/fake_run'
-    fake_file, = get_files(fake_loc, 'ugc8508*dat')
-
+    # cut and asts added to best fit MATCH-derived SFH
+    sgal_file =  test_base + 'ugc8508_f475w_f814w_bestsfr_cor.dat'
+    # cut and asts added to best fit MATCH-derived SFH used as input SFH to TRILEGAL.
+    tsgal_file =  test_base + 'caf09_v1.2s_m36_s12d_ns_nas/out_ugc8508_f475w_f814w_bestsfr.dat'
     sgal = SimGalaxy(sgal_file)
-    fake = read_fake(fake_file)
-    inds, = np.nonzero((f['mag1'] < 99) & (f['mag2'] < 99))
-    bins = np.arange(fake['mass'].min(), fake['mass'].max(), 0.5)
-    h = np.histogram(fake['mass'][inds], bins=bins)[0]
-    bins1 = np.arange(sgal.data['m_ini'].min(), sgal.data['m_ini'].max(), 0.5)
-    h1 = np.histogram(sgal.data['m_ini'], bins=bins1)[0]
+    tsgal = SimGalaxy(tsgal_file)
 
+    dm = 0.1
+    bins = np.arange(0.8, 8 + dm, dm)
+    good, = np.nonzero( (tsgal.data['F814W_cor'] < 99.) & (tsgal.data['F160W_cor'] < 99.))
+    itps, = np.nonzero(tsgal.data['stage'] == 7)
+    inds1 = list(set(good) & set(itps))
+    tmass = tsgal.data[inds1]['m_ini']
+    h1 = np.histogram(tmass, bins=bins)[0] / np.sum(tmass)
+
+    good, = np.nonzero((sgal.data['F814W_cor'] < 99.) & (sgal.data['F160W_cor'] < 99.))
+    itps, = np.nonzero(sgal.data['stage'] == 7)
+    inds = list(set(good) & set(itps))
+    mass = sgal.data['m_ini'][inds]
+    h = np.histogram(mass, bins=bins)[0] / np.sum(mass)
 
     fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(8, 6))
     fig.subplots_adjust(hspace=.4, top=0.97, bottom=0.11)
     ax1 = sfh.plot_csfr(ax=ax1)
     ax1 = tsfh.plot_csfr(ax=ax1)
-    ax2.plot(bins1[1:], h1 / np.sum(sgal.data['m_ini']), linestyle='steps-mid')
-    ax2.plot(bins[1:], h / np.sum(fake['mass'][inds]), linestyle='steps-right')
+    ax2.plot(bins[:-1], h1, linestyle='steps-mid')
+    ax2.plot(bins[:-1], h, linestyle='steps-mid')
+    #ax2.errorbar(bins[:-1], h * np.sum(mass), yerr=np.sqrt(h), fmt='none')
+    #ax2.errorbar(bins[:-1], h1 * np.sum(tmass), yerr=np.sqrt(h1), fmt='none')
     ax2.set_yscale('log')
+    ax2.set_xlim(0.8, 6.5)
     ax1.tick_params(direction='in', which='both')
     ax2.tick_params(direction='in', which='both')
-    ax2.set_xlabel(r'$\rm{Mass\ (M_\odot)}$')
-    ax2.set_ylabel(r'$\rm{Fraction\ of\ Total\ Mass}$')
+    ax2.set_xlabel(r'$\rm{TP\!-\!AGB\ Mass\ (M_\odot)}$')
+    ax2.set_ylabel(r'$\rm{\#/Mass\ bin (0.1\ M_\odot)}$')
     ax1.set_xlabel(r'$\rm{Time\ (Gyr)}$')
     ax1.set_ylabel(r'$\rm{Cummulative\ SF}$')
     plt.savefig('ugc8505_csfr_mass.png')
@@ -111,6 +122,7 @@ def cut_sims():
                    np.column_stack((smag1[inds], smag2[inds])), fmt='%.4f')
     return
 
+
 def call_make_fakeparam():
     loc ='/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/fake_run'
     params = get_files(loc, '*.param')
@@ -130,14 +142,12 @@ def call_make_fakeparam():
 #cut_sims()
 # 6 run calcsfh on those
 # !make_calcsfh.sh
+# NO -- SKIP 7. Run varysfh.sh on the trilegal-as-data and use that in (8)
 # 7 make fake with the sfh
 #call_make_fakeparam()
 # ! bash make_fake.sh; ! bash fake.sh
 # 8 compare csfrs and mass distibutions.
 #csfr_masshist()
-
-
-
 
 """
 To run lots of jobs ...
