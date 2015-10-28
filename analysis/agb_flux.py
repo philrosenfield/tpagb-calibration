@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,53 +14,6 @@ from ..fileio import load_lf_file, load_observation
 from .analyze import get_itpagb
 
 plt.style.use('presentation')
-
-def main(argv):
-    parser = argparse.ArgumentParser(description="Plot LFs against galaxy data")
-
-    parser.add_argument('-e', '--hmcfiles', type=str, nargs='*',
-                        help='HMC files')
-
-    parser.add_argument('-f', '--force', action='store_true',
-                        help='over ride all parameters and run default files')
-
-    parser.add_argument('sfhfiles', type=str, nargs='*',
-                        help='CalcSFH output files')
-
-    parser.add_argument('narratio_files', type=str, nargs='*',
-                        help='model narratio files')
-
-    parser.add_argument('lf_files', type=str, nargs='*',
-                        help='model LFs files')
-
-    parser.add_argument('observations', type=str, nargs='*',
-                        help='data files to compare to')
-
-    args = parser.parse_args(argv)
-
-    make_plot(args.narratio_files, args.sfhfiles, args.lffiles, args.observations, hmcfiles=args.hmcfiles)
-
-if __name__ == '__main__':
-    if '-f' in sys.argv[1:]:
-        default_run()
-    else:
-        main(sys.argv[1:])
-
-
-def default_run():
-    import os
-    lf_loc = '/Volumes/tehom/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
-    obs_loc = '/Volumes/tehom/andromeda/research/TP-AGBcalib/SNAP/data/opt_ir_matched_v2/copy/'
-    sfh_loc = '/Volumes/tehom/andromeda/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
-
-    lf_files = get_files(lf_loc, '*lf.dat')
-    targets = [os.path.split(l)[1].split('_')[0] for l in lf_files]
-    observations = [get_files(obs_loc, '{}*fits'.format(t))[0] for t in targets]
-    narratio_files = [get_files(lf_loc, '{}*nar*dat'.format(t))[0] for t in targets]
-    sfh_files = [get_files(sfh_loc, '{}*sfh'.format(t))[0] for t in targets]
-    hmc_files = [get_files(sfh_loc, '{}*.mcmc.zc'.format(t))[0] for t in targets]
-
-    make_plot(narratio_files, sfh_files, lf_files, observations, hmcfiles=hmcfiles)
 
 
 def add_inset(ax0, extent, xlims, ylims):
@@ -82,9 +36,11 @@ def add_inset(ax0, extent, xlims, ylims):
     -------
         ax : inset axes instance
     '''
+    import  matplotlib
     ax = plt.axes(extent)
     ax.set_xlim(xlims)
     ax.set_ylim(ylims)
+
     rect = matplotlib.patches.Rectangle((xlims[0], ylims[0]),
                                         np.diff(xlims), np.diff(ylims),
                                         fill=False, color='k')
@@ -92,10 +48,29 @@ def add_inset(ax0, extent, xlims, ylims):
     return ax
 
 
-
 def ntpagb_model_data(narratiofile, sfhfile, hmcfile=None):
     """
+    Compare the number of TP-AGB stars in the model to the data.
+    Parameters
+    ----------
+    narratiofile : formatted files containing the number ratio of TP-AGB stars
+    and RGB stars etc. See normalize.py
 
+    sfhfile : the output of calcsfh (to calculate the mass in each sf age bin)
+    hmcfile : if you want Hybrid MC errors reported
+    Returns
+    -------
+    massfrac, massfrac_perr, massfrac_merr : floats
+        the mass fraction between 0, 2e9 years and associated uncertainties
+
+    agbm2d, agbm2d_err : the number of TP-AGB stars compared to the data
+        and (even) Poisson uncertainties.
+
+    NB
+    The first line in the narratiofile is a measurement of the data.
+    Set up to take the mass fraction at 0 (youngest age calculated)
+    and 2e9. If adjusting, see sfh.mass_fraction.__doc__, currently,
+    units can by yr or log yr.
     """
     ratiodata = readfile(narratiofile, string_column=[0, 1, 2])
     inds, = np.nonzero(ratiodata['target'] != 'data')
@@ -114,9 +89,31 @@ def ntpagb_model_data(narratiofile, sfhfile, hmcfile=None):
 
 def make_plot(narratio_files, sfhfiles, lffiles, observations, hmcfiles=None,
               inset=False):
+    """
+    Make two plots to compare with Figure 7 of Melbourne+ 2012 Apj 748, 47
+    Parameters
+    ----------
+    narratio_files : list of str
+        Formatted files from normalize.py with the AGB/RGB ratio data
+    sfhfiles : list of str
+        outputs of calcsfh
+    lffiles : list of str
+        Formatted files from normalize.py with the scaled LFs
+    observations : list of str
+        Fits files to compare with (apples to apples, should use 4 filter files)
+    hmcfiles : list of str
+        Hybrid MonteCarlo outputs associated with each SFH file.
+
+    NB
+    Dude, I'm trying to publish. There are NO checks to make sure each target
+    is consistent across each of the 5 f*ing file types. No check to see if
+    the list lentghs are the same. In the time I am writing this doc string,
+    I could have written those tests, but at some point, and that point is now,
+    you gotta choose, documenting or coding? (See the nice -f hack around argparse)
+    """
     def _plot(ax, targets, f, massfrac, m2d, m2d_err, massfrac_perr,
               massfrac_merr):
-        ax = make_melbourne_plot(ax=ax, targets=targets, flux=f)
+        ax = make_melbourne_plot(ax=ax, targets=None, flux=f)
         color = '#30a2da'
         ax.plot(massfrac, m2d, 'o', color=color, label='R14', ms=10, zorder=1000)
         ax.errorbar(massfrac, m2d, yerr=np.array(m2d_err) / 2,
@@ -137,6 +134,9 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, hmcfiles=None,
                             for i in range(len(observations))])
 
     targets = [os.path.split(s)[1].split('_')[0] for s in sfhfiles]
+
+    for i in range(len(sfhfiles)):
+        print targets[i], massfrac[i]
 
     flux = [False, True]
     ytitles = [latexify('\# TP-AGB (model) / \# TP-AGB (data)'),
@@ -166,12 +166,16 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, hmcfiles=None,
                   massfrac_merr)
 
         ax.set_xlabel(latexify('Mass Fraction of Young Stars (<2 Gyr)'))
+        ax.set_xlim(-0.01, 0.45)
         plt.savefig(title)
     return ax
 
 def make_melbourne_plot(tablefile='default', ax=None, targets=None, flux=False):
+    """
+    Toss Melbourne's data on the plot.
+    """
     if tablefile=='default':
-        tablefile = '/Volumes/tehom/andromeda/research/TP-AGBcalib/tables/melbourne2012_tab.dat'
+        tablefile = '/Volumes/tehom/research/TP-AGBcalib/tables/melbourne2012_tab.dat'
     meltab = readfile(tablefile, string_column=0)
 
     if targets is None:
@@ -197,18 +201,21 @@ def make_melbourne_plot(tablefile='default', ax=None, targets=None, flux=False):
         y = meltab[n][inds]
         xerr = meltab['fmass_y_2gr_err'][inds] / 2
         yerr = meltab['{}_err'.format(n)][inds] / 2
-        ax.plot(x, y, linestyle='none', **kws[i])
         ax.errorbar(x, y, yerr=yerr, xerr=xerr, fmt='none', ecolor=kws[i]['color'])
+        ax.plot(x, y, linestyle='none', **kws[i])
         ax.axhline(np.mean(y), ls='--', color=kws[i]['color'])
     return ax
 
 def ftpagb_model_data(lffile, observation):
+    """
+    Calculate the TP-AGB flux from the data and model
+    """
     lfd = load_lf_file(lffile)
     #print lffile
     try:
-        mags = lfd['F160W']
-    except:
         mags = lfd['F160W_cor']
+    except:
+        mags = lfd['F160W']
 
     mtpagbs = lfd['sim_agb']
 
@@ -232,4 +239,55 @@ def ftpagb_model_data(lffile, observation):
     return np.mean(magbfluxs / dagbflux), np.std(magbfluxs / dagbflux)
 
 def latexify(string):
+    """.format is so pretty with latex and curly brackets"""
     return r'$\rm{{{}}}$'.format(string.replace(' ', '\ '))
+
+def default_run():
+    """Will you stop writing code and publish for f*s sake. """
+    import os
+    lf_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
+    obs_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/data/opt_ir_matched_v2/copy/'
+    sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
+
+    lf_files = get_files(lf_loc, '*lf.dat')
+    targets = [os.path.split(l)[1].split('_')[0] for l in lf_files]
+    observations = [get_files(obs_loc, '{}*fits'.format(t))[0] for t in targets]
+    narratio_files = [get_files(lf_loc, '{}*nar*dat'.format(t))[0] for t in targets]
+    sfh_files = [get_files(sfh_loc, '{}*sfh'.format(t))[0] for t in targets]
+    hmc_files = [get_files(sfh_loc, '{}*.mcmc.zc'.format(t))[0] for t in targets]
+
+    make_plot(narratio_files, sfh_files, lf_files, observations, hmcfiles=hmc_files,
+              inset=False)
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description="Plot LFs against galaxy data")
+
+    parser.add_argument('-e', '--hmcfiles', type=str, nargs='*',
+                        help='HMC files')
+
+    parser.add_argument('-f', '--force', action='store_true',
+                        help='over ride all parameters and run default files')
+
+    parser.add_argument('sfhfiles', type=str, nargs='*',
+                        help='CalcSFH output files')
+
+    parser.add_argument('narratio_files', type=str, nargs='*',
+                        help='model narratio files')
+
+    parser.add_argument('lf_files', type=str, nargs='*',
+                        help='model LFs files')
+
+    parser.add_argument('observations', type=str, nargs='*',
+                        help='data files to compare to')
+
+    args = parser.parse_args(argv)
+
+    make_plot(args.narratio_files, args.sfhfiles, args.lffiles, args.observations, hmcfiles=args.hmcfiles)
+
+if __name__ == '__main__':
+    if '-f' in sys.argv[1:]:
+        # FUCK YEAH LETS DO THIS
+        default_run()
+    else:
+        main(sys.argv[1:])

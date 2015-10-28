@@ -3,7 +3,7 @@ import os
 import sys
 
 import matplotlib.pyplot as plt
-from .fileio import get_files
+from ..fileio import get_files
 from dweisz.match.scripts.sfh import SFH as MatchSFH
 
 plt.style.use('presentation')
@@ -48,14 +48,18 @@ def main(argv):
         plt.savefig('all_csfr.png')
 
 
-if __name__ == '__main__':
-    main(sys.argv[1:])
-    
 
 def default_run():
-    sfh_loc = '/Volumes/tehom/andromeda/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
+    sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
     sfh_files = get_files(sfh_loc, '*sfh')
     targets = [os.path.split(l)[1].split('_')[0] for l in sfh_files]
     hmc_files = [get_files(sfh_loc, '{}*.mcmc.zc'.format(t))[0] for t in targets]
     sfhs = [MatchSFH(sfh_files[i], hmc_files[i]) for i in range(len(targets))]
+    print sfh_files
+    [s.plot_csfr() for s in sfhs]
 
+if __name__ == '__main__':
+    if '-f' in sys.argv:
+        default_run()
+    else:
+        main(sys.argv[1:])

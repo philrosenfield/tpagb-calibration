@@ -1,6 +1,146 @@
-from ..fileio import replace_ext, get_files
+from ResolvedStellarPops import SimGalaxy
+from astropy.io import fits
+import os
+from dweisz.match.scripts.fake import make_fakeparam
+from dweisz.match.scripts.fileio import get_files, read_fake, replace_ext
+from dweisz.match.scripts.sfh import SFH
+import numpy as np
+import matplotlib.pyplot as plt
 
 
+def csfr_masshist():
+    """ Do all
+    sgal_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/'
+    sgal_files = get_files(sgal_loc, '*cor*dat')
+    fake_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/fake_run'
+    fake_files = get_files(fake_loc, '*dat')
+    targets = [os.path.split(p)[1].split('_')[0] for p in fakes]
+    sgal_files = np.concatenate([[s for s in sgal_files if t in s] for t in targets])
+
+    sgals = [SimGalaxy(s) for s in sgal_files]
+    fakes = [read_fake(f) for f in fake_files]
+
+    for i, (f, s) in enumerate(zip(fakes, sgals)):
+        fig, ax = plt.subplots()
+        inds, = np.nonzero((f['mag1'] < 99) & (f['mag2'] < 99))
+        bins = np.arange(f['mass'].min(), f['mass'].max(), 0.5)
+        h = np.histogram(f['mass'][inds], bins=bins)[0]
+
+        bins1 = np.arange(s.data['m_ini'].min(), s.data['m_ini'].max(), 0.5)
+        h1 = np.histogram(s.data['m_ini'], bins=bins1)[0]
+
+        ax.plot(bins1[1:], h1 / np.sum(s.data['m_ini']), linestyle='steps-mid')
+        ax.plot(bins[1:], h / np.sum(f['mass'][inds]), linestyle='steps-mid')
+        ax.set_yscale('log')
+        ax.set_title(targets[i])
+    """
+    data_sfh = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/ugc8508_f475w_f814w.sfh'
+    data_hmc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/ugc8508_f475w_f814w.mcmc.zc'
+    sfh = SFH(data_sfh, hmc_file=data_hmc)
+
+    model_sfh = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/ugc8508_f475w_f814w.sfh'
+    tsfh = SFH(model_sfh)
+    sgal_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/'
+    sgal_file, = get_files(sgal_loc, 'ugc8508*cor*dat')
+    fake_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/fake_run'
+    fake_file, = get_files(fake_loc, 'ugc8508*dat')
+
+    sgal = SimGalaxy(sgal_file)
+    fake = read_fake(fake_file)
+    inds, = np.nonzero((f['mag1'] < 99) & (f['mag2'] < 99))
+    bins = np.arange(fake['mass'].min(), fake['mass'].max(), 0.5)
+    h = np.histogram(fake['mass'][inds], bins=bins)[0]
+    bins1 = np.arange(sgal.data['m_ini'].min(), sgal.data['m_ini'].max(), 0.5)
+    h1 = np.histogram(sgal.data['m_ini'], bins=bins1)[0]
+
+
+    fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(8, 6))
+    fig.subplots_adjust(hspace=.4, top=0.97, bottom=0.11)
+    ax1 = sfh.plot_csfr(ax=ax1)
+    ax1 = tsfh.plot_csfr(ax=ax1)
+    ax2.plot(bins1[1:], h1 / np.sum(sgal.data['m_ini']), linestyle='steps-mid')
+    ax2.plot(bins[1:], h / np.sum(fake['mass'][inds]), linestyle='steps-right')
+    ax2.set_yscale('log')
+    ax1.tick_params(direction='in', which='both')
+    ax2.tick_params(direction='in', which='both')
+    ax2.set_xlabel(r'$\rm{Mass\ (M_\odot)}$')
+    ax2.set_ylabel(r'$\rm{Fraction\ of\ Total\ Mass}$')
+    ax1.set_xlabel(r'$\rm{Time\ (Gyr)}$')
+    ax1.set_ylabel(r'$\rm{Cummulative\ SF}$')
+    plt.savefig('ugc8505_csfr_mass.png')
+
+
+def cut_sims():
+    sims = ['ugc8508_f475w_f814w_bestsfr_cor.dat',
+            'ngc3741_f475w_f814w_bestsfr_cor.dat',
+            'ngc2403-halo-6_f606w_f814w_bestsfr_cor.dat',
+            'ugc4459_f555w_f814w_bestsfr_cor.dat',
+            'ugc5139_f555w_f814w_bestsfr_cor.dat',
+            'ugc4305-1_f555w_f814w_bestsfr_cor.dat',
+            'ngc2403-deep_f606w_f814w_bestsfr_cor.dat']
+
+    gals = ['/Volumes/tehom/research/TP-AGBcalib/SNAP/data/galaxies/copy/ugc8508_f475w_f814w_v1_gst.fits',
+            '/Volumes/tehom/research/TP-AGBcalib/SNAP/data/galaxies/copy/ngc3741_f475w_f814w_v1_gst.fits',
+            '/Volumes/tehom/research/TP-AGBcalib/SNAP/data/galaxies/copy/ngc2403-halo-6_f606w_f814w_v1_gst.fits',
+            '/Volumes/tehom/research/TP-AGBcalib/SNAP/data/galaxies/copy/ugc4459_f555w_f814w_v1_gst.fits',
+            '/Volumes/tehom/research/TP-AGBcalib/SNAP/data/galaxies/copy/ugc5139_f555w_f814w_v1_gst.fits',
+            '/Volumes/tehom/research/TP-AGBcalib/SNAP/data/galaxies/copy/ugc4305-1_f555w_f814w_v1_gst.fits',
+            '/Volumes/tehom/research/TP-AGBcalib/SNAP/data/galaxies/copy/ngc2403-deep_f606w_f814w_v1_gst.fits']
+
+
+    for sim, gal in zip(sims, gals):
+        g = fits.getdata(gal)
+        s = SimGalaxy(sim)
+        filter1, filter2 = ['{}_cor'.format(f) for f in s.filters]
+        try:
+            mag1 = g['MAG1_ACS']
+            mag2 = g['MAG2_ACS']
+        except:
+            mag1 = g['MAG1_WFPC2']
+            mag2 = g['MAG2_WFPC2']
+        color = mag1 - mag2
+
+        smag1 = s.data[filter1]
+        smag2 = s.data[filter2]
+        scolor = smag1 - smag2
+
+        inds, = np.nonzero((smag1 < mag1.max()) & (smag1 > mag1.min()) &
+                           (smag2 < smag2.max()) &  (smag2 > smag2.min()) &
+                           (scolor < scolor.max()) & (scolor > scolor.min()))
+        np.savetxt(sim.replace('_cor.dat','_cor_cut.match'),
+                   np.column_stack((smag1[inds], smag2[inds])), fmt='%.4f')
+    return
+
+def call_make_fakeparam():
+    loc ='/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/fake_run'
+    params = get_files(loc, '*.param')
+    targets = [os.path.split(p)[1].split('_')[0] for p in params]
+    sfh_files = get_files(loc, '*sfh')
+    sfhfiles =  np.concatenate([[s for s in sfh_files if t in s] for t in targets])
+    [make_fakeparam(params[i], sfhfiles[i]) for i in range(len(params))]
+
+
+# 1 Run best fit sfh (on andromeda)
+# 2 Normalize to optical data
+# /Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/normalize.sh
+# 3 add asts
+# add_asts.sh
+# 4 Cut lower mag limits to match optical data
+# 5 cull file to mag1, mag2 list
+#cut_sims()
+# 6 run calcsfh on those
+# !make_calcsfh.sh
+# 7 make fake with the sfh
+#call_make_fakeparam()
+# ! bash make_fake.sh; ! bash fake.sh
+# 8 compare csfrs and mass distibutions.
+#csfr_masshist()
+
+
+
+
+"""
+To run lots of jobs ...
 
 # I did this in ipython
 # triouts = !! ls out*dat
@@ -52,3 +192,4 @@ for j, t in enumerate(targets):
 if not slurm:
     with open(smft.format(k), 'w') as outp:
         outp.write(line)
+"""

@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-
+import glob
 import numpy as np
 from ResolvedStellarPops import StarPop
 
@@ -18,6 +18,21 @@ data_loc = os.path.join(snap_src, 'data', 'galaxies')
 match_run_loc = os.path.join(snap_src, 'match')
 phat_data_loc =  os.path.join(phat_src, 'low_av', 'phot')
 phat_match_run_loc =  os.path.join(phat_src, 'low_av', 'fake')
+
+
+def ensure_file(f, mad=True):
+    '''
+    input
+    f (string): if f is not a file will print "no file"
+    optional
+    mad (bool)[True]: if mad is True, will exit program.
+    '''
+    test = os.path.isfile(f)
+    if test is False:
+        logging.warning('{} not found'.format(f))
+        if mad:
+            sys.exit()
+    return test
 
 
 def replace_ext(filename, ext):
@@ -220,6 +235,13 @@ def load_observation(filename, colname1, colname2, match_param=None,
             mag1 = mag1[inds]
             mag2 = mag2[inds]
             logger.info('using exclude gates')
+
+    inds, = np.nonzero(mag1-mag2 < -5)
+    if len(inds) > 10:
+        logger.warning('Lots ({}) of super blue shit found in {}! Cutting them out.'.format(filename, len(inds)))
+        ginds, = np.nonzero(mag1-mag2 > -5)
+        mag1 = mag1[ginds]
+        mag2 = mag2[ginds]
     return mag1, mag2
 
 def load_from_lf_file(lf_file, filter1='F814W_cor', filter2='F160W_cor',
