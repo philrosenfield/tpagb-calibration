@@ -4,7 +4,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-
+from ..TPAGBparams import EXT
 from ResolvedStellarPops.fileio import readfile, get_files
 from ResolvedStellarPops.utils import count_uncert_ratio
 from ResolvedStellarPops.galaxies.galaxy import Galaxy
@@ -151,10 +151,10 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, hmcfiles=None,
         plt.legend(loc='best')
         if f:
             ax.set_ylabel(ytitles[1])
-            title = 'agbflux_m2d.png'
+            title = 'agbflux_m2d{}'.format(EXT)
         else:
             ax.set_ylabel(ytitles[0])
-            title = 'magb_m2d.png'
+            title = 'magb_m2d{}'.format(EXT)
 
         if inset:
             yext = [0.6, 0.90]

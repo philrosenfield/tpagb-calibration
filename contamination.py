@@ -8,7 +8,7 @@ import os
 import ResolvedStellarPops as rsp
 from ResolvedStellarPops import utils
 from astropy.io import fits
-
+from TPAGBparams import EXT
 from astroML.plotting import hist as mlhist
 from scipy import integrate
 angst_data = rsp.angst_tables.angst_data
@@ -549,7 +549,7 @@ def test_contamination_line(filenames, diag_plot=False):
             ax.set_xlabel('$F814W-F160W$')
             ax.set_ylabel('$F160W$')
             ax.set_ylim(26, ax.get_ylim()[0])
-            plt.savefig(fname + '_contam.png')
+            plt.savefig(fname + '_contam{}'.format(EXT))
         ftpinrhebs = np.append(ftpinrhebs, ftpinrheb)
         frhebintps = np.append(frhebintps, frhebintp)
         ntpcontams = np.append(ntpcontams, ntpcontam)
@@ -606,7 +606,7 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
     fs = []
     y = []
     for fitsfile in fitsfiles:
-        target = fitsfile.split('_')[0]
+        target = os.path.split(fitsfile)[1].split('_')[0]
         logger.debug(fitsfile)
         ctm = Contamination()
         color, mag, verts, mtrgb = load_data(fitsfile, absmag=absmag)
@@ -637,9 +637,12 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
             #ax.set_title(gal.target)
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
+            ax.axhline(mtrgb, ls='--', color='k', lw=1)
+            yarr = np.arange(*ax.get_xlim(), step=0.1)
+            ax.fill_betweenx(yarr, mtrgb + 0.2, mtrgb - 0.2, color='k', alpha=0.2)
             #if test is not None:
             #    ax.plot(test(mag[mag < mtrgb]), mag[mag < mtrgb], lw=2)
-            fig.savefig('{}_{}-{}_contam.png'.format(target, filter1, filter2), dpi=600)
+            fig.savefig('{}_{}-{}_contam{}'.format(target, filter1, filter2, EXT))
 
         if result_plot and f[0] > 0:
             xarr = np.arange(color.min(), color.max(), step=0.1)
@@ -661,7 +664,7 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
         ax1.set_xlabel(xlabel)
         ax1.set_ylabel(ylabel)
         ax1.legend(loc='best')
-        fig1.savefig('tp-agb_rheb_contam.png')
+        fig1.savefig('tp-agb_rheb_contam{}'.format(EXT))
 
     return color_seps, mean_mags, fs, y
 
@@ -671,8 +674,8 @@ def main(argv):
     description="Run contamination tests."
     parser = argparse.ArgumentParser(description=description)
 
-    parser.add_argument('-a', '--absmag', action='store_true',
-                        help='use absmag')
+    parser.add_argument('-a', '--absmag', action='store_false',
+                        help='do not use absmag')
 
     parser.add_argument('-m', '--model', action='store_true',
                         help='run model contamination tests')
@@ -707,7 +710,8 @@ def main(argv):
     elif args.data:
         find_data_contamination(args.input_files, search=args.search,
                                 diag_plot=args.diag_plot, threshlimit=True,
-                                nanlimit=True, result_plot=args.result_plot)
+                                nanlimit=True, result_plot=args.result_plot,
+                                absmag=args.absmag)
 
 if __name__ == '__main__':
     main(sys.argv[1:])

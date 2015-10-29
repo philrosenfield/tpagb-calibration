@@ -5,19 +5,17 @@ import os
 import sys
 
 import matplotlib as mpl
-#mpl.use('Agg')
 import matplotlib.pylab as plt
 
 import numpy as np
 import ResolvedStellarPops as rsp
 angst_data = rsp.angst_tables.angst_data
 
+from ..TPAGBparams import EXT
 from ..analysis.analyze import get_itpagb, parse_regions
-
 from ..fileio import load_obs, find_fakes, find_match_param, load_lf_file
 from ..fileio import load_observation
 from ..utils import minmax
-
 from ..pop_synth import stellar_pops
 from ..sfhs import star_formation_histories
 
@@ -352,8 +350,8 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
     [nir_axs[i].set_xlim(-10, -1) for i in range(3)]
     [opt_axs[i].set_ylim(-500, 500) for i in [1,2]]
     [nir_axs[i].set_ylim(-500, 500) for i in [1,2]]
-    fig1.savefig('{}_{}_comp_lfs.png'.format(extra_str, filter1))
-    fig2.savefig('{}_{}_comp_lfs.png'.format(extra_str, filter2))
+    fig1.savefig('{}_{}_comp_lfs{}'.format(extra_str, filter1, EXT))
+    fig2.savefig('{}_{}_comp_lfs{}'.format(extra_str, filter2, EXT))
     return opt_axs, nir_axs
 
 
@@ -455,13 +453,11 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
 
         if xlim is not None:
             ax.set_xlim(xlim)
-        #else:
-        #    xmax = ax.get_xlim()[-1]
-        #    xmin = np.min([np.min(mag2), np.min(np.concatenate(mag2s))])
-        #    ax.set_xlim(xmin, xmax)
-        if filt == filter2:
-            if regions_kw is not None:
-                ax = add_lines_to_plot(ax, **regions_kw)
+
+        band = 'nir'
+        if '814' in filt:
+            band = 'opt'
+        ax = add_trgb(ax, target, band)
 
         ax.legend(loc='lower right')
         ax.set_xlabel('${}$'.format(filt.replace('_cor', '')), fontsize=20)
@@ -470,34 +466,64 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
             ax = add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB')
 
         plt.tick_params(labelsize=16)
-        outfile = '{}_{}{}_lfs.png'.format(lf_file.split('_lf')[0], filt, extra_str)
+        outfile = '{}_{}{}_lfs{}'.format(lf_file.split('_lf')[0], filt, extra_str, EXT)
         plt.savefig(outfile)
         logger.info('wrote {}'.format(outfile))
     return
 
 
-def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None,
-                      trgb=None, trgb_exclude=None, lf=True, col_min=None,
-                      col_max=None, **kwargs):
+def add_trgb(ax, target, band, lf=True):
+    offset = 1.
+    opt_fake, nir_fake = find_fakes(target)
+    faint_color = 'grey'
 
-    if mag_bright is not None:
-        low = mag_faint
-        mid = mag_bright
+    if 'ir' in band.lower():
+        trgb = angst_data.get_snap_trgb_av_dmod(target.upper())[0]
+        comp1, comp2 = stellar_pops.limiting_mag(nir_fake, 0.9)
+        trgb_exclude = 0.2
     else:
-        assert offset is not None, \
-        'need either offset or mag limits'
+        trgb = angst_data.get_tab5_trgb_av_dmod(target.upper())[0]
+        comp1, comp2 = stellar_pops.limiting_mag(opt_fake, 0.9)
+        trgb_exclude = 0.1
+
+    mag_faint = trgb + offset  # 1 mag below TRGB
+
+    if comp2 < mag_faint and comp2 > trgb:
+        # comp2 is between 1 mag below TRGB and TRGB use it.
+        mag_faint = comp2
+        faint_color = 'k'
+
+    ax = add_lines_to_plot(ax, trgb_exclude=trgb_exclude,
+                           trgb=trgb, mag_faint=mag_faint,
+                           faint_color=faint_color, lf=lf)
+    return ax
+
+
+
+def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=0.,
+                      trgb=None, trgb_exclude=0., lf=True, col_min=None,
+                      col_max=None, faint_color=None, **kwargs):
+
+    #if mag_bright is not None:
+    #    mid = mag_bright
+    #else:
+    #    mid = trgb + trgb_exclude
+    faint_color = faint_color or 'black'
+
+    if mag_faint is not None:
+        low = mag_faint
+    else:
         low = trgb + offset
-        mid = trgb + trgb_exclude
 
     yarr = np.linspace(*ax.get_ylim())
     if lf:
-
         # vertical lines around the trgb exclude region
-        ax.fill_betweenx(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
-                         color='black', alpha=0.1)
+        if trgb_exclude > 0:
+            ax.fill_betweenx(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
+                             color='black', alpha=0.1)
         ax.vlines(trgb, *ax.get_ylim(), color='black', linestyle='--')
-
-        ax.vlines(low, *ax.get_ylim(), color='black', linestyle='--')
+        if offset > 0 or mag_faint is not None:
+            ax.vlines(low, *ax.get_ylim(), color=faint_color, linestyle='--')
         #ax.fill_betweenx(yarr, mid, low, color='black', alpha=0.1)
         #if mag_limit_val is not None:
         #    ax.fill_betweenx(yarr, mag_limit_val, ax.get_xlim()[-1],
@@ -506,11 +532,12 @@ def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=None,
         xarr = np.linspace(*ax.get_xlim())
 
         # vertical lines around the trgb exclude region
-        ax.fill_between(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
-                         color='black', alpha=0.1)
-        ax.hlines(trgb, *ax.get_xlim(), color='black', linestyle='--')
-
-        ax.hlines(low, *ax.get_xlim(), color='black', linestyle='--')
+        if trgb_exclude > 0:
+            ax.fill_between(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
+                             color='black', alpha=0.1)
+        ax.axhline(trgb, color='black', linestyle='--')
+        if offset > 0 or mag_faint is not None:
+            ax.axhline(low, color='black', linestyle='--')
         #ax.fill_betweenx(yarr, mid, low, color='black', alpha=0.1)
         #if mag_limit_val is not None:
         #    ax.fill_betweenx(yarr, mag_limit_val, ax.get_xlim()[-1],
@@ -597,7 +624,7 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
         axs[0].plot(magbins[1:], mhist, color='r', linestyle='steps-pre', lw=2,
                     zorder=1, alpha=0.3)
 
-        outfile = '{}_{}_{}_scatterhist.png'.format(outfmt, zstr, band)
+        outfile = '{}_{}_{}_scatterhist{}'.format(outfmt, zstr, band, EXT)
         plt.savefig(outfile)
         logger.info('wrote {}'.format(outfile))
 
@@ -626,7 +653,7 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
             if len(regions_kw) > 0:
                 ax = add_lines_to_plot(ax, lf=False, **regions_kw)
 
-        outfile = '{}_{}_{}.png'.format(outfmt, zstr, band)
+        outfile = '{}_{}_{}{}'.format(outfmt, zstr, band, EXT)
         plt.savefig(outfile)
         logger.info('wrote {}'.format(outfile))
     return

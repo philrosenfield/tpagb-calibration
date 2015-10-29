@@ -1,8 +1,8 @@
 import numpy as np
-import from dweisz.match import scripts as match
+from dweisz.match import scripts as match
 import os
 import ResolvedStellarPops as rsp
-
+from TPAGBparams import snap_src
 def within(val, val2, perr=0.0, merr=0.0,  perr2=0.0, merr2=0.0):
     frac_diff = (val - val2) / val2
     nerr = np.nan
@@ -24,9 +24,9 @@ def within(val, val2, perr=0.0, merr=0.0,  perr2=0.0, merr2=0.0):
     return frac_diff, nerr, nerr2
 
 def MelbourneTable1():
-    table1 = '/Volumes/tehom/Dropbox/andromeda/research/TP-AGBcalib/SNAP/tables/melbourne2012_tab1.dat'
+    table1 = os.path.join(snap_src, 'tables/melbourne2012_tab1.dat')
     tab1 =  rsp.fileio.readfile(table1, string_column=0)
-    sfh_loc = '/Volumes/tehom/Dropbox/andromeda/research/TP-AGBcalib/SNAP/varysfh/extpagb'
+    sfh_loc = os.path.join(snap_src, 'varysfh/extpagb')
     sfh_names = ['ddo71_f606w_f814w.sfh',
                  'ddo78_f475w_f814w.sfh',
                  #'ddo82_F606W_F814W.sfh',

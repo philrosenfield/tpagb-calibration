@@ -6,7 +6,7 @@ from dweisz.match.scripts.fileio import get_files, read_fake, replace_ext
 from dweisz.match.scripts.sfh import SFH
 import numpy as np
 import matplotlib.pyplot as plt
-
+from ..TPAGBparams import EXT
 
 def csfr_masshist():
     """ Do all
@@ -78,7 +78,7 @@ def csfr_masshist():
     ax2.set_ylabel(r'$\rm{\#/Mass\ bin (0.1\ M_\odot)}$')
     ax1.set_xlabel(r'$\rm{Time\ (Gyr)}$')
     ax1.set_ylabel(r'$\rm{Cummulative\ SF}$')
-    plt.savefig('ugc8505_csfr_mass.png')
+    plt.savefig('ugc8505_csfr_mass{}'.format(EXT))
 
 
 def cut_sims():

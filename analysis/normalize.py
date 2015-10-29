@@ -8,7 +8,7 @@ import os
 import sys
 
 import ResolvedStellarPops as rsp
-
+from ..TPAGBparams import EXT
 from .analyze import get_itpagb, parse_regions
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag, exclude_gate_inds
 from ..sfhs.star_formation_histories import StarFormationHistories
@@ -226,7 +226,7 @@ def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
     ax.set_xlabel('{}-{}'.format(f1,f2))
     ax.set_ylabel('{}'.format(f2))
     plotting.add_lines_to_plot(ax, lf=False, **regions_kw)
-    plt.savefig(sgal.name.replace('.dat', '_diag.png'))
+    plt.savefig(sgal.name.replace('.dat', '_diag{}'.format(EXT)))
     plt.close()
     if multi_plot:
         ind = list(set(np.nonzero(sgal.data[f1][inds] < 30)[0]) &
@@ -264,7 +264,7 @@ def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
 
         ax.set_ylim(ylim)
 
-        plt.savefig(sgal.name.replace('.dat', '_diagcmd.png'))
+        plt.savefig(sgal.name.replace('.dat', '_diagcmd{}'.format(EXT)))
         plt.close()
     return
 
@@ -425,8 +425,6 @@ For the mag limits either:
                           extra_str=extra_str)
 
     if args.lfplot:
-        # plotting.plotting has its own main, but with parse_regions here
-        # it's easier.
         plotting.compare_to_gal(fdict['lf_file'], args.observation,
                        narratio_file=fdict['narratio_file'], filter1=f1,
                        agb_mod=agb_mod, regions_kw=regions_kw,

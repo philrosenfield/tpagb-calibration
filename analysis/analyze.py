@@ -14,7 +14,6 @@ import matplotlib.pylab as plt
 import ResolvedStellarPops as rsp
 
 from astropy.io import ascii
-from IPython import parallel
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_obs, find_fakes

@@ -2,6 +2,7 @@ import os
 import socket
 hostname = socket.gethostname()
 
+EXT = '.png'
 if hostname.endswith('astro.washington.edu'):
     print 'better edit TPAGBparams.py...'
 else:

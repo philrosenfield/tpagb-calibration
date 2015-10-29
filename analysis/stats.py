@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ResolvedStellarPops as rsp
 
-#from TPAGBparams import snap_src
+from ..TPAGBparams import EXT
 
 from astroML.stats import binned_statistic_2d
 from ..fileio import load_photometry
@@ -135,7 +135,7 @@ def compare_hess(lf_file, observation, filter1='F814W_cor', filter2='F160W_cor',
             labels[1] = fmt1.format(mrgb, mratio, mratio_err)
 
 
-        figname = lf_file.replace('.dat', '.png')
+        figname = lf_file.replace('.dat', EXT)
         fignames = [figname.replace('lf', 'tpagb_hess'),
                     figname.replace('lf', 'hess'),
                     figname.replace('lf', 'notpagb_hess')]
@@ -337,7 +337,7 @@ def chi2plot(chi2table, outfile_loc=None, flatten=True):
                         xycoords='axes fraction')
         axs[2].annotate(r'$\rm{No TP\!-\!AGB}$', (0.02, 0.02), fontsize=16,
                         xycoords='axes fraction')
-        outfile = os.path.join(outfile_loc, 'chi2_{}.png'.format(ycol))
+        outfile = os.path.join(outfile_loc, 'chi2_{}{}'.format(ycol, EXT))
         fig.savefig(outfile, dpi=150)
 
     fig, axs = plt.subplots(ncols=3, sharex=True, sharey=False,
@@ -380,7 +380,7 @@ def chi2plot(chi2table, outfile_loc=None, flatten=True):
     axs[1].annotate(r'$\rm{TP\!-\!AGB\ Only}$', (0.02, 0.02), fontsize=16,
                     xycoords='axes fraction')
 
-    outfile = os.path.join(outfile_loc, 'chi2_target.png')
+    outfile = os.path.join(outfile_loc, 'chi2_target{}'.fromat(EXT))
     fig.savefig(outfile, dpi=150)
 
     return axs
