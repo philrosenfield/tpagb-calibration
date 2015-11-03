@@ -109,7 +109,10 @@ def parse_regions(args):
                 search_str = '*{}*.matchfake'.format(args.target.upper())
                 fakes = rsp.fileio.get_files(matchfake_loc, search_str)
                 logger.info('found fakes {}'.format(fakes))
-                fake = [f for f in fakes if filter1 in f][0]
+                try:
+                    fake = [f for f in fakes if filter1 in f][0]
+                except:
+                    fake = [f for f in fakes if filter2 in f][0]
                 logger.info('using fake: {}'.format(fake))
                 _, comp_mag2 = limiting_mag(fake, args.comp_frac)
                 #comp_mag1, comp_mag2 = limiting_mag(args.fake_file,
@@ -170,7 +173,7 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
                                                                dmod=dmod, Av=Av))
 
     else:
-        logger.warning('Not using TP-AGB RHeB line')
+        logger.warning('Not using TP-AGB RHeB line: {}'.format(col))
         if mtrgb is None:
             mtrgb, Av, dmod = angst_data.get_tab5_trgb_av_dmod(target.upper(),
                                                                filters=col)

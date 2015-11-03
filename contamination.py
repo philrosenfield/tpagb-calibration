@@ -8,7 +8,8 @@ import os
 import ResolvedStellarPops as rsp
 from ResolvedStellarPops import utils
 from astropy.io import fits
-from TPAGBparams import EXT
+from TPAGBparams import EXT, snap_src
+from plotting.plotting import emboss
 from astroML.plotting import hist as mlhist
 from scipy import integrate
 angst_data = rsp.angst_tables.angst_data
@@ -638,8 +639,11 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
             ax.axhline(mtrgb, ls='--', color='k', lw=1)
+
             yarr = np.arange(*ax.get_xlim(), step=0.1)
             ax.fill_betweenx(yarr, mtrgb + 0.2, mtrgb - 0.2, color='k', alpha=0.2)
+            ax.text(ax.get_xlim()[1] - 0.01, ax.get_ylim()[0] - 0.2, r'$\rm{{{}}}$'.format(target.replace('-', '\!-\!').upper()),
+            fontsize=20, ha='right', **emboss())
             #if test is not None:
             #    ax.plot(test(mag[mag < mtrgb]), mag[mag < mtrgb], lw=2)
             fig.savefig('{}_{}-{}_contam{}'.format(target, filter1, filter2, EXT))
@@ -668,6 +672,79 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
 
     return color_seps, mean_mags, fs, y
 
+
+def rgb_cut():
+    targets = ['eso540-030',
+                'kdg73',
+                'ngc2403-deep',
+                'ngc2403-halo-6',
+                'ngc3741',
+                'ngc4163',
+                'ugc4305-1',
+                'ugc4459',
+                'ugc5139',
+                'ugc8508']
+
+    fits_files = get_files(snap_src + 'data/opt_ir_matched_v2/copy', '*fits')
+    fits_files = np.concatenate([[s for s in fits_files if t in s] for t in targets])
+    gals = [rsp.galaxy.Galaxy(f) for f in fits_files]
+    fig, ax = plt.subplots()
+    colors = ['k', 'k', '#853E43', '#853E43', 'k', '#853E43', '#853E43', '#853E43', '#853E43', 'k']
+    from astropy.table import Table
+    tab = Table.read(snap_src + '/tables/tab1.tex', format='latex', data_start=1, delimiter='&', guess=False, header_start=0)
+    for i, g in enumerate(gals):
+       ir_mtrgb, Av, dmod = g.trgb_av_dmod('F160W')
+       opt_mtrgb, Av, dmod = g.trgb_av_dmod('F814W')
+       targ1 = targets[i].replace('eso540-030', 'KDG2').replace('ugc4305-1', 'HoII').replace('ugc5139', 'HoI').replace('ugc4459', 'DDO53').upper().replace('-DEEP','').replace('-HALO-6', '').replace('GC', '')
+       targ = difflib.get_close_matches(targ1, tab['Galaxy'])[0]
+       ax.plot(tab[tab['Galaxy'] == targ]['MB'], opt_mtrgb-ir_mtrgb, 'o', ms=9, color=colors[i])
+       ha = 'center'
+       if '4459' in targets[i]:
+          ha = 'left'
+       if '8508' in targets[i]:
+          ha = 'right'
+       ax.text(tab[tab['Galaxy'] == targ]['MB'], opt_mtrgb-ir_mtrgb + 0.01, r'$\rm{{{}}}$'.format(targets[i].replace('-', '\!-\!').upper()), ha=ha, fontsize=12)
+       ax.axvline(-13, color='k', ls='--')
+       ax.set_xlim(ax.get_xlim()[::-1])
+       ax.set_xlabel(r'$M_{B_T}$')
+       ax.set_ylabel(r'$\rm{(F814W-F160W)_{TRGB}}$')
+       ax.set_xlim(-10, -20)
+       plt.savefig('rgb_color_cut{}'.format(EXT))
+
+
+    a = 1.25
+    b = 1.4
+    db = [0.4, 0.4, 0.6, 0.6, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
+    blues = [a, a, b, b, a, b, b, b, b, a]
+
+    for i, g in enumerate(gals):
+       fig, ax = plt.subplots()
+       mtrgb, Av, dmod = g.trgb_av_dmod('F160W')
+       try:
+           color = g.data['MAG2_ACS'] - g.data['MAG4_IR']
+           mag = g.data['MAG4_IR']
+       except:
+           color = g.data['MAG2_WFPC2'] - g.data['MAG4_IR']
+           mag = g.data['MAG4_IR']
+       ax.plot(color, mag, 'o', ms=3, mec='none', c='k', alpha=0.5)
+
+       verts = np.array([[blues[i], mtrgb + 1], [blues[i], mtrgb],
+                         [blues[i] + db[i], mtrgb], [blues[i] + db[i], mtrgb + 1],
+                         [blues[i], mtrgb + 1]])
+       ax.plot(verts[:, 0], verts[:, 1], lw=2, color='#853E43')
+       m = np.arange(mag.min(), mtrgb, 0.1)
+       cs = tpagb_rheb_line(m, dmod=dmod, Av=Av)
+       ax.plot(cs, m, color='k')
+       itpagb = get_itpagb(targets[i], color, mag, 'F160W', dmod=dmod, Av=Av)[0]
+       ax.plot(color[itpagb], mag[itpagb], 'o', ms=5, mfc='none', mec='#156692', alpha=0.5)
+       ax.set_xlim(-0.5,4)
+       ax.set_ylim(25.1, 17)
+       ax.text(ax.get_xlim()[1] - 0.01, ax.get_ylim()[0] - 0.2, r'$\rm{{{}}}$'.format(targets[i].replace('-', '\!-\!').upper()),
+               fontsize=20, ha='right', **emboss())
+
+       ax.set_xlabel(r'$\rm{F814W-F160W}$')
+       ax.set_ylabel(r'$\rm{F160W}$')
+       plt.savefig('{}_contam_cmd{}'.format(targets[i], EXT))
 
 def main(argv):
     """Contaminatoin Tests"""

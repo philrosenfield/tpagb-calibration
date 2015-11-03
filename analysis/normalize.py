@@ -54,14 +54,15 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
     target = os.path.split(tricat)[1].split('_')[1]
 
     sgal_rgb, sgal_agb = rgb_agb_regions(ymag, **regions_kw)
-    if 'IR' in filter2 or '110' in filter2 or '160' in filter2:
+
+    if 'IR' in filter2 in filter2 or '160' in filter2 and not '110' in filter1:
         sgal_agb = get_itpagb(target, regions_kw['color'], ymag, filter2)
 
     # normalization
     norm, idx_norm, sim_rgb, sim_agb = normalize_simulation(ymag, nrgbs,
                                                             sgal_rgb, sgal_agb,
                                                             norm=norm)
-    tol = 0.7
+    tol = 1. #0.7
     if norm <= tol:
         norm_dict = {'norm': norm, 'sim_rgb': sim_rgb, 'sim_agb': sim_agb,
                      'sgal_rgb': sgal_rgb, 'sgal_agb': sgal_agb,
@@ -319,10 +320,6 @@ For the mag limits either:
 
     parser.add_argument('-q', '--colnames', type=str, default='MAG2_ACS,MAG4_IR',
                         help='comma separated column names in observation data')
-
-    parser.add_argument('-r', '--table', type=str,
-                        help=('read colorlimits, completness mags from a prepared table'
-                              ' depreciated!'))
 
     parser.add_argument('-s', '--scolnames', type=str, default='F814W,F160W',
                         help='comma separated column names in trilegal catalog')
