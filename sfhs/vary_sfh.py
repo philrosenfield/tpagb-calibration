@@ -168,6 +168,10 @@ class VarySFHs(SFH):
     def prepare_trilegal_files(self, random_sfr=True, random_z=False,
                                zdisp=False, overwrite=False, object_mass=None):
         '''make the sfhs, make the galaxy inputs'''
+        dry_run=True
+        if overwrite:
+            dry_run = False
+
         self.sfr_files = self.make_many_trilegal_sfhs(nsfhs=self.nsfhs,
                                                       outfile_fmt=self.sfr_fmt,
                                                       random_sfr=random_sfr,
