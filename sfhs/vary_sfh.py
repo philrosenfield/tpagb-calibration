@@ -169,7 +169,8 @@ class VarySFHs(SFH):
     def prepare_trilegal_files(self, random_sfr=True, random_z=False,
                                zdisp=False, overwrite=False, object_mass=None):
         '''make the sfhs, make the galaxy inputs'''
-        self.sfr_files = self.make_many_trilegal_sfhs(nsfhs=self.nsfhs,
+        import pdb; pdb.set_trace()
+	self.sfr_files = self.make_many_trilegal_sfhs(nsfhs=self.nsfhs,
                                                       outfile_fmt=self.sfr_fmt,
                                                       random_sfr=random_sfr,
                                                       random_z=random_z,
