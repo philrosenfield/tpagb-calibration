@@ -35,7 +35,7 @@ def load_sim_masses(target):
                     'ngc404-deep', 'ugc4459', 'm81-deep', 'ugca292']:
         mass = 2.5e+08
     elif target in ['ugc4305-1', 'ugc4305-2', 'ngc4163', 'ddo82', 'eso540-030',
-		    'ngc3077-phoenix']:
+                    'ngc3077-phoenix']:
         mass = 5.0e+08
     else:
         mass = 1.0e+07
@@ -169,7 +169,7 @@ class VarySFHs(SFH):
     def prepare_trilegal_files(self, random_sfr=True, random_z=False,
                                zdisp=False, overwrite=False, object_mass=None):
         '''make the sfhs, make the galaxy inputs'''
-        dry_run=True
+        dry_run = True
         if overwrite:
             dry_run = False
 
