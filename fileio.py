@@ -102,7 +102,7 @@ def find_phatfake(target):
     return fake, fake
 
 def load_obs(target, optfilter1=''):
-    """return in NIR and OPT galaxy as StarPop objects"""
+    """return in NIR and OPT galaxy as StarPop objects -- not 4 filter"""
     from astropy.io import fits
     if 'm31' in target or 'B' in target:
         optgal, nirgal = load_phat(target)
@@ -178,7 +178,9 @@ def load_lf_file(lf_file):
     with open(lf_file, 'r') as lf:
         lines = [l.strip() for l in lf.readlines() if not l.startswith('#')]
 
-    dtypes = [float, float, float, float, int, int, int, int, int, float]
+    dtypes = [float, float, float, float, int, int, int, int, int, float, str]
+    assert len(dtypes) == ncols, 'lf file format is not recognized'
+
     for i, key in enumerate(header):
         lfd[key] = [np.array(l.split(), dtype=dtypes[i])
                     for l in lines[i::ncols] if len(l.split())>0]

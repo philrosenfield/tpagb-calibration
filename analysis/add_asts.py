@@ -50,17 +50,24 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
         else:
             outfile = outfiles[i]
         # do the ast corrections
+        msg = '{}_cor and already in header'
         for ast in asts:
+            correct = 'both'
             header = open(trilegal_catalog, 'r').readline()
-            if ast.filter1 + '_cor' in header.split() and \
-                ast.filter2 + '_cor' in header.split():
-                msg = '{}_cor and {}_cor already in header'
-                logger.debug(msg.format(ast.filter1, ast.filter2))
-                continue
+            if ast.filter1 + '_cor' in header.split():
+                logger.warning(msg.format(ast.filter1))
+                if correct == 'both':
+                    correct = 'filter2'
+            if ast.filter2 + '_cor' in header.split():
+                logger.warning(msg.format(ast.filter2))
+                if correct == 'both':
+                    correct = 'filter1'
+                else:
+                    continue
 
             rsp.ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
                                     outfile=outfile, diag_plot=diag_plot,
-                                    hdf5=hdf5)
+                                    hdf5=hdf5, correct=correct)
     return
 
 

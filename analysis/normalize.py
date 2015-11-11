@@ -29,6 +29,8 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
 
     if sgal is None:
         sgal = rsp.SimGalaxy(tricat)
+        if sgal is None:
+            return None, {}, []
         if 'dav' in tricat.lower():
             print('applying dav')
             dAv = float('.'.join(sgal.name.split('dav')[1].split('.')[:2]).replace('_',''))
@@ -75,13 +77,42 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
 
 
 def tpagb_lf(sgal, narratio_dict, inds, filt1, filt2, lf_line=''):
-    """format a narratio_dict for a line in the LF output file"""
+    """format a narratio_dict for a line in the LF output file
+    Parameters
+    ----------
+    sgal : rsp.SimGalaxy
+
+    narratio_dict : dict
+        see narratio.__doc__
+    inds : array
+        inds of sgal.data, full array unless exclude gates were used
+    filt1 : str
+        name of filter1
+    filt2 : str
+        name of filter2
+    lf_line : str
+        if adding many sgals together
+        format is stupid and makes for slow reading.
+        each row is:
+        filt1 : mag1 full simulation length = inds
+        filt2 : mag2 full simulation length = inds
+        logAge : logAge full simulation length = inds
+        [M/H] : [M/H] full simulation length = inds
+        sim_rgb : index array of sgal from narratio_dict
+        sim_agb : index array of sgal from narratio_dict
+        sgal_rgb : index array of sgal from narratio_dict
+        sgal_agb : index array of sgal from narratio_dict
+        idx_norm : index array of sgal from narratio_dict
+        norm : float, from narratio_dict
+        idx : int or str, simulation number or "bestsfr" (last value before .dat in filename)
+    """
 
     header = '# {} {} '.format(filt1, filt2)
-    header += 'logAge [M/H] sim_rgb sim_agb sgal_rgb sgal_agb idx_norm norm'
+    header += 'logAge [M/H] sim_rgb sim_agb sgal_rgb sgal_agb idx_norm norm idx'
 
     if len(lf_line) == 0:
         lf_line = header
+    idx = sgal.name.split('_')[-1].replace('.dat', '')
     lf_line += '\n' + '\n'.join([' '.join(['%g' % m for m in sgal.data[filt1][inds]]),
                                  ' '.join(['%g' % m for m in sgal.data[filt2][inds]]),
                                  ' '.join(['%g' % m for m in sgal.data['logAge'][inds]]),
@@ -91,7 +122,8 @@ def tpagb_lf(sgal, narratio_dict, inds, filt1, filt2, lf_line=''):
                                  ' '.join(['%i' % m for m in narratio_dict['sgal_rgb']]),
                                  ' '.join(['%i' % m for m in narratio_dict['sgal_agb']]),
                                  ' '.join(['%i' % m for m in narratio_dict['idx_norm']]),
-                                 '%.4f' % narratio_dict['norm']])
+                                 '%.4f' % narratio_dict['norm'],
+                                 '%s' % idx])
     return lf_line
 
 

@@ -35,11 +35,53 @@ try:
 except:
     pass
 
-def emboss():
+
+def emboss(fg='w', lw=3):
     from matplotlib.patheffects import withStroke
-    myeffect = withStroke(foreground="w", linewidth=3)
-    ann_kwargs = dict(path_effects=[myeffect])
-    return ann_kwargs
+    myeffect = withStroke(foreground=fg, linewidth=lw, alpha=0.5)
+    return dict(path_effects=[myeffect])
+
+
+def outside_labels(axs, fig=None, xlabel=None, ylabel=None, rows=True,
+                   text_kw={}):
+    """
+    make an ndarray of axes only have lables on the outside of the grid
+    also add common x and y label if fig, xlabel, ylabel passed.
+    Returns
+        np.ravel(axs)
+    """
+    ndim = len(shape(axs))
+    text_kw = dict({'ha': 'center', 'va': 'center', 'fontsize': 24}.items() + text_kw.items())
+    if ndim == 1:
+        if rows:
+            bottom = axs[-1]
+            [ax.tick_params(labelbottom=False, direction='in', which='both')
+             for ax in np.ravel(axs)]
+            bottom.tick_params(labelbottom=True)
+        else:
+            left = axs[0]
+            [ax.tick_params(labelleft=False, direction='in', which='both')
+             for ax in np.ravel(axs)]
+            left.tick_params(labelleft=True)
+    else:
+        top = axs[0, :]
+        left = [axs[0, 0], axs[1, 0]]
+        right = [axs[0, -1], axs[1, -1]]
+
+        [ax.tick_params(labelleft=False, direction='in', which='both')
+         for ax in np.ravel(axs)]
+        [ax.tick_params(labeltop=True, labelbottom=False) for ax in top]
+        [ax.tick_params(labelleft=True) for ax in left]
+        [ax.tick_params(labelright=True) for ax in right]
+
+    axs = np.ravel(axs)
+
+    if xlabel is not None:
+        fig.text(0.5, 0.04, xlabel, **text_kw)
+
+    if ylabel is not None:
+        fig.text(0.06, 0.5, ylabel, rotation='vertical', **text_kw)
+    return axs
 
 
 def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
@@ -149,7 +191,8 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
     hists = [np.histogram(m, bins=bins)[0] for m in ms]
     minhists = np.min(np.array(hists).T, axis=1)
     maxhists = np.max(np.array(hists).T, axis=1)
-    meanhists = np.mean(np.array(hists).T, axis=1)
+    #meanhists = np.mean(np.array(hists).T, axis=1)
+    meanhists = np.median(np.array(hists).T, axis=1)
     ax.fill_between(bins[1:], minhists, maxhists, color=plt_kw_lab['color'], alpha='0.2')
     ax.plot(bins[1:], minhists, linestyle='steps-mid', color=plt_kw_lab['color'], lw=2)
     ax.plot(bins[1:], maxhists, linestyle='steps-mid', color=plt_kw_lab['color'], lw=2)
@@ -191,7 +234,7 @@ def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
              over_plot=None):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
-    target = target.replace('-', '\!-\!')
+    target = target.replace('-', '\!-\!').upper()
     plot_kw = dict({'drawstyle': 'steps-mid', 'lw': 1,
                     'color': data_default_color,
                     'label': '${}$'.format(target)}.items() + plot_kw.items())
@@ -355,39 +398,6 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
     return opt_axs, nir_axs
 
 
-def load_data(opt=True, optfilter1=None, target=None, extra_str='',
-              optfilter2_limit=None, nirfilter2_limit=None,
-              optregions_kw={}, nirregions_kw={}):
-
-    optgal, nirgal = load_obs(target, optfilter1=optfilter1)
-    optfake, nirfake = find_fakes(target)
-    if opt:
-        maglimit = optfilter2_limit
-        fake_file = optfake
-        extra_str += '_opt'
-        regions_kw = optregions_kw
-        try:
-            mag2 = optgal.data['MAG2_ACS']
-        except:
-            try:
-                mag2 = optgal.data['MAG2_WFPC2']
-            except:
-                mag2 = optgal.data['F814W']
-        filter2 = optfilter2
-    else:
-        maglimit = nirfilter2_limit
-        fake_file = nirfake
-        try:
-            mag2 = nirgal.data['MAG2_IR']
-        except:
-            mag2 = optgal.data['F814W']
-        extra_str = extra_str.replace('opt', 'nir')
-        regions_kw = nirregions_kw
-        filter2 = nirfilter2
-
-    return mag2, filter2, regions_kw, fake_file, maglimit, extra_str
-
-
 def compare_to_gal(lf_file, observation, filter1='F814W_cor',
                    filter2='F160W_cor', col1='MAG2_ACS', col2='MAG4_IR',
                    dmag=0.1, narratio_file=None, make_plot=True,
@@ -486,19 +496,20 @@ def add_trgb(ax, target, band, lf=True):
         comp1, comp2 = stellar_pops.limiting_mag(opt_fake, 0.9)
         trgb_exclude = 0.1
 
-    mag_faint = trgb + offset  # 1 mag below TRGB
-
-    if comp2 < mag_faint and comp2 > trgb:
+    ## hack ... always plot 90% completeness
+    ## undo hack: uncomment next lines
+    #mag_faint = trgb + offset  # 1 mag below TRGB
+    #if comp2 < mag_faint and comp2 > trgb:
         # comp2 is between 1 mag below TRGB and TRGB use it.
-        mag_faint = comp2
-        faint_color = 'k'
+    ## undo hack: tab these in under if statement
+    mag_faint = comp2
+    faint_color = 'k'
+    ## end hack ...
 
     ax = add_lines_to_plot(ax, trgb_exclude=trgb_exclude,
                            trgb=trgb, mag_faint=mag_faint,
                            faint_color=faint_color, lf=lf)
     return ax
-
-
 
 def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=0.,
                       trgb=None, trgb_exclude=0., lf=True, col_min=None,

@@ -190,14 +190,6 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
     return itpagb#, irheb
 
 
-# Someday this will call all the codes in order
-# add_asts
-# normalize
-# decontaminate
-# plotting
-# stats
-
-
 def main(argv):
     """main function of analyze"""
     description="Run analysis routines, so far just match_stats."

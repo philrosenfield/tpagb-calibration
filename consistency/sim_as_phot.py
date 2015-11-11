@@ -62,6 +62,10 @@ def csfr_masshist():
     mass = sgal.data['m_ini'][inds]
     h = np.histogram(mass, bins=bins)[0] / np.sum(mass)
 
+    from scipy.stats import ks_2samp
+    a, p = ks_2samp(h, h1)
+    print 'KS:', a, p
+    
     fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(8, 6))
     fig.subplots_adjust(hspace=.4, top=0.97, bottom=0.11)
     ax1 = sfh.plot_csfr(ax=ax1)

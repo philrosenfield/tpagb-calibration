@@ -185,24 +185,11 @@ class VarySFHs(SFH):
 
     def run_once(self, galaxy_input=None, triout=None, ite=0, overwrite=False):
         """write call to trilegal string"""
-        flag = 0
         ver = 2.3
-        call = ''
-
-        #if os.path.isfile(triout) and not overwrite:
-        #    logger.warning('{} exists, will overwrite if no hdf5 file found'.format(triout))
-        #    flag += 1
-
-        hdf5file = rsp.fileio.replace_ext(triout, 'hdf5')
-        if os.path.isfile(hdf5file) and not overwrite:
-            logger.warning('{} already exists, not calling trilegal'.format(hdf5file))
-            flag += 1
-
-        if flag < 1:
-            call = 'nice -n +19 taskset -c {0} code_{1}/main'.format(ite, ver)
-            call += ' -f {0} -a -l {1} {2} > {2}.scrn'.format(self.cmd_input_file,
-                                                               galaxy_input,
-                                                               triout)
+        call = 'nice -n +19 taskset -c {0} code_{1}/main'.format(ite, ver)
+        call += ' -f {0} -a -l {1} {2} > {2}.scrn'.format(self.cmd_input_file,
+                                                          galaxy_input,
+                                                          triout)
         return call
 
     def call_run(self, dry_run=False, nproc=8, overwrite=False):

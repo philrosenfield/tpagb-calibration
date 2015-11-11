@@ -4,6 +4,7 @@ import sys
 from ..TPAGBparams import EXT
 import matplotlib.pyplot as plt
 from ..fileio import get_files
+from .plotting import outside_labels, emboss
 from dweisz.match.scripts.sfh import SFH
 
 plt.style.use('presentation')
@@ -46,34 +47,6 @@ def main(argv):
         ax.set_ylabel('$\\rm{Culmulative\ SF}$')
         plt.legend(loc=0, frameon=False)
         plt.savefig('all_csfr{}'.format(EXT))
-
-def emboss(fg='w', lw=3):
-    from matplotlib.patheffects import withStroke
-    myeffect = withStroke(foreground=fg, linewidth=lw, alpha=0.5)
-    return dict(path_effects=[myeffect])
-
-def outside_labels(axs, fig=None, xlabel=None, ylabel=None):
-    """
-    make an ndarray of axes only have lables on the outside of the grid
-    also add common x and y label if fig, xlabel, ylabel passed.
-    Returns
-        np.ravel(axs)
-    """
-    [ax.tick_params(labelleft=False, direction='in', which='both')
-     for ax in np.ravel(axs)]
-    [ax.tick_params(labeltop=True, labelbottom=False) for ax in axs[0, :]]
-    [ax.tick_params(labelleft=True) for ax in [axs[0, 0], axs[1, 0]]]
-    [ax.tick_params(labelright=True) for ax in [axs[0, -1], axs[1, -1]]]
-    axs = np.ravel(axs)
-
-    if xlabel is not None:
-        fig.text(0.5, 0.04, xlabel, ha='center', va='center', fontsize=24)
-
-    if ylabel is not None:
-        fig.text(0.06, 0.5, ylabel, ha='center', va='center', fontsize=24,
-                 rotation='vertical')
-    return axs
-
 
 def default_run():
     sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
