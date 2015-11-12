@@ -155,6 +155,10 @@ def tpagb_rheb_line(mag, b=6.653127, m=-9.03226, dmod=0., Av=0.0):
 def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
                mtrgb=None, dmod=0.0, Av=0.0):
     # careful! get_snap assumes F160W
+    off = 0
+    if '300' in target:
+        off = 0.4
+
     if '160' in col or '110' in col or 'IR' in col:
         if mtrgb is None:
             try:
@@ -167,10 +171,9 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
                                                      dmod=dmod, Av=Av)
                 dmod = 0.
                 Av = 0.
-        redward_of_rheb, = np.nonzero(color > tpagb_rheb_line(mag,
-                                                              dmod=dmod, Av=Av))
-        blueward_of_rheb, = np.nonzero(color < tpagb_rheb_line(mag,
-                                                               dmod=dmod, Av=Av))
+        cs = tpagb_rheb_line(mag, dmod=dmod, Av=Av) + off
+        redward_of_rheb, = np.nonzero(color > cs)
+        blueward_of_rheb, = np.nonzero(color < cs)
 
     else:
         logger.warning('Not using TP-AGB RHeB line: {}'.format(col))

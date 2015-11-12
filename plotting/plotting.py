@@ -50,7 +50,8 @@ def outside_labels(axs, fig=None, xlabel=None, ylabel=None, rows=True,
     Returns
         np.ravel(axs)
     """
-    ndim = len(shape(axs))
+    ndim = len(np.shape(axs))
+    print(ndim)
     text_kw = dict({'ha': 'center', 'va': 'center', 'fontsize': 24}.items() + text_kw.items())
     if ndim == 1:
         if rows:
@@ -65,14 +66,16 @@ def outside_labels(axs, fig=None, xlabel=None, ylabel=None, rows=True,
             left.tick_params(labelleft=True)
     else:
         top = axs[0, :]
-        left = [axs[0, 0], axs[1, 0]]
-        right = [axs[0, -1], axs[1, -1]]
+        bottom = axs[-1, :]
+        left = axs[:, 0]
+        right = axs[:, -1]
 
-        [ax.tick_params(labelleft=False, direction='in', which='both')
-         for ax in np.ravel(axs)]
-        [ax.tick_params(labeltop=True, labelbottom=False) for ax in top]
+        [ax.tick_params(labelbottom=False, labelleft=False, direction='in',
+                        which='both') for ax in np.ravel(axs)]
+        [ax.tick_params(labeltop=True) for ax in top]
         [ax.tick_params(labelleft=True) for ax in left]
         [ax.tick_params(labelright=True) for ax in right]
+        [ax.tick_params(labelbottom=True) for ax in bottom]
 
     axs = np.ravel(axs)
 

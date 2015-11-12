@@ -50,14 +50,15 @@ def main(argv):
 
 def default_run():
     sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
-    targets = ['ugc8508', 'ngc4163', 'ngc2403-deep', 'ngc2403-halo-6',
-               'ugc4459', 'eso540-030', 'ngc3741', 'ugc5139', 'ugc4305-1', 'kdg73']
+    targets = ['ngc300-wide1', 'ugc8508', 'ngc4163', 'ngc2403-deep', 'ngc2403-halo-6',
+               'ugc4459', 'eso540-030', 'ngc3741', 'ugc5139', 'ugc4305-1',
+               'ugc4305-2', 'kdg73', 'ugca292']
 
-    fig, axs = plt.subplots(ncols=5, nrows=2, figsize=(16, 8))
+    fig, axs = plt.subplots(ncols=5, nrows=3, figsize=(16, 8))
     axs = outside_labels(axs, fig=fig, xlabel=r'$\rm{Age (Gyr)}$',
                         ylabel=r'$\rm{Cumulative\ SF}$')
     fig.subplots_adjust(wspace=0.1, hspace=0.1, left=0.1)
-
+    line = ''
     for i in range(len(targets)):
         ax = axs[i]
         lab = r'$\rm{{{}}}$'.format(targets[i].upper().replace('-','\!-\!'))
@@ -65,11 +66,13 @@ def default_run():
         hmc_file, = get_files(sfh_loc, '*{}*.mcmc.zc'.format(targets[i]))
 
         sfh = SFH(sfh_file, hmc_file)
+        d = sfh.param_table()
+        line += d['fmt'].format(**d)
         ax = sfh.plot_csfr(ax=ax)
         ax.text(1, 0.05, lab, ha='right', fontsize=16, **emboss())
 
     plt.savefig('csfr{}'.format(EXT))
-
+    print(line)
 
 if __name__ == '__main__':
     if '-f' in sys.argv:

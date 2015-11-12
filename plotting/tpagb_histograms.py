@@ -2,7 +2,9 @@ from ..fileio import load_lf_file, get_files
 from ResolvedStellarPops.galaxies.simgalaxy import SimGalaxy
 from .plotting import outside_labels, emboss, tpagb_model_default_color
 from ..TPAGBparams import snap_src, EXT
-from palettable.wesanderson import Zissou_5
+from palettable.wesanderson import Darjeeling2_5
+import matplotlib.pyplot as plt
+import numpy as np
 
 def load_tpagbs(lf_file, sims, key='m_ini', gyr=False):
     """
@@ -189,6 +191,7 @@ def load_hists(targets, path, mean_only=False, saved=False, save=True,
         meanhs = []
         histss = []
         for target in targets:
+            print(target)
             sims = get_files(path, 'out*{}*.dat'.format(target))
             lf_file, = get_files(path, '*{}*lf.dat'.format(target))
             bins, hists, meanh = make_hists(load_tpagbs(lf_file, sims, gyr=gyr),
@@ -244,22 +247,27 @@ def stacked_plot(targets, path=None, save=False, saved=False,
         ax.tick_params(labelbottom='off', bottom='off', top='off',
                        left='off', right='off')
 
-    fig, ax = plt.subplots(figsize=(12,6))
-    if key == 'logAge':
-        bins = np.array([ 0., 0.3, 1., 1.5, 6.3, 15.])
-    else:
-        bins = np.array([0.8, 1.2, 1.8, 2.4, 3., 4.])
-    colors = Darjeeling2_5.mpl_colors
-    colors.append(colors[0])
-    colors.pop(0)
-
     if saved:
-        bins, histss, meanhs = load_hists(targets, saved=True, key=key,
-                                          mean_only=True)
+        bins, _, meanhs = load_hists(targets, path, saved=True, key=key,
+                                     mean_only=True)
     else:
-        bins, histss, meanhs = load_hists(targets, path, key=key, save=save,
-                                          mean_only=True, bins=bins)
+        if key == 'logAge':
+            bins = np.array([ 0., 0.3, 1., 1.5, 6.3, 15.])
+        else:
+            bins = np.array([0.8, 1.2, 1.8, 2.4, 3., 4.])
+        bins, _, meanhs = load_hists(targets, path, key=key, save=save,
+                                     mean_only=True, bins=bins)
 
+    colors = Darjeeling2_5.mpl_colors
+    colors.append(colors[0])  # see iterations with barh below
+    colors.pop(0)
+    # bug? Does not make the plots the same width
+    if key == 'logAge':
+        right = 1.135
+    else:
+        right = 0.98
+    fig, ax = plt.subplots(figsize=(14,6))
+    fig.subplots_adjust(right=right, left=0.2, bottom=0.05, top=0.98)
 
     for i, target in enumerate(targets):
         meanh = meanhs[i] / np.sum(meanhs[i])
@@ -270,21 +278,31 @@ def stacked_plot(targets, path=None, save=False, saved=False,
     decorate(ax, bins, targets, Darjeeling2_5.mpl_colors, key)
     outfile = 'tpagb_{}_hists{}'.format(key, EXT)
     plt.savefig(outfile)
+    plt.close()
+    print('wrote {}'.format(outfile))
 
 def default_run():
-    targets = ['ugc8508',
+    path = snap_src + '/varysfh/extpagb/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
+    targets = ['ngc300-wide1',
+               'ugc8508',
                'ngc4163',
                'ngc2403-deep',
                'ngc2403-halo-6',
                'ugc4459',
                'eso540-030',
                'ugc4305-1',
+               'ugc4305-2',
                'ngc3741',
                'ugc5139',
-               'kdg73'][::-1]
-    path = snap_src + 'varysfh/extpagb/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
-    stacked_plot(targets, path=path, saved=True, key='logAge')
+               'kdg73',
+               'ugca292'][::-1]
+    #How to include more galaxies ...
+    #new = ['ngc300-wide1', 'ugc4305-2', 'ugca292']
+    #stacked_plot(new, path=path, saved=False, save=True, key='logAge')
+    #stacked_plot(new, path=path, saved=False, save=True, key='m_ini')
+
     stacked_plot(targets, path=path, saved=True, key='m_ini')
+    stacked_plot(targets, path=path, saved=True, key='logAge')
 
 if __name__ == "__main__":
     default_run()
@@ -347,4 +365,3 @@ def _plot(bins, hists, meanh, ax=None, axes_labels=True):
         ax.set_ylabel(ylab)
         ax.set_xlabel(xlab)
     return ax
-

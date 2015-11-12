@@ -8,7 +8,9 @@ import os
 import ResolvedStellarPops as rsp
 from ResolvedStellarPops import utils
 from astropy.io import fits
-from TPAGBparams import EXT, snap_src
+from TPAGBparams import EXT, data_loc, snap_src
+import difflib
+from .fileio import get_files
 from plotting.plotting import emboss
 from astroML.plotting import hist as mlhist
 from scipy import integrate
@@ -42,6 +44,9 @@ def tpagb_rheb_line(mag, b=6.653127, m=-9.03226, dmod=0., Av=0.0):
 def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
                mtrgb=None, dmod=0.0, Av=0.0):
     # careful! get_snap assumes F160W
+    off = 0
+    if '300' in target:
+        off = 0.4
     if '160' in col or '110' in col or 'IR' in col:
         if mtrgb is None:
             try:
@@ -54,10 +59,9 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
                                                      dmod=dmod, Av=Av)
                 dmod = 0.
                 Av = 0.
-        redward_of_rheb, = np.nonzero(color > tpagb_rheb_line(mag,
-                                                              dmod=dmod, Av=Av))
-        blueward_of_rheb, = np.nonzero(color < tpagb_rheb_line(mag,
-                                                               dmod=dmod, Av=Av))
+        cs = tpagb_rheb_line(mag, dmod=dmod, Av=Av) + off
+        redward_of_rheb, = np.nonzero(color > cs)
+        blueward_of_rheb, = np.nonzero(color < cs)
 
     else:
         logger.warning('Not using TP-AGB RHeB line')
@@ -575,8 +579,8 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
     if search:
         logger.warning('overriding inputs')
         absmag = True
-        from TPAGBparams import snap_src
-        data_loc = os.path.join(snap_src, 'data/opt_ir_matched_v2/copy/')
+        from TPAGBparams import data_loc
+        data_loc = os.path.join(data_loc, 'copy/')
         fitsfiles = rsp.fileio.get_files(data_loc, '*fits')
         plist = ['sn-ngc2403-pr_f606w_f814w_f110w_f160w.fits',
                  'ngc7793-halo-6_f606w_f814w_f110w_f160w.fits',
@@ -675,47 +679,65 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
 
 def rgb_cut():
     targets = ['eso540-030',
-                'kdg73',
-                'ngc2403-deep',
+               'kdg73',
+               'ngc2403-deep',
                 'ngc2403-halo-6',
                 'ngc3741',
                 'ngc4163',
                 'ugc4305-1',
+                'ngc300',
                 'ugc4459',
                 'ugc5139',
-                'ugc8508']
+                'ugc8508',
+                'ugca292']
 
-    fits_files = get_files(snap_src + 'data/opt_ir_matched_v2/copy', '*fits')
-    fits_files = np.concatenate([[s for s in fits_files if t in s] for t in targets])
+    fits_files = get_files(data_loc + '/copy', '*fits')
+    fits_files = np.concatenate([[s for s in fits_files if t in s]
+                                 for t in targets])
     gals = [rsp.galaxy.Galaxy(f) for f in fits_files]
     fig, ax = plt.subplots()
-    colors = ['k', 'k', '#853E43', '#853E43', 'k', '#853E43', '#853E43', '#853E43', '#853E43', 'k']
     from astropy.table import Table
-    tab = Table.read(snap_src + '/tables/tab1.tex', format='latex', data_start=1, delimiter='&', guess=False, header_start=0)
+    tab = Table.read(snap_src + '/tables/tab1.tex', format='latex',
+                     data_start=1, delimiter='&', guess=False, header_start=0)
+    blues = []
+    dbs = []
     for i, g in enumerate(gals):
-       ir_mtrgb, Av, dmod = g.trgb_av_dmod('F160W')
-       opt_mtrgb, Av, dmod = g.trgb_av_dmod('F814W')
-       targ1 = targets[i].replace('eso540-030', 'KDG2').replace('ugc4305-1', 'HoII').replace('ugc5139', 'HoI').replace('ugc4459', 'DDO53').upper().replace('-DEEP','').replace('-HALO-6', '').replace('GC', '')
-       targ = difflib.get_close_matches(targ1, tab['Galaxy'])[0]
-       ax.plot(tab[tab['Galaxy'] == targ]['MB'], opt_mtrgb-ir_mtrgb, 'o', ms=9, color=colors[i])
-       ha = 'center'
-       if '4459' in targets[i]:
-          ha = 'left'
-       if '8508' in targets[i]:
-          ha = 'right'
-       ax.text(tab[tab['Galaxy'] == targ]['MB'], opt_mtrgb-ir_mtrgb + 0.01, r'$\rm{{{}}}$'.format(targets[i].replace('-', '\!-\!').upper()), ha=ha, fontsize=12)
-       ax.axvline(-13, color='k', ls='--')
-       ax.set_xlim(ax.get_xlim()[::-1])
-       ax.set_xlabel(r'$M_{B_T}$')
-       ax.set_ylabel(r'$\rm{(F814W-F160W)_{TRGB}}$')
-       ax.set_xlim(-10, -20)
-       plt.savefig('rgb_color_cut{}'.format(EXT))
+        ir_mtrgb, Av, dmod = g.trgb_av_dmod('F160W')
+        opt_mtrgb, Av, dmod = g.trgb_av_dmod('F814W')
+        targ1 = targets[i].replace('eso540-030', 'KDG2').replace('ugc4305-1', 'HoII').replace('ugc5139', 'HoI').replace('ugc4459', 'DDO53').upper().replace('-DEEP','').replace('-HALO-6', '').replace('GC', '')
+        targ = difflib.get_close_matches(targ1, tab['Galaxy'])[0]
+        mb = tab[tab['Galaxy'] == targ]['MB']
+        print(targets[i], mb)
+        blue = 1.4
+        db = 0.4
+        if mb < -13.1:
+            color = '#853E43'
+        else:
+            color = 'k'
+            blue = 1.25
 
+        if mb <= -17:
+            db = 0.6
+            if '300' in targets[i]
+                blue = 1.6
+        blues.append(blue)
+        dbs.append(db)
 
-    a = 1.25
-    b = 1.4
-    db = [0.4, 0.4, 0.6, 0.6, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
-    blues = [a, a, b, b, a, b, b, b, b, a]
+        ax.plot(mb, opt_mtrgb-ir_mtrgb, 'o', ms=9, color=color)
+        ha = 'center'
+        if '4459' in targets[i]:
+            ha = 'left'
+        if '8508' in targets[i]:
+            ha = 'right'
+        ax.text(mb, opt_mtrgb - ir_mtrgb + 0.01,
+                r'$\rm{{{}}}$'.format(targets[i].replace('-', '\!-\!').upper()),
+                ha=ha, fontsize=12)
+        ax.axvline(-13, color='k', ls='--')
+        ax.set_xlim(ax.get_xlim()[::-1])
+        ax.set_xlabel(r'$M_{B_T}$')
+        ax.set_ylabel(r'$\rm{(F814W-F160W)_{TRGB}}$')
+        ax.set_xlim(-10, -20)
+        plt.savefig('rgb_color_cut{}'.format(EXT))
 
     for i, g in enumerate(gals):
        fig, ax = plt.subplots()
@@ -729,11 +751,14 @@ def rgb_cut():
        ax.plot(color, mag, 'o', ms=3, mec='none', c='k', alpha=0.5)
 
        verts = np.array([[blues[i], mtrgb + 1], [blues[i], mtrgb],
-                         [blues[i] + db[i], mtrgb], [blues[i] + db[i], mtrgb + 1],
+                         [blues[i] + dbs[i], mtrgb], [blues[i] + dbs[i], mtrgb + 1],
                          [blues[i], mtrgb + 1]])
        ax.plot(verts[:, 0], verts[:, 1], lw=2, color='#853E43')
        m = np.arange(mag.min(), mtrgb, 0.1)
-       cs = tpagb_rheb_line(m, dmod=dmod, Av=Av)
+       off = 0
+       if '300' in targets[i]:
+           off = 0.4
+       cs = tpagb_rheb_line(m, dmod=dmod, Av=Av) + off
        ax.plot(cs, m, color='k')
        itpagb = get_itpagb(targets[i], color, mag, 'F160W', dmod=dmod, Av=Av)[0]
        ax.plot(color[itpagb], mag[itpagb], 'o', ms=5, mfc='none', mec='#156692', alpha=0.5)
@@ -769,6 +794,9 @@ def main(argv):
     parser.add_argument('-r', '--result_plot', action='store_true',
                         help='with -d and -s make result plot')
 
+    parser.add_argument('-f', '--rgb_cut', action='store_true',
+                        help='make contam plots and trgb color vs MB')
+
     parser.add_argument('input_files', type=str, nargs='*',
                         help='fits files if -d trilegal simulatoins if -m')
 
@@ -791,4 +819,7 @@ def main(argv):
                                 absmag=args.absmag)
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    if '-f' in sys.argv[1:]:
+        rgb_cut()
+    else:
+        main(sys.argv[1:])
