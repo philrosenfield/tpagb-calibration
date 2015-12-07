@@ -129,15 +129,13 @@ class VarySFHs(SFH):
         write the galaxy input file
 
         TO DO:
-        BF could/should come from match param file... could make a mistake here
-        also could do better with IMF...
+        BF, IMF could/should come from match param file... could make a mistake here
         wfc3snap and filter1 are hard coded...
         '''
         self.galaxy_inputs = []
         msfh = match.sfh.SFH(self.sfh_file)
 
-        if msfh.IMF == 0:
-            file_imf = 'tab_imf/imf_kroupa02.dat'
+        file_imf = file_imf or 'tab_imf/imf_kroupa02.dat'
 
         gal_dict = \
             {'mag_limit_val': limiting_mag(self.fake_file, 0.1)[1],
