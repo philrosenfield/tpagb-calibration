@@ -129,13 +129,15 @@ class VarySFHs(SFH):
         write the galaxy input file
 
         TO DO:
-        BF, IMF could/should come from match param file... could make a mistake here
+        BF could/should come from match param file... could make a mistake here
+        also could do better with IMF...
         wfc3snap and filter1 are hard coded...
         '''
         self.galaxy_inputs = []
-        msfh = match.sfh.SFH(self.sfh_file)
+        msfh = match.sfh.SFH(self.sfh_file, meta_file=self.meta_file)
 
-        file_imf = file_imf or 'tab_imf/imf_kroupa02.dat'
+        if msfh.IMF == 0:
+            file_imf = 'tab_imf/imf_kroupa02.dat'
 
         gal_dict = \
             {'mag_limit_val': limiting_mag(self.fake_file, 0.1)[1],
@@ -280,11 +282,14 @@ def main(argv):
     parser.add_argument('-o', '--outfile', type=str, default='trilegal_script.sh',
                         help='Output file to run trilegal')
 
+    parser.add_argument('-e', '--hmc_file', type=str,
+                        help='MATCH HybridMC file')
+
+    parser.add_argument('-m', '--meta_file', type=str,
+                        help='MATCH output file with bestfit Av and dmod, and IMF if sfh_file is a zcmerge file.')
+
     parser.add_argument('sfh_file', type=str,
                         help='MATCH SFH file: must have the format target_filter1_filter2.extensions')
-
-    parser.add_argument('hmc_file', type=str,
-                        help='MATCH HybridMC file')
 
     parser.add_argument('fake_file', type=str,
                         help='AST file (for stellar pop mag depth)')
@@ -306,7 +311,8 @@ def main(argv):
               'nsfhs': args.nsfhs,
               'outfile_loc': outfile_loc,
               'sfh_file': args.sfh_file,
-              'target': target}
+              'target': target,
+              'meta_file': args.meta_file}
 
     call_VarySFH(indict, loud=args.verbose, nproc=args.nproc,
                  overwrite=args.overwrite, outfile=args.outfile)
