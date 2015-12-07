@@ -92,7 +92,8 @@ class VarySFHs(SFH):
         """load input parameters needed for vary_sfh"""
         # parameters needed
         inputs = ['filter1', 'filter2', 'outfile_loc', 'target', 'hmc_file',
-                  'cmd_input_file', 'fake_file', 'nsfhs', 'sfh_file']
+                  'cmd_input_file', 'fake_file', 'nsfhs', 'sfh_file',
+                  'meta_file']
 
         needed = [k for k in inputs if not k in indict.keys()]
         if len(needed) > 0:
