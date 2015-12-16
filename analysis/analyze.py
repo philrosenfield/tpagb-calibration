@@ -44,7 +44,8 @@ def get_trgb(target, filter2='F160W', filter1=None):
                 if filter1 is not None:
                     key = [k for k in key if filter1 in k]
                 else:
-                    logger.error('Need another filter to find trgb')
+                    logger.warning('More than one ANGST entry for trgb, need another filter to find trgb, assuming',target_row[key[0]])
+                    logger.warning('Only worry if dmag={} is a big deal'.format(np.abs(target_row[key[0]]['mTRGB']-target_row[key[1]]['mTRGB'])))
             trgb = target_row[key[0]]['mTRGB']
         else:
             trgb = angst_data.get_snap_trgb_av_dmod(target.upper())[0]
@@ -136,7 +137,7 @@ def parse_regions(args):
     return regions_kw
 
 
-def tpagb_rheb_line(mag, b=6.653127, m=-9.03226, dmod=0., Av=0.0):
+def tpagb_rheb_line(mag, b=-7, m=-9.03226, dmod=0., Av=0.0, off=0.0):
     """
     Default values found in this code using UGC5139 and NGC3741
     b=6.21106, m=-8.97165
@@ -145,20 +146,20 @@ def tpagb_rheb_line(mag, b=6.653127, m=-9.03226, dmod=0., Av=0.0):
     median:
     b=6.653127, m=-9.03226
     set dmod and Av to 0 for absmag
+    adjusted from median by eye:
+    b=7.453127, m=-9.03226
+    with off = f814w-f160w trgb
+    b=-7, m=-9.03226
     """
     ah = 0.20443
     ai = 0.60559
     c = (ah + m * (ah - ai))
-    return (mag - b - dmod - c * Av) / m
+    return (mag - b - dmod - c * Av) / m + off
 
 
 def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
-               mtrgb=None, dmod=0.0, Av=0.0):
+               mtrgb=None, dmod=0.0, Av=0.0, off=0):
     # careful! get_snap assumes F160W
-    off = 0
-    if '300' in target:
-        off = 0.4
-
     if '160' in col or '110' in col or 'IR' in col:
         if mtrgb is None:
             try:
@@ -171,12 +172,12 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
                                                      dmod=dmod, Av=Av)
                 dmod = 0.
                 Av = 0.
-        cs = tpagb_rheb_line(mag, dmod=dmod, Av=Av) + off
+        cs = tpagb_rheb_line(mag, dmod=dmod, Av=Av, off=off)
         redward_of_rheb, = np.nonzero(color > cs)
         blueward_of_rheb, = np.nonzero(color < cs)
 
     else:
-        logger.warning('Not using TP-AGB RHeB line: {}'.format(col))
+        logger.warning('Not using TP-AGB RHeB line')
         if mtrgb is None:
             mtrgb, Av, dmod = angst_data.get_tab5_trgb_av_dmod(target.upper(),
                                                                filters=col)
@@ -190,7 +191,7 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
     brighter_than_trgb, = np.nonzero(mag < mtrgb)
     itpagb = list(set(redward_of_rheb) & set(brighter_than_trgb))
     irheb = list(set(brighter_than_trgb) & set(redward_of_bluecut) & set(blueward_of_rheb))
-    return itpagb#, irheb
+    return itpagb #, irheb
 
 
 def main(argv):

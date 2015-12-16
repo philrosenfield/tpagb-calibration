@@ -155,7 +155,7 @@ class StarFormationHistories(object):
         return mh_interp
 
     def make_trilegal_sfh(self, random_sfr=False, random_z=False,
-                          zdisp=True, outfile='default', dry_run=False):
+                          zdisp=True, outfile='default', overwrite=False):
         '''
         turn binned sfh in to trilegal sfh
         random_sfr:
@@ -170,8 +170,6 @@ class StarFormationHistories(object):
         if outfile == 'default':
             outfile = os.path.join(self.base,
                                    self.name.replace(self.sfh_ext, '.tri.dat'))
-        if dry_run is True:
-            return outfile
 
         age1a = 10 ** (self.data.lagei)
         age1p = 1.0 * 10 ** (self.data.lagei + 0.0001)
@@ -206,18 +204,21 @@ class StarFormationHistories(object):
             zdisp = [''] * len(mh)
             fmt = '%.4e %.3e %.4f %s\n'
 
-        with open(outfile, 'w') as out:
-            for i in range(len(sfr)):
-                if sfr[i] == 0:
-                    # this is just a waste of lines in TRILEGAL
-                    continue
-                if mh[i] == 0:
-                    logger.error('should Z=0.02?')
-                    import pdb; pdb.set_trace()
-                out.write(fmt % (age1a[i], 0.0, metalicity[i], zdisp[i]))
-                out.write(fmt % (age1p[i], sfr[i], metalicity[i], zdisp[i]))
-                out.write(fmt % (age2a[i], sfr[i], metalicity[i], zdisp[i]))
-                out.write(fmt % (age2p[i], 0.0, metalicity[i], zdisp[i]))
+        if not os.path.isfile(outfile) or overwrite:
+            with open(outfile, 'w') as out:
+                for i in range(len(sfr)):
+                    if sfr[i] == 0:
+                        # this is just a waste of lines in TRILEGAL
+                        continue
+                    if mh[i] == 0:
+                        logger.error('should Z=0.02?')
+                        import pdb; pdb.set_trace()
+                    out.write(fmt % (age1a[i], 0.0, metalicity[i], zdisp[i]))
+                    out.write(fmt % (age1p[i], sfr[i], metalicity[i], zdisp[i]))
+                    out.write(fmt % (age2a[i], sfr[i], metalicity[i], zdisp[i]))
+                    out.write(fmt % (age2p[i], 0.0, metalicity[i], zdisp[i]))
+        else:
+            logger.info('not overwriting {}'.format(outfile))
         return outfile
 
     def load_random_arrays(self, attr_str):

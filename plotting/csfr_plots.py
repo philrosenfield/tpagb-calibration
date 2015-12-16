@@ -49,10 +49,11 @@ def main(argv):
         plt.savefig('all_csfr{}'.format(EXT))
 
 def default_run():
-    sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
+    #sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
+    sfh_loc = os.getcwd()
     targets = ['ngc300-wide1', 'ugc8508', 'ngc4163', 'ngc2403-deep', 'ngc2403-halo-6',
                'ugc4459', 'eso540-030', 'ngc3741', 'ugc5139', 'ugc4305-1',
-               'ugc4305-2', 'kdg73', 'ugca292']
+               'ugc4305-2', 'ugca292', 'kdg73', 'ddo82']
 
     fig, axs = plt.subplots(ncols=5, nrows=3, figsize=(16, 8))
     axs = outside_labels(axs, fig=fig, xlabel=r'$\rm{Age (Gyr)}$',
@@ -61,11 +62,12 @@ def default_run():
     line = ''
     for i in range(len(targets)):
         ax = axs[i]
+        print targets[i]
         lab = r'$\rm{{{}}}$'.format(targets[i].upper().replace('-','\!-\!'))
-        sfh_file, = get_files(sfh_loc, '*{}*sfh'.format(targets[i]))
-        hmc_file, = get_files(sfh_loc, '*{}*.mcmc.zc'.format(targets[i]))
+        meta_file, = get_files(sfh_loc, '*{}*sfh'.format(targets[i]))
+        sfh_file, = get_files(sfh_loc, '*{}*zc.dat'.format(targets[i]))
 
-        sfh = SFH(sfh_file, hmc_file)
+        sfh = SFH(sfh_file, meta_file=meta_file)
         d = sfh.param_table()
         line += d['fmt'].format(**d)
         ax = sfh.plot_csfr(ax=ax)

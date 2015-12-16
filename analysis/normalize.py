@@ -9,7 +9,7 @@ import sys
 
 import ResolvedStellarPops as rsp
 from ..TPAGBparams import EXT
-from .analyze import get_itpagb, parse_regions
+from .analyze import get_itpagb, parse_regions, get_trgb
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag, exclude_gate_inds
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_observation, load_table
@@ -54,11 +54,15 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
 
     # select rgb and agb regions
     target = os.path.split(tricat)[1].split('_')[1]
+    ir_mtrgb = get_trgb(target, filter2='F160W', filter1=None)
+    opt_mtrgb = get_trgb(target, filter2='F814W')
+    trgb_color = opt_mtrgb - ir_mtrgb
 
     sgal_rgb, sgal_agb = rgb_agb_regions(ymag, **regions_kw)
 
     if 'IR' in filter2 in filter2 or '160' in filter2 and not '110' in filter1:
-        sgal_agb = get_itpagb(target, regions_kw['color'], ymag, filter2)
+        sgal_agb = get_itpagb(target, regions_kw['color'], ymag, filter2,
+                              off=trgb_color)
 
     # normalization
     norm, idx_norm, sim_rgb, sim_agb = normalize_simulation(ymag, nrgbs,
@@ -208,6 +212,10 @@ def write_results(res_dict, target, filter1, filter2, outfile_loc, agb_mod, extr
 def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={},
                   match_param=None):
     target, _ = rsp.asts.parse_pipeline(filename)
+    ir_mtrgb = get_trgb(target, filter2='F160W', filter1=None)
+    opt_mtrgb = get_trgb(target, filter2='F814W')
+    trgb_color = opt_mtrgb - ir_mtrgb
+
     mag1, mag2 = load_observation(filename, col1, col2, match_param=match_param)
     ymag = mag2
     if yfilter == 'V':
@@ -219,7 +227,8 @@ def count_rgb_agb(filename, col1, col2, yfilter='V', regions_kw={},
     regions_kw['color'] = mag1 - mag2
     gal_rgb, gal_agb = rgb_agb_regions(ymag, **regions_kw)
     if 'IR' in col2:
-        gal_agb = get_itpagb(target, regions_kw['color'], ymag, col2)
+        gal_agb = get_itpagb(target, regions_kw['color'], ymag, col2,
+                             off=trgb_color)
 
     return float(len(gal_rgb)), float(len(gal_agb))
 

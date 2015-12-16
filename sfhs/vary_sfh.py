@@ -170,16 +170,12 @@ class VarySFHs(SFH):
     def prepare_trilegal_files(self, random_sfr=True, random_z=False,
                                zdisp=False, overwrite=False, object_mass=None):
         '''make the sfhs, make the galaxy inputs'''
-        dry_run = True
-        if overwrite:
-            dry_run = False
-
         self.sfr_files = self.make_many_trilegal_sfhs(nsfhs=self.nsfhs,
                                                       outfile_fmt=self.sfr_fmt,
                                                       random_sfr=random_sfr,
                                                       random_z=random_z,
                                                       zdisp=zdisp,
-                                                      dry_run=overwrite)
+                                                      overwrite=overwrite)
 
         self.prepare_galaxy_input(overwrite=overwrite, object_mass=object_mass)
         return
@@ -193,7 +189,7 @@ class VarySFHs(SFH):
                                                           triout)
         return call
 
-    def call_run(self, dry_run=False, nproc=8, overwrite=False):
+    def call_run(self, nproc=8, overwrite=False):
         """Call run_once or run_parallel depending on self.nsfh value"""
         if self.nsfhs <= 1:
             self.prepare_trilegal_files(random_sfr=False, random_z=False,
