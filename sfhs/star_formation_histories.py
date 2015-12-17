@@ -144,12 +144,15 @@ class StarFormationHistories(object):
         I think it's reasonable since this is really just finding the -zinc
         law that MATCH assumes.
         '''
+        mh_interp = np.nan
         somesf, = np.nonzero(self.data.sfr != 0)
         #ff = interp1d(self.data.lagei[somesf], self.data.mh[somesf],
         #              bounds_error=False)
-        _, mh_interp = rsp.utils.extrap1d(self.data.lagei[somesf],
-                                          self.data.mh[somesf],
-                                          self.data.lagei)
+        if len(somesf) > 1:
+
+            _, mh_interp = rsp.utils.extrap1d(self.data.lagei[somesf],
+                                              self.data.mh[somesf],
+                                              self.data.lagei)
 
         self.mh_interp = mh_interp
         return mh_interp
@@ -185,7 +188,8 @@ class StarFormationHistories(object):
         if random_z is False:
             mh = self.data.mh
             self.interp_null_values()
-            mh = self.mh_interp
+            if np.isfinite(self.mh_interp).all():
+                mh = self.mh_interp
             #mh[mh == 0.0] = np.nan
         else:
             # Not using mh errs from MATCH. Untrustworthy.
