@@ -294,7 +294,7 @@ def main(argv):
     args = parser.parse_args(argv)
 
     target, filter1, filter2 = \
-        os.path.split(args.sfh_file)[1].split('.')[0].split('_')
+        os.path.split(args.sfh_file)[1].split('.')[0].split('_')[:3]
 
     agb_mod = args.cmd_input_file.replace('cmd_input_', '').replace('.dat', '').lower()
     outfile_loc = os.path.join(os.getcwd(), agb_mod)
