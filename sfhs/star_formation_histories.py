@@ -334,7 +334,7 @@ class StarFormationHistories(object):
 
     def make_many_trilegal_sfhs(self, nsfhs=100, outfile_fmt='default',
                                 random_sfr=True, random_z=False,
-                                zdisp=True, dry_run=False):
+                                zdisp=True, overwrite=False):
         '''
         make nsfhs number of trilegal sfh input files.
         '''
@@ -342,7 +342,7 @@ class StarFormationHistories(object):
             outfile_fmt = self.name.replace(self.sfh_ext, '%03d.tri.dat')
 
         mk_tri_sfh_kw = {'random_sfr': random_sfr, 'random_z': random_z,
-                         'zdisp': zdisp, 'dry_run': dry_run}
+                         'zdisp': zdisp, 'overwrite': overwrite}
 
         outfiles = [self.make_trilegal_sfh(outfile=outfile_fmt % i,
                                            **mk_tri_sfh_kw)
