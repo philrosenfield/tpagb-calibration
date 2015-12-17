@@ -14,6 +14,7 @@ from dweisz.match import scripts as match
 
 from .star_formation_histories import StarFormationHistories as SFH
 from ..pop_synth.stellar_pops import limiting_mag
+from ..fileio import replace_ext
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -294,7 +295,7 @@ def main(argv):
     args = parser.parse_args(argv)
 
     target, filter1, filter2 = \
-        os.path.split(args.sfh_file)[1].split('.')[0].split('_')[:3]
+        os.path.split(replace_ext(args.sfh_file, ''))[1].split('_')[:3]
 
     agb_mod = args.cmd_input_file.replace('cmd_input_', '').replace('.dat', '').lower()
     outfile_loc = os.path.join(os.getcwd(), agb_mod)
