@@ -92,19 +92,7 @@ class VarySFHs(SFH):
     def initialize_inputs(self, indict):
         """load input parameters needed for vary_sfh"""
         # parameters needed
-        inputs = ['filter1', 'filter2', 'outfile_loc', 'target', 'hmc_file',
-                  'cmd_input_file', 'fake_file', 'nsfhs', 'sfh_file',
-                  'meta_file']
-
-        needed = [k for k in inputs if not k in indict.keys()]
-        if len(needed) > 0:
-            logger.error('missing needed input parameters: {}'.format(needed))
-
-        unused = [k for k in indict.keys() if not k in inputs]
-        if len(unused) > 0:
-            logger.warning('not using {}'.format(unused))
-
-        [self.__setattr__(k, v) for k, v in indict.items() if k in inputs]
+        [self.__setattr__(k, v) for k, v in indict.items()]
         return
 
     def trilegal_file_fmt(self):
@@ -176,7 +164,8 @@ class VarySFHs(SFH):
                                                       random_sfr=random_sfr,
                                                       random_z=random_z,
                                                       zdisp=zdisp,
-                                                      overwrite=overwrite)
+                                                      overwrite=overwrite,
+                                                      sample=self.burstsfh)
 
         self.prepare_galaxy_input(overwrite=overwrite, object_mass=object_mass)
         return
@@ -268,6 +257,9 @@ def main(argv):
     parser.add_argument('-n', '--nproc', type=int, default=8,
                         help='number of processors')
 
+    parser.add_argument('-b', '--burstsfh', action='store_true',
+                        help='use Ben Johnson\'s scombine to sample the SFH')
+
     parser.add_argument('-f', '--overwrite', action='store_true',
                         help='write call to trilegal even if output file exists')
 
@@ -310,7 +302,8 @@ def main(argv):
               'outfile_loc': outfile_loc,
               'sfh_file': args.sfh_file,
               'target': target,
-              'meta_file': args.meta_file}
+              'meta_file': args.meta_file,
+              'burstsfh': args.burstsfh}
 
     call_VarySFH(indict, loud=args.verbose, nproc=args.nproc,
                  overwrite=args.overwrite, outfile=args.outfile)
