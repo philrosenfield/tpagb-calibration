@@ -27,42 +27,42 @@ class VarySFHs(SFH):
     '''run several variations of the age sfr z from SFH'''
     def __init__(self, inp_obj=None, input_file=None):
         """Vary the SFH from MATCH for a trilegal simulations
-        
+
         Parameters
         ----------
             inp_obj : rsp.fileio.InputParameters object
                 input parameters object
             input_file : path to file that can be read into a dictionary via rsp.fileio.load_input
-        
+
             Necessary contents of input_file/inp_obj
             ------------------
             file_origin : str
                 what type of SFH file (match-grid, match-hmc)
-        
+
             filter1, filter2 : str, str
                 V, I filters. Used only in file name conventions
-        
+
             galaxy_input : str
                 template galaxy input. object_mass and sfr-z file will be adjusted
-        
+
             outfile_loc : str
                 path to put the trilegal output files
-        
+
             target : str
                 name of observation target for file name conventions
-        
+
             hmc_file : str
                 path to the Hybrid MCMC file
-            
+
             sfh_file : str
                 path to the MATCH SFH file
-                
+
             cmd_input_file : str
                 path to the cmd input file to run TRILEGAL
-        
+
             object_mass : str, will be converted to float
                 optional, overwrite the mass set in galaxy_input
-        
+
             nsfhs : str, will be converted to int
                 number of sfhs to sample
         """
@@ -86,9 +86,9 @@ class VarySFHs(SFH):
     def initialize_inputs(self, indict):
         """load input parameters needed for vary_sfh"""
         # parameters needed
-        inputs = ['file_origin', 'filter1', 'filter2', 'galaxy_input',
-                  'outfile_loc', 'target', 'hmc_file', 'cmd_input_file',
-                  'object_mass', 'nsfhs', 'sfh_file']
+        inputs = ['filter1', 'filter2', 'galaxy_input', 'outfile_loc',
+                  'target', 'hmc_file', 'cmd_input_file', 'object_mass',
+                  'nsfhs', 'sfh_file']
 
         needed = [k for k in inputs if not k in indict.keys()]
         if len(needed) > 0:
@@ -115,7 +115,7 @@ class VarySFHs(SFH):
 
         sfr_fmt = '{}{}_tri_%003i.sfr'.format(self.target, self.filter1)
         self.sfr_fmt = os.path.join(self.outfile_loc, sfr_fmt)
-        
+
     def prepare_galaxy_input(self, object_mass=None, overwrite=False):
         '''
         write the galaxy input file from a previously written template.
@@ -131,7 +131,7 @@ class VarySFHs(SFH):
 
         if object_mass is not None:
             extra2 = ' '.join(lines[-6].split()[1:])
-        
+
         for i in range(len(self.sfr_files)):
             lines[-3] = ' '.join([self.sfr_files[i], extra])
             if object_mass is not None:
@@ -173,7 +173,7 @@ class VarySFHs(SFH):
         if os.path.isfile(hdf5file) and not overwrite:
             logger.warning('{} already exists, not calling trilegal'.format(hdf5file))
             flag += 1
-        
+
         if flag < 1:
             call = 'nice -n +19 taskset -c {0} code_{1}/main'.format(ite, ver)
             call += ' -f {0} -a -l {1} {2} > {2}.scrn'.format(self.cmd_input_file,
@@ -217,7 +217,7 @@ def call_VarySFH(input_file, loud=False, nproc=8, outfile=None,
                  overwrite=False):
     """
     write a script to run trilegal in parallel sampling the sfh
-    
+
     overwrite may not work as expected:
     a) for trilegal input files (*.galinp, *.sfr): won't overwrite
     b) trilegal output: won't write the command to call trilegal if the .hdf5
