@@ -245,9 +245,9 @@ def latexify(string):
 def default_run():
     """Will you stop writing code and publish for f*s sake. """
     import os
-    lf_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
+    lf_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/final_hope/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
     obs_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/data/opt_ir_matched_v2/copy/'
-    sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
+    sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/final_hope/'
 
     lf_files = get_files(lf_loc, '*lf.dat')
     targets = [os.path.split(l)[1].split('_')[0] for l in lf_files]
