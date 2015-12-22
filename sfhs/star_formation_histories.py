@@ -135,23 +135,14 @@ class StarFormationHistories(object):
             rand_arr = np.append(rand_arr, np.random.choice(new_arr))
         return rand_arr
 
-    def sample_sfh(self, bigbins=False):
+    def sample_sfh(self):
         from scombine import sfhutils
         from scombine.bursty_sfh import burst_sfh
         import pdb; pdb.set_trace()
         sfh = sfhutils.load_angst_sfh(os.path.join(self.base, self.name))
-        lsfh = sfh['t1']
+        lsfh = sfh['t1'].copy()
         sfh['t1'] = 10 ** (sfh['t1'] - 9)
         sfh['t2'] = 10 ** (sfh['t2'] - 9)
-
-        if bigbins:
-            # make bins csfr wide
-            thresh = 5  # how many bins
-            d2 = np.diff(sfh['mformed'], 2)
-            inds = np.argsort(d2)[:thresh] + 2
-            inds = np.insert(inds, 0, 0)
-            inds = np.append(inds, -1)
-            # uch.
 
         # decide on f_burst random (0, 1]
         f_burst = np.random.random()
