@@ -80,7 +80,7 @@ def ntpagb_model_data(narratiofile, sfhfile, hmcfile=None):
     mean_nagb = np.mean(ratiodata['nagb'][1:])
     agbm2d = mean_nagb / ratiodata['nagb'][0]
 
-    sfh = MatchSFH(sfhfile, hmc_file=hmcfile)
+    sfh = MatchSFH(sfhfile, meta_file=hmcfile)
     massfrac, massfrac_perr, massfrac_merr = sfh.mass_fraction(0, 2e9)
 
     agbm2d_err = count_uncert_ratio(np.mean(ratiodata['nagb'][1:]),
@@ -253,8 +253,8 @@ def default_run():
     targets = [os.path.split(l)[1].split('_')[0] for l in lf_files]
     observations = [get_files(obs_loc, '{}*fits'.format(t))[0] for t in targets]
     narratio_files = [get_files(lf_loc, '{}*nar*dat'.format(t))[0] for t in targets]
-    sfh_files = [get_files(sfh_loc, '{}*sfh'.format(t))[0] for t in targets]
-    hmc_files = [get_files(sfh_loc, '{}*.mcmc.zc'.format(t))[0] for t in targets]
+    hmc_files = [get_files(sfh_loc, '{}*sfh'.format(t))[0] for t in targets]
+    sfh_files = [get_files(sfh_loc, '{}*.mcmc.zc.dat'.format(t))[0] for t in targets]
 
     make_plot(narratio_files, sfh_files, lf_files, observations, hmcfiles=hmc_files,
               inset=False)
