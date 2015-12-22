@@ -40,19 +40,19 @@ doit $1 ugca292_f475w_f814w -c 1.15,0.40
 
 
 
-#$1 hs117_f606w_f814w -c 1.32,0.40
-#$1 ngc300-wide1_f475w_f814w -c 1.74,0.60
-#$1 ngc404-deep_f606w_f814w -c 1.74,0.40 -q MAG2_WFPC2,MAG4_IR
-#$1 ddo71_f606w_f814w -c 1.37,0.40
-#$1 ddo78_f475w_f814w -c 1.55,0.40
-#$1 kkh37_f475w_f814w -c 1.38,0.40
-#$1 m81-deep_f475w_f814w -c 1.80,0.60
-#$1 m81-deep_f606w_f814w -c 1.80,0.60
-#$1 ngc2976-deep_f606w_f814w -c 1.69,0.40
-#$1 ngc404-deep_f606w_f814w -c 1.74,0.40 -q MAG2_WFPC2,MAG4_IR
-#$1 ngc4163_f475w_f814w -c 1.49,0.40
-#$1 scl-de1_f606w_f814w -c 1.32,0.40
-#$1 ugca292_f606w_f814w -c 1.15,0.40
+#doit $1 hs117_f606w_f814w -c 1.32,0.40
+#doit $1 ngc300-wide1_f475w_f814w -c 1.74,0.60
+#doit $1 ngc404-deep_f606w_f814w -c 1.74,0.40 -q MAG2_WFPC2,MAG4_IR
+#doit $1 ddo71_f606w_f814w -c 1.37,0.40
+#doit $1 ddo78_f475w_f814w -c 1.55,0.40
+#doit $1 kkh37_f475w_f814w -c 1.38,0.40
+#doit $1 m81-deep_f475w_f814w -c 1.80,0.60
+#doit $1 m81-deep_f606w_f814w -c 1.80,0.60
+#doit $1 ngc2976-deep_f606w_f814w -c 1.69,0.40
+#doit $1 ngc404-deep_f606w_f814w -c 1.74,0.40 -q MAG2_WFPC2,MAG4_IR
+#doit $1 ngc4163_f475w_f814w -c 1.49,0.40
+#doit $1 scl-de1_f606w_f814w -c 1.32,0.40
+#doit $1 ugca292_f606w_f814w -c 1.15,0.40
 
 
 ## get the prefixs:
