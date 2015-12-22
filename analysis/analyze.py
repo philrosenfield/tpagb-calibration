@@ -74,6 +74,7 @@ def parse_regions(args):
             trgb = np.nan
 
     if args.table is not None:
+        # depreciated
         row = load_table(args.table, args.target, optfilter1=args.optfilter1,
                          opt=opt)
         if args.offset is None or row['mag_by_eye'] != 0:
