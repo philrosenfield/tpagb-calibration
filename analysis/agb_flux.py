@@ -152,21 +152,23 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, metafiles=None,
         if f:
             ax.set_ylabel(ytitles[1])
             title = 'agbflux_m2d{}'.format(EXT)
+            ylim = [0, 11]
         else:
             ax.set_ylabel(ytitles[0])
             title = 'magb_m2d{}'.format(EXT)
-
+            ylim = [0, 7]
         if inset:
             yext = [0.6, 0.90]
-            ylim = [0.3, 2]
+            iylim = [0.3, 2]
             if f:
-                ylim = [0.3, 2]
-            ax1 = add_inset(ax, [0.18, 0.65, 0.3, 0.28], [-0.005, 0.041], ylim)
+                iylim = [0.3, 2]
+            ax1 = add_inset(ax, [0.18, 0.65, 0.3, 0.28], [-0.005, 0.041], iylim)
             _plot(ax1, targets, f, massfrac, m2d, m2d_err, massfrac_perr,
                   massfrac_merr)
 
         ax.set_xlabel(latexify('Mass Fraction of Young Stars (<2 Gyr)'))
         ax.set_xlim(-0.01, 0.45)
+        ax.set_ylim(ylim)
         plt.savefig(title)
     return ax
 
