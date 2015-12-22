@@ -48,7 +48,7 @@ def add_inset(ax0, extent, xlims, ylims):
     return ax
 
 
-def ntpagb_model_data(narratiofile, sfhfile, hmcfile=None):
+def ntpagb_model_data(narratiofile, sfhfile, metafile=None):
     """
     Compare the number of TP-AGB stars in the model to the data.
     Parameters
@@ -57,7 +57,7 @@ def ntpagb_model_data(narratiofile, sfhfile, hmcfile=None):
     and RGB stars etc. See normalize.py
 
     sfhfile : the output of calcsfh (to calculate the mass in each sf age bin)
-    hmcfile : if you want Hybrid MC errors reported
+    metafile : if you want Hybrid MC errors reported
     Returns
     -------
     massfrac, massfrac_perr, massfrac_merr : floats
@@ -80,14 +80,14 @@ def ntpagb_model_data(narratiofile, sfhfile, hmcfile=None):
     mean_nagb = np.mean(ratiodata['nagb'][1:])
     agbm2d = mean_nagb / ratiodata['nagb'][0]
 
-    sfh = MatchSFH(sfhfile, meta_file=hmcfile)
+    sfh = MatchSFH(sfhfile, meta_file=metafile)
     massfrac, massfrac_perr, massfrac_merr = sfh.mass_fraction(0, 2e9)
 
     agbm2d_err = count_uncert_ratio(np.mean(ratiodata['nagb'][1:]),
                                             ratiodata['nagb'][0])
     return massfrac, massfrac_perr, massfrac_merr, agbm2d, agbm2d_err
 
-def make_plot(narratio_files, sfhfiles, lffiles, observations, hmcfiles=None,
+def make_plot(narratio_files, sfhfiles, lffiles, observations, metafiles=None,
               inset=False):
     """
     Make two plots to compare with Figure 7 of Melbourne+ 2012 Apj 748, 47
@@ -101,7 +101,7 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, hmcfiles=None,
         Formatted files from normalize.py with the scaled LFs
     observations : list of str
         Fits files to compare with (apples to apples, should use 4 filter files)
-    hmcfiles : list of str
+    metafiles : list of str
         Hybrid MonteCarlo outputs associated with each SFH file.
 
     NB
@@ -123,11 +123,11 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, hmcfiles=None,
         ax.axhline(1., color='k', lw=2)
         return ax
 
-    if hmcfiles is None:
-        hmcfiles = [None] * len(sfhfiles)
+    if metafiles is None:
+        metafiles = [None] * len(sfhfiles)
 
     massfrac, massfrac_perr, massfrac_merr, agbm2d, agbm2d_err = \
-        zip(*[ntpagb_model_data(narratio_files[i], sfhfiles[i], hmcfile=hmcfiles[i])
+        zip(*[ntpagb_model_data(narratio_files[i], sfhfiles[i], metafile=metafiles[i])
               for i in range(len(sfhfiles))])
 
     fagbm2d, fagbm2d_err = zip(*[ftpagb_model_data(lffiles[i], observations[i])
@@ -253,18 +253,18 @@ def default_run():
     targets = [os.path.split(l)[1].split('_')[0] for l in lf_files]
     observations = [get_files(obs_loc, '{}*fits'.format(t))[0] for t in targets]
     narratio_files = [get_files(lf_loc, '{}*nar*dat'.format(t))[0] for t in targets]
-    hmc_files = [get_files(sfh_loc, '{}*sfh'.format(t))[0] for t in targets]
+    meta_files = [get_files(sfh_loc, '{}*sfh'.format(t))[0] for t in targets]
     sfh_files = [get_files(sfh_loc, '{}*.mcmc.zc.dat'.format(t))[0] for t in targets]
 
-    make_plot(narratio_files, sfh_files, lf_files, observations, hmcfiles=hmc_files,
+    make_plot(narratio_files, sfh_files, lf_files, observations, metafiles=meta_files,
               inset=False)
 
 
 def main(argv):
     parser = argparse.ArgumentParser(description="Plot LFs against galaxy data")
 
-    parser.add_argument('-e', '--hmcfiles', type=str, nargs='*',
-                        help='HMC files')
+    parser.add_argument('-e', '--metafiles', type=str, nargs='*',
+                        help='files with dmod, av, uncertainties files')
 
     parser.add_argument('-f', '--force', action='store_true',
                         help='over ride all parameters and run default files')
@@ -283,7 +283,7 @@ def main(argv):
 
     args = parser.parse_args(argv)
 
-    make_plot(args.narratio_files, args.sfhfiles, args.lffiles, args.observations, hmcfiles=args.hmcfiles)
+    make_plot(args.narratio_files, args.sfhfiles, args.lffiles, args.observations, metafiles=args.metafiles)
 
 if __name__ == '__main__':
     if '-f' in sys.argv[1:]:
