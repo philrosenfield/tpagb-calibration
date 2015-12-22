@@ -1,10 +1,16 @@
 import argparse
 import os
 import sys
-
+from ..TPAGBparams import EXT
 import matplotlib.pyplot as plt
+<<<<<<< HEAD
 import match
 import ResolvedStellarPops as rsp
+=======
+from ..fileio import get_files
+from .plotting import outside_labels, emboss
+from dweisz.match.scripts.sfh import SFH
+>>>>>>> opt_nir_matched
 
 plt.style.use('presentation')
 
@@ -24,7 +30,11 @@ def main(argv):
 
     args = parser.parse_args(argv)
 
+<<<<<<< HEAD
     sfhs = [match.utils.MatchSFH(s) for s in args.name]
+=======
+    sfhs = [rsp.match.utils.MatchSFH(s) for s in args.name]
+>>>>>>> opt_nir_matched
     targets = [s.name.split('_')[0] for s in sfhs]
 
     if args.one_plot:
@@ -45,8 +55,44 @@ def main(argv):
         ax.set_xlabel('$\\rm{Time\ (Gyr)}$')
         ax.set_ylabel('$\\rm{Culmulative\ SF}$')
         plt.legend(loc=0, frameon=False)
-        plt.savefig('all_csfr.png')
+        plt.savefig('all_csfr{}'.format(EXT))
 
+def default_run():
+    #sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
+    sfh_loc = os.getcwd()
+    targets = ['ngc300-wide1', 'ugc8508', 'ngc4163', 'ngc2403-deep', 'ngc2403-halo-6',
+               'ugc4459', 'eso540-030', 'ngc3741', 'ugc5139', 'ugc4305-1',
+               'ugc4305-2', 'ugca292', 'kdg73', 'ddo82']
+
+    fig, axs = plt.subplots(ncols=5, nrows=3, figsize=(16, 8))
+    axs = outside_labels(axs, fig=fig, xlabel=r'$\rm{Age (Gyr)}$',
+                        ylabel=r'$\rm{Cumulative\ SF}$')
+    fig.subplots_adjust(wspace=0.1, hspace=0.1, left=0.1)
+    line = ''
+    for i in range(len(targets)):
+        ax = axs[i]
+        print targets[i]
+        lab = r'$\rm{{{}}}$'.format(targets[i].upper().replace('-','\!-\!'))
+        meta_file, = get_files(sfh_loc, '*{}*sfh'.format(targets[i]))
+        sfh_file, = get_files(sfh_loc, '*{}*zc.dat'.format(targets[i]))
+
+        sfh = SFH(sfh_file, meta_file=meta_file)
+        d = sfh.param_table()
+        line += d['fmt'].format(**d)
+        ax = sfh.plot_csfr(ax=ax)
+        ax.text(1, 0.05, lab, ha='right', fontsize=16, **emboss())
+
+    plt.savefig('csfr{}'.format(EXT))
+    print(line)
+
+<<<<<<< HEAD
 
 if __name__ == '__main__':
     main(sys.argv[1:])
+=======
+if __name__ == '__main__':
+    if '-f' in sys.argv:
+        default_run()
+    else:
+        main(sys.argv[1:])
+>>>>>>> opt_nir_matched

@@ -6,8 +6,9 @@ import sys
 import matplotlib.pylab as plt
 import numpy as np
 import ResolvedStellarPops as rsp
-
+from dweisz.match import scripts as match
 from ResolvedStellarPops.convertz import convertz
+from scipy.interpolate import interp1d
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ __all__ = ['StarFormationHistories', 'parse_sfh_data']
 def parse_sfh_data(sfh_file, hmc_file=None):
     '''
     parse match sfh into a np.recarray
-    
+
     if hmc_file is given, use the SFR errors from there.
     Parameters
     ----------
@@ -35,14 +36,15 @@ def parse_sfh_data(sfh_file, hmc_file=None):
     -------
     np.recarray of the sfh file with hmc_file uncertainties overwritten.
     '''
-    try:   
-        data = rsp.match.utils.read_binned_sfh(sfh_file)
+    try:
+        data = match.fileio.read_binned_sfh(sfh_file)
     except:
-        logger.error('please add a new data reader')
+        logger.error('please add a new data reader, {}'.format(sys.exc_info()))
         sys.exit(2)
 
     if hmc_file is not None:
-        hmc_data = rsp.match.utils.read_binned_sfh(hmc_file)
+        logger.error('Overwriting uncertainties with hmc_file!!!')
+        hmc_data = match.utils.read_binned_sfh(hmc_file)
         data.sfr_errp = hmc_data.sfr_errp
         data.sfr_errm = hmc_data.sfr_errm
     return data
@@ -54,7 +56,6 @@ class StarFormationHistories(object):
                  sfr_file_loc=None, search_fmt=None, sfh_ext='.sfh'):
         self.base, self.name = os.path.split(sfh_file)
         self.data = parse_sfh_data(sfh_file, hmc_file=hmc_file)
-        self.file_origin = 'match-hmc'
         self.sfr_files = sfr_files
         self.sfh_ext = sfh_ext
         if sfr_file_loc is not None and search_fmt is not None:
@@ -121,7 +122,7 @@ class StarFormationHistories(object):
             elif errp == 0 and errm != 0:
                 # no positive uncertainties
                 neg_gauss = np.random.normal(val, errm, npoints)
-                new_arr = neg_gauss[neg_gauss <= val]
+                new_arr = neg_gauss#[neg_gauss <= val]
             elif errp != 0 and errm == 0:
                 # no negative uncertainties
                 pos_gauss = np.random.normal(val, errp, npoints)
@@ -134,6 +135,49 @@ class StarFormationHistories(object):
             rand_arr = np.append(rand_arr, np.random.choice(new_arr))
         return rand_arr
 
+    def sample_sfh(self, bigbins=False):
+        from scombine import sfhutils
+        from scombine.bursty_sfh import burst_sfh
+        import pdb; pdb.set_trace()
+        sfh = sfhutils.load_angst_sfh(os.path.join(self.base, self.name))
+        lsfh = sfh['t1']
+        sfh['t1'] = 10 ** (sfh['t1'] - 9)
+        sfh['t2'] = 10 ** (sfh['t2'] - 9)
+
+        if bigbins:
+            # make bins csfr wide
+            thresh = 5  # how many bins
+            d2 = np.diff(sfh['mformed'], 2)
+            inds = np.argsort(d2)[:thresh] + 2
+            inds = np.insert(inds, 0, 0)
+            inds = np.append(inds, -1)
+            # uch.
+
+        # decide on f_burst random (0, 1]
+        f_burst = np.random.random()
+        # decide on contrast (0, 10]
+        contrast = np.random.random() * 10.
+
+        # call burst_sfh
+        age, sfr, tburst = burst_sfh(sfh=sfh, bin_res=1., fwhm_burst=0.05,
+                                     f_burst=f_burst, contrast=contrast)
+        assert np.isclose(*np.unique(np.diff(age))[:5])  # only takes 5
+        dage = np.diff(age)[0]
+
+        # making this left sided bins for trilegal
+        age1a = age
+        age1p = age + 0.0001
+        age2a = age + dage
+        age2p = age + dage + 0.0001
+
+        # interpolate mh
+        somesf, = np.nonzero(sfh['sfr'] != 0)
+        f = interp1d(sfh['t1'][somesf], sfh['met'][somesf],
+                     bounds_error=False)
+        somemet = np.nonzero(np.isfinite(f(age)))
+        f, mh = rsp.utils.extrap1d(age[somemet], f(age)[somemet], age)
+        return age1a, age1p, age2a, age2p, sfr, mh
+
     def interp_null_values(self):
         '''
         If there is no SF, there is still some +err in SF. However, M/H is
@@ -144,18 +188,19 @@ class StarFormationHistories(object):
         I think it's reasonable since this is really just finding the -zinc
         law that MATCH assumes.
         '''
+        mh_interp = np.nan
         somesf, = np.nonzero(self.data.sfr != 0)
-        #ff = interp1d(self.data.lagei[somesf], self.data.mh[somesf],
-        #              bounds_error=False)
-        _, mh_interp = rsp.math_utils.extrap1d(self.data.lagei[somesf],
-                                               self.data.mh[somesf],
-                                               self.data.lagei)
+
+        if len(somesf) > 1:
+            f, mh_interp = rsp.utils.extrap1d(self.data.lagei[somesf],
+                                              self.data.mh[somesf],
+                                              self.data.lagei)
 
         self.mh_interp = mh_interp
         return mh_interp
 
-    def make_trilegal_sfh(self, random_sfr=False, random_z=False,
-                          zdisp=True, outfile='default', dry_run=False):
+    def make_trilegal_sfh(self, random_sfr=False, random_z=False, sample=False,
+                          zdisp=True, outfile='default', overwrite=False):
         '''
         turn binned sfh in to trilegal sfh
         random_sfr:
@@ -167,35 +212,35 @@ class StarFormationHistories(object):
         # Zsun is just a scaling that needs to be undone from MATCH to here.
         zsun = 0.02
 
-        if self.file_origin == 'match-old':
-            random_sfr = False
-            random_z = False
-            zdisp = False
         if outfile == 'default':
             outfile = os.path.join(self.base,
                                    self.name.replace(self.sfh_ext, '.tri.dat'))
-        if dry_run is True:
-            return outfile
 
-        age1a = 10 ** (self.data.lagei)
-        age1p = 1.0 * 10 ** (self.data.lagei + 0.0001)
-        age2a = 1.0 * 10 ** self.data.lagef
-        age2p = 1.0 * 10 ** (self.data.lagef + 0.0001)
-
-        if random_sfr is False:
-            sfr = self.data.sfr
+        if sample:
+            age1a, age1p, age2a, age2p, sfr, mh = self.sample_sfh(bigbins=False)
         else:
-            sfr = self.random_draw_within_uncertainty('sfr')
+            age1a = 10 ** (self.data.lagei)
+            age1p = 1.0 * 10 ** (self.data.lagei + 0.0001)
+            age2a = 1.0 * 10 ** self.data.lagef
+            age2p = 1.0 * 10 ** (self.data.lagef + 0.0001)
 
+            if random_sfr is False:
+                sfr = self.data.sfr
+            else:
+                sfr = self.random_draw_within_uncertainty('sfr')
 
-        if random_z is False:
-            mh = self.data.mh
-        else:
-            # HACK. Not using mh errs from MATCH. Untrustworthy.
-            # Shifting instead from within dispersion.
-            self.interp_null_values()
-            disp = np.median(self.data.mh_disp[np.nonzero(self.data.mh_disp)])/2.
-            mh = self.mh_interp + np.random.normal(0, disp)
+            if random_z is False:
+                mh = self.data.mh
+                self.interp_null_values()
+                if np.isfinite(self.mh_interp).all():
+                    mh = self.mh_interp
+                #mh[mh == 0.0] = np.nan
+            else:
+                # Not using mh errs from MATCH. Untrustworthy.
+                # Shifting instead from within dispersion.
+                self.interp_null_values()
+                disp = np.median(self.data.mh_disp[np.nonzero(self.data.mh_disp)])/2.
+                mh = self.mh_interp + np.random.normal(0, disp)
 
         metalicity = zsun * 10 ** mh
 
@@ -207,15 +252,21 @@ class StarFormationHistories(object):
             zdisp = [''] * len(mh)
             fmt = '%.4e %.3e %.4f %s\n'
 
-        with open(outfile, 'w') as out:
-            for i in range(len(sfr)):
-                if sfr[i] == 0:
-                    # this is just a waste of lines in TRILEGAL
-                    continue
-                out.write(fmt % (age1a[i], 0.0, metalicity[i], zdisp[i]))
-                out.write(fmt % (age1p[i], sfr[i], metalicity[i], zdisp[i]))
-                out.write(fmt % (age2a[i], sfr[i], metalicity[i], zdisp[i]))
-                out.write(fmt % (age2p[i], 0.0, metalicity[i], zdisp[i]))
+        if not os.path.isfile(outfile) or overwrite:
+            with open(outfile, 'w') as out:
+                for i in range(len(sfr)):
+                    if sfr[i] == 0:
+                        # this is just a waste of lines in TRILEGAL
+                        continue
+                    if mh[i] == 0:
+                        logger.error('should Z=0.02?')
+                        import pdb; pdb.set_trace()
+                    out.write(fmt % (age1a[i], 0.0, metalicity[i], zdisp[i]))
+                    out.write(fmt % (age1p[i], sfr[i], metalicity[i], zdisp[i]))
+                    out.write(fmt % (age2a[i], sfr[i], metalicity[i], zdisp[i]))
+                    out.write(fmt % (age2p[i], 0.0, metalicity[i], zdisp[i]))
+        else:
+            logger.info('not overwriting {}'.format(outfile))
         return outfile
 
     def load_random_arrays(self, attr_str):
@@ -331,7 +382,7 @@ class StarFormationHistories(object):
 
     def make_many_trilegal_sfhs(self, nsfhs=100, outfile_fmt='default',
                                 random_sfr=True, random_z=False,
-                                zdisp=True, dry_run=False):
+                                zdisp=True, overwrite=False, sample=False):
         '''
         make nsfhs number of trilegal sfh input files.
         '''
@@ -339,7 +390,8 @@ class StarFormationHistories(object):
             outfile_fmt = self.name.replace(self.sfh_ext, '%03d.tri.dat')
 
         mk_tri_sfh_kw = {'random_sfr': random_sfr, 'random_z': random_z,
-                         'zdisp': zdisp, 'dry_run': dry_run}
+                         'zdisp': zdisp, 'overwrite': overwrite,
+                         'sample': sample}
 
         outfiles = [self.make_trilegal_sfh(outfile=outfile_fmt % i,
                                            **mk_tri_sfh_kw)

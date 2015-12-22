@@ -6,12 +6,11 @@ from ResolvedStellarPops.galaxies.starpop import stars_in_region
 from ResolvedStellarPops.galaxies.asts import ASTs
 from ResolvedStellarPops.utils import points_inside_poly
 
-
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None,
-                    col_max=None, mag1=None, mag_bright=None,
+                    col_max=None, mag1=None, mag_bright=None, color=None,
                     mag_faint=None):
     """
     Return indices of mag in rgb and agb regions
@@ -20,32 +19,32 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
     ----------
     mag : array
         (probably should be filter2) list of magnitudes
-    
+
     offset : float
         magnitude offset below the trgb to include as rgb stars
-    
+
     trgb_exclude : float
         +/- magnitude around the trgb to exclude from rgb and agb star
         determination
-    
+
     trgb : float
         magnitude (same filter as mag) of the rgb tip
-    
+
     col_min : float
         blue color cut (need mag1)
-    
+
     col_max : float
         red color cut (need mag1)
-    
+
     mag1 : array
         filter1 magnitude list
-    
+
     mag_bright : float
         brightest mag to include as rgb (agb is set to mag=10)
-    
+
     mag_faint : float
         faintest mag to include as rgb
-        
+
     Returns
     -------
     srgb, sagb : array, array
@@ -58,7 +57,7 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
 
     """
     # define RGB regions
-    if offset is not None:
+    if offset is not None and np.isfinite(trgb):
         low = trgb + offset
         mid = trgb + trgb_exclude
     else:
@@ -69,9 +68,9 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
 
     # Recovered stars in simulated RGB region.
     srgb = stars_in_region(mag, low, mid, col_min=col_min, col_max=col_max,
-                           mag1=mag1)
+                           mag1=mag1, color=color)
     if len(srgb) == 0:
-        import pdb; pdb.set_trace()
+        logger.error('There are no simulated RGB stars in the given regions.')
     # define AGB regions
     if offset is not None:
         mid = trgb - trgb_exclude
@@ -80,15 +79,16 @@ def rgb_agb_regions(mag, offset=None, trgb_exclude=None, trgb=None, col_min=None
     high = 10
 
     # Recovered stars in simulated AGB region.
-    sagb = stars_in_region(mag, mid, high)
+    sagb = stars_in_region(mag, mid, high, col_min=col_min, col_max=10,
+                           mag1=mag1, color=color)
 
     return srgb, sagb
 
 
-def normalize_simulation(mag, nrgb, srgb, sagb):
+def normalize_simulation(mag, nrgb, srgb, sagb, norm=None, tol=0.5):
     """
     scale simulation to have the same number of nrgb (data) as srgb (from mag)
-    
+
     Parameters
     ----------
     mag : array
@@ -110,13 +110,15 @@ def normalize_simulation(mag, nrgb, srgb, sagb):
         random sample of srgb scaled to nrgb
     agb : array
         random sample of sagb scaled to nrgb
-    
+
     """
-    norm = nrgb / float(len(srgb))
+    if norm is None:
+        norm = nrgb / float(len(srgb))
 
     logger.info('Normalization: %f' % norm)
-    if norm >= 0.5:
-        logger.warning('Not many simulated stars, need larger region or larger simulation')
+    if norm >= tol:
+        logger.warning('Not many simulated stars, '
+                       'need larger region or larger simulation')
 
     # random sample the data distribution
     rands = np.random.random(len(mag))
@@ -197,32 +199,46 @@ def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
         exclude_gates = get_exclude_gates(match_param)
         if False in np.isfinite(exclude_gates):
             return exclude_gates
-        
+
     color = mag1 - mag2
     mag = mag1
     points = np.column_stack((color, mag))
-    inds, = np.nonzero(points_inside_poly(points, exclude_gates))
-    
+
+    inds = np.array([])
+    for exg in exclude_gates:
+        ind, = np.nonzero(points_inside_poly(points, exg))
+        inds = np.append(inds, ind)
+    inds = list(np.unique(inds.flatten()))
+
     decontam = np.arange(len(mag))
     decontam = np.delete(decontam, inds)
-    
+
     if ms_color_cut:
         color_cut = np.median(color[inds])
         blue = np.nonzero(color[decontam] < color_cut)
         decontam = np.delete(decontam, blue)
-    
+        logger.info('doing a color cut')
     return decontam
 
 
 def get_exclude_gates(match_param):
-    exg = np.ndarray(shape=(10,)) * np.nan
+    """
+    parse the exclude gates from a match param file.
+    Returns a list of arrays of verticies.
+    """
     ex_line = open(match_param, 'r').readlines()[7]
     nexgs = np.int(ex_line[0])
     if nexgs == 0:
         logger.warning('no exclude gates')
-    elif nexgs > 1:
-        logger.error('get_exclude_gates only works on 1 gate... code!')
+        exgs = [np.inf]
     else:
-        exg = np.array(ex_line.split()[1:-1], dtype=float)
-        exg = np.append(exg, exg[:2])
-    return exg.reshape(5, 2)
+        ex_data = np.array(ex_line.split()[1:-1], dtype=float)
+        npts = len(ex_data)
+        splits = np.arange(0, npts + 1, 8)
+        exgs = [ex_data[splits[i]: splits[i+1]] for i in range(len(splits)-1)]
+        # complete the polygon and reshape
+        for i in range(len(exgs)):
+            exgs[i] = np.append(exgs[i], exgs[i][:2])
+            exgs[i] = exgs[i].reshape(5, 2)
+
+    return exgs
