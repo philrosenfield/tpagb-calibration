@@ -299,9 +299,9 @@ def default_run():
                'ugca292'][::-1]
     #How to include more galaxies ...
     #new = ['ngc300-wide1', 'ugc4305-2', 'ugca292']
-    new = ['ddo82']
-    stacked_plot(new, path=path, saved=False, save=True, key='logAge')
-    stacked_plot(new, path=path, saved=False, save=True, key='m_ini')
+    #new = ['ddo82']
+    #stacked_plot(new, path=path, saved=False, save=True, key='logAge')
+    #stacked_plot(new, path=path, saved=False, save=True, key='m_ini')
 
     stacked_plot(targets, path=path, saved=True, key='m_ini')
     stacked_plot(targets, path=path, saved=True, key='logAge')
