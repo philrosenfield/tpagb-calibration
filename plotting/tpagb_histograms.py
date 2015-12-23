@@ -282,8 +282,9 @@ def stacked_plot(targets, path=None, save=False, saved=False,
     print('wrote {}'.format(outfile))
 
 def default_run():
-    path = snap_src + '/varysfh/extpagb/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
-    targets = ['ngc300-wide1',
+    path = snap_src + '/varysfh/extpagb/final_hope/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
+    targets = ['ddo82',
+               'ngc300-wide1',
                'ugc8508',
                'ngc4163',
                'ngc2403-deep',
