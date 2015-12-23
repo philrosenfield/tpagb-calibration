@@ -87,6 +87,7 @@ def ntpagb_model_data(narratiofile, sfhfile, metafile=None):
                                             ratiodata['nagb'][0])
     return massfrac, massfrac_perr, massfrac_merr, agbm2d, agbm2d_err
 
+
 def make_plot(narratio_files, sfhfiles, lffiles, observations, metafiles=None,
               inset=False):
     """
@@ -223,6 +224,7 @@ def ftpagb_model_data(lffile, observation):
 
     gal = Galaxy(observation)
     mtrgb, Av, dmod = gal.trgb_av_dmod('F160W')
+    trgb_color = gal.trgb_av_dmod('F814W') - mtrgb
 
     try:
         color = gal.data['MAG2_ACS'] - gal.data['MAG4_IR']
@@ -230,7 +232,8 @@ def ftpagb_model_data(lffile, observation):
         color = gal.data['MAG2_WFPC2'] - gal.data['MAG4_IR']
 
     mag2 = gal.data['MAG4_IR']
-    dtpagb = get_itpagb(lffile.split('_')[0], color, mag2, 'F160W', dmod=dmod, Av=Av, mtrgb=mtrgb)
+    dtpagb = get_itpagb(lffile.split('_')[0], color, mag2, 'F160W', dmod=dmod, Av=Av, mtrgb=mtrgb,
+                        off=trgb_color)
     dagbflux = np.sum(10 ** (-.4 * mag2[dtpagb]))
     magbfluxs = [np.sum(10 ** (-.4 * mags[i][mtpagbs[i]])) for i in range(len(mags))]
 
