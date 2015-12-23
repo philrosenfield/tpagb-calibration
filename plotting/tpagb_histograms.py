@@ -130,7 +130,7 @@ def read_hists(targets, path, key='m_ini', mean_only=False):
     mean_only : bool
         only load median histogram
     """
-
+    import pdb; pdb.set_trace()
     mfiles = [get_files(path, '{}_mean_tpagb_{}_hists.dat'.format(t, key))[0]
               for t in targets]
     hfiles = [get_files(path, '{}_tpagb_{}_hists.dat'.format(t, key))[0]
