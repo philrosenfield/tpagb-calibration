@@ -55,6 +55,7 @@ def default_run():
     #sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
     sfh_loc = os.getcwd()
     err_loc = os.path.join(snap_src, 'data/dweisz11_csfr')
+    print(os.path.isdir(err_loc))
     targets = ['ngc300-wide1', 'ugc8508', 'ngc4163', 'ngc2403-deep', 'ngc2403-halo-6',
                'ugc4459', 'eso540-030', 'ngc3741', 'ugc5139', 'ugc4305-1',
                'ugc4305-2', 'ugca292', 'kdg73', 'ddo82']
