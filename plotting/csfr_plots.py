@@ -54,7 +54,7 @@ def main(argv):
 def default_run():
     #sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
     sfh_loc = os.getcwd()
-    err_loc = os.path.join(snap_src, 'data', 'dweisz11_csfr')
+    err_loc = os.path.join(snap_src, 'data/dweisz11_csfr')
     targets = ['ngc300-wide1', 'ugc8508', 'ngc4163', 'ngc2403-deep', 'ngc2403-halo-6',
                'ugc4459', 'eso540-030', 'ngc3741', 'ugc5139', 'ugc4305-1',
                'ugc4305-2', 'ugca292', 'kdg73', 'ddo82']
@@ -77,8 +77,7 @@ def default_run():
         try:
             err_file, =  get_files(err_loc, '*{}*fine'.format(targets[i]))
             esfh = SFH(err_file, meta_file=meta_file)
-            esfh.plot_csfr(ax=ax, plt_kw={}, fill_between_kw={'alpha':0.25},
-                          data=False)
+            esfh.plot_csfr(ax=ax, fill_between_kw={'alpha':0.25}, data=False)
         except:
             print('systematic uncertainty file {} not found'.format(targets[i]))
         
