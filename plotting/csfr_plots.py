@@ -80,7 +80,7 @@ def default_run():
             sfh.plot_csfr(ax=ax, plt_kw={}, fill_between_kw={'alpha':0.25},
                           data=False)
         except:
-            print('{} not found'.format(err_file))
+            print('systematic uncertainty file {} not found'.format(targets[i]))
         
         d = sfh.param_table()
         line += d['fmt'].format(**d)
