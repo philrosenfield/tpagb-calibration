@@ -224,7 +224,7 @@ def ftpagb_model_data(lffile, observation):
 
     gal = Galaxy(observation)
     mtrgb, Av, dmod = gal.trgb_av_dmod('F160W')
-    trgb_color = gal.trgb_av_dmod('F814W') - mtrgb
+    trgb_color = gal.trgb_av_dmod('F814W')[0] - mtrgb
 
     try:
         color = gal.data['MAG2_ACS'] - gal.data['MAG4_IR']
