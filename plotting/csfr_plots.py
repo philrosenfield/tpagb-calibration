@@ -1,16 +1,12 @@
 import argparse
 import os
 import sys
-from ..TPAGBparams import EXT
+from ..TPAGBparams import EXT, snap_src
 import matplotlib.pyplot as plt
-<<<<<<< HEAD
-import match
 import ResolvedStellarPops as rsp
-=======
 from ..fileio import get_files
 from .plotting import outside_labels, emboss
 from dweisz.match.scripts.sfh import SFH
->>>>>>> opt_nir_matched
 
 plt.style.use('presentation')
 
@@ -30,11 +26,9 @@ def main(argv):
 
     args = parser.parse_args(argv)
 
-<<<<<<< HEAD
-    sfhs = [match.utils.MatchSFH(s) for s in args.name]
-=======
-    sfhs = [rsp.match.utils.MatchSFH(s) for s in args.name]
->>>>>>> opt_nir_matched
+
+    sfhs = [SFH(s) for s in args.name]
+
     targets = [s.name.split('_')[0] for s in sfhs]
 
     if args.one_plot:
@@ -60,6 +54,7 @@ def main(argv):
 def default_run():
     #sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/'
     sfh_loc = os.getcwd()
+    err_loc = os.path.join(snap_src, 'data', 'dweisz11_csfr')
     targets = ['ngc300-wide1', 'ugc8508', 'ngc4163', 'ngc2403-deep', 'ngc2403-halo-6',
                'ugc4459', 'eso540-030', 'ngc3741', 'ugc5139', 'ugc4305-1',
                'ugc4305-2', 'ugca292', 'kdg73', 'ddo82']
@@ -77,22 +72,27 @@ def default_run():
         sfh_file, = get_files(sfh_loc, '*{}*zc.dat'.format(targets[i]))
 
         sfh = SFH(sfh_file, meta_file=meta_file)
+        ax = sfh.plot_csfr(ax=ax)
+        
+        try:
+            err_file, =  get_files(err_loc, '*{}*fine'.format(targets[i]))
+            esfh = SFH(err_file, meta_file=meta_file)
+            sfh.plot_csfr(ax=ax, plt_kw={}, fill_between_kw={'alpha':0.25},
+                          data=False)
+        except:
+            print('{} not found'.format(err_file))
+        
         d = sfh.param_table()
         line += d['fmt'].format(**d)
-        ax = sfh.plot_csfr(ax=ax)
+        
         ax.text(1, 0.05, lab, ha='right', fontsize=16, **emboss())
 
     plt.savefig('csfr{}'.format(EXT))
     print(line)
 
-<<<<<<< HEAD
 
-if __name__ == '__main__':
-    main(sys.argv[1:])
-=======
 if __name__ == '__main__':
     if '-f' in sys.argv:
         default_run()
     else:
         main(sys.argv[1:])
->>>>>>> opt_nir_matched
