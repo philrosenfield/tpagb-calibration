@@ -284,8 +284,7 @@ def stacked_plot(targets, path=None, save=False, saved=False,
 
 def default_run():
     path = snap_src + '/varysfh/extpagb/final_hope/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
-    targets = ['ddo82',
-               'ngc300-wide1',
+    targets = ['ngc300-wide1',
                'ugc8508',
                'ngc4163',
                'ngc2403-deep',
@@ -301,8 +300,8 @@ def default_run():
     #How to include more galaxies ... set saved=False.
     #new = ['ngc300-wide1', 'ugc4305-2', 'ugca292']
     #new = ['ddo82']
-    stacked_plot(targets, path=path, saved=False, save=True, key='logAge')
-    stacked_plot(targets, path=path, saved=False, save=True, key='m_ini')
+    #stacked_plot(targets, path=path, saved=False, save=True, key='logAge')
+    #stacked_plot(targets, path=path, saved=False, save=True, key='m_ini')
 
     stacked_plot(targets, path=path, saved=True, key='m_ini')
     stacked_plot(targets, path=path, saved=True, key='logAge')

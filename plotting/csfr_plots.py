@@ -80,7 +80,7 @@ def default_run():
             esfh = SFH(err_file, meta_file=meta_file)
             esfh.plot_csfr(ax=ax, fill_between_kw={'alpha':0.25}, data=False)
         except:
-            import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
             print('systematic uncertainty file {} not found'.format(targets[i]))
         
         d = sfh.param_table()
