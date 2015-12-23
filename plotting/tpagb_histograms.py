@@ -130,7 +130,7 @@ def read_hists(targets, path, key='m_ini', mean_only=False):
     mean_only : bool
         only load median histogram
     """
-    import pdb; pdb.set_trace()
+
     mfiles = [get_files(path, '{}_mean_tpagb_{}_hists.dat'.format(t, key))[0]
               for t in targets]
     hfiles = [get_files(path, '{}_tpagb_{}_hists.dat'.format(t, key))[0]
@@ -298,11 +298,11 @@ def default_run():
                'ugc5139',
                'kdg73',
                'ugca292'][::-1]
-    #How to include more galaxies ...
+    #How to include more galaxies ... set saved=False.
     #new = ['ngc300-wide1', 'ugc4305-2', 'ugca292']
     #new = ['ddo82']
-    #stacked_plot(new, path=path, saved=False, save=True, key='logAge')
-    #stacked_plot(new, path=path, saved=False, save=True, key='m_ini')
+    stacked_plot(targets, path=path, saved=False, save=True, key='logAge')
+    stacked_plot(targets, path=path, saved=False, save=True, key='m_ini')
 
     stacked_plot(targets, path=path, saved=True, key='m_ini')
     stacked_plot(targets, path=path, saved=True, key='logAge')
