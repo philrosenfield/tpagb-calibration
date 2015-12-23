@@ -56,7 +56,6 @@ class VarySFHs(SFH):
 
         Parameters
         ----------
-<<<<<<< HEAD
             inp_obj : rsp.fileio.InputParameters object
                 input parameters object
             input_file : path to file that can be read into a dictionary via rsp.fileio.load_input
@@ -94,36 +93,6 @@ class VarySFHs(SFH):
                 number of sfhs to sample
         """
         # load SFH instance to make lots of trilegal runs
-        self.input_file = input_file
-        if input_file is not None:
-            indict = rsp.fileio.load_input(input_file)
-=======
-        filter1, filter2 : str, str
-        V, I filters. Used only in file name conventions
-
-        outfile_loc : str
-            path to put the trilegal output files
-
-        target : str
-            name of observation target for file name conventions
-
-        hmc_file : str
-            path to the Hybrid MCMC file
-
-        sfh_file : str
-            path to the MATCH SFH file
->>>>>>> opt_nir_matched
-
-        cmd_input_file : str
-            path to the cmd input file to run TRILEGAL
-
-        object_mass : str, will be converted to float
-            optional, overwrite the mass set in galaxy_input
-
-        nsfhs : str, will be converted to int
-            number of sfhs to sample
-        """
-        # load SFH instance to make lots of trilegal runs
         self.initialize_inputs(indict)
 
         # load in hmc data to self.data
@@ -135,23 +104,7 @@ class VarySFHs(SFH):
     def initialize_inputs(self, indict):
         """load input parameters needed for vary_sfh"""
         # parameters needed
-<<<<<<< HEAD
-        inputs = ['filter1', 'filter2', 'galaxy_input', 'outfile_loc',
-                  'target', 'hmc_file', 'cmd_input_file', 'object_mass',
-                  'nsfhs', 'sfh_file']
-
-        needed = [k for k in inputs if not k in indict.keys()]
-        if len(needed) > 0:
-            logger.error('missing needed input parameters: {}'.format(needed))
-
-        unused = [k for k in indict.keys() if not k in inputs]
-        if len(unused) > 0:
-            logger.warning('not using {}'.format(unused))
-
-        [self.__setattr__(k, v) for k, v in indict.items() if k in inputs]
-=======
         [self.__setattr__(k, v) for k, v in indict.items()]
->>>>>>> opt_nir_matched
         return
 
     def trilegal_file_fmt(self):
@@ -169,15 +122,11 @@ class VarySFHs(SFH):
         sfr_fmt = '{}_{}_%003i.trisfr'.format(self.target, self.filter1)
         self.sfr_fmt = os.path.join(self.outfile_loc, sfr_fmt)
 
-<<<<<<< HEAD
-    def prepare_galaxy_input(self, object_mass=None, overwrite=False):
-=======
         galinp_fmt = '{}_{}_%003i.galinp'.format(self.target, self.filter1)
         self.galinp_fmt = os.path.join(self.outfile_loc, galinp_fmt)
 
     def prepare_galaxy_input(self, object_mass=None, overwrite=False,
                              file_imf=None, object_cutoffmass=0.8):
->>>>>>> opt_nir_matched
         '''
         write the galaxy input file
 
@@ -187,16 +136,6 @@ class VarySFHs(SFH):
         wfc3snap and filter1 are hard coded...
         '''
         self.galaxy_inputs = []
-<<<<<<< HEAD
-        galaxy_input = self.galaxy_input
-        ext = '.' + galaxy_input.split('.')[-1]
-        lines = open(galaxy_input).readlines()
-        # line that links to sfr file.
-        extra = ' '.join(lines[-3].split(' ')[1:])
-
-        if object_mass is not None:
-            extra2 = ' '.join(lines[-6].split()[1:])
-=======
         msfh = match.sfh.SFH(self.sfh_file, meta_file=self.meta_file)
 
         if msfh.IMF == 0:
@@ -213,7 +152,6 @@ class VarySFHs(SFH):
              'object_cutoffmass': object_cutoffmass}
 
         trigal_dict = trilegal.utils.galaxy_input_dict(**gal_dict)
->>>>>>> opt_nir_matched
 
         for i in range(len(self.sfr_files)):
             trigal_dict['object_sfr_file'] =  self.sfr_files[i]
@@ -247,29 +185,10 @@ class VarySFHs(SFH):
     def run_once(self, galaxy_input=None, triout=None, ite=0, overwrite=False):
         """write call to trilegal string"""
         ver = 2.3
-<<<<<<< HEAD
-        call = ''
-
-        #if os.path.isfile(triout) and not overwrite:
-        #    logger.warning('{} exists, will overwrite if no hdf5 file found'.format(triout))
-        #    flag += 1
-
-        hdf5file = rsp.fileio.replace_ext(triout, 'hdf5')
-        if os.path.isfile(hdf5file) and not overwrite:
-            logger.warning('{} already exists, not calling trilegal'.format(hdf5file))
-            flag += 1
-
-        if flag < 1:
-            call = 'nice -n +19 taskset -c {0} code_{1}/main'.format(ite, ver)
-            call += ' -f {0} -a -l {1} {2} > {2}.scrn'.format(self.cmd_input_file,
-                                                               galaxy_input,
-                                                               triout)
-=======
         call = 'nice -n +19 taskset -c {0} code_{1}/main'.format(ite, ver)
         call += ' -f {0} -a -l {1} {2} > {2}.scrn'.format(self.cmd_input_file,
                                                           galaxy_input,
                                                           triout)
->>>>>>> opt_nir_matched
         return call
 
     def call_run(self, nproc=8, overwrite=False):
