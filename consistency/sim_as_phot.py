@@ -1,14 +1,18 @@
-from ResolvedStellarPops import SimGalaxy
-from astropy.io import fits
 import os
-from dweisz.match.scripts.fake import make_fakeparam
-from dweisz.match.scripts.fileio import get_files, read_fake, replace_ext
-from dweisz.match.scripts.sfh import SFH
-import numpy as np
+
 import matplotlib.pyplot as plt
-from ..TPAGBparams import EXT, snap_src
+import numpy as np
 from scipy.stats import ks_2samp
-from .plotting import emboss
+
+from ResolvedStellarPops import SimGalaxy
+from dweisz.match.scripts.sfh import SFH
+
+from ..TPAGBparams import EXT, snap_src
+from ..plotting.plotting import emboss
+
+#from astropy.io import fits
+#from dweisz.match.scripts.fake import make_fakeparam
+#from dweisz.match.scripts.fileio import get_files, read_fake, replace_ext
 
 def cull_data(simgalaxname):
     """
