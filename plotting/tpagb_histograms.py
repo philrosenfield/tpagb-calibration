@@ -1,3 +1,5 @@
+import sys, os
+
 from ..fileio import load_lf_file, get_files
 from ResolvedStellarPops.galaxies.simgalaxy import SimGalaxy
 from .plotting import outside_labels, emboss, tpagb_model_default_color
@@ -101,11 +103,11 @@ def save_hists(target, bins, hists, meanh, key='m_ini'):
     key : str
         column from trilegal (for file name)
     """
+    outfile = '{}_tpagb_{}_hists.dat'.format(target, key)
     line = '# target bins hists\n'
     line += ' '.join(map('{:.3f}'.format, bins)) + '\n'
     hline = '\n'.join([' '.join(map('{:d}'.format, hist)) for hist in hists])
     mline = ' '.join(map('{}'.format, meanh)) + '\n'
-    outfile = '{}_tpagb_{}_hists.dat'.format(target, key)
     with open(outfile, 'w') as out:
         out.write(line)
         out.write(hline)
@@ -130,11 +132,14 @@ def read_hists(targets, path, key='m_ini', mean_only=False):
     mean_only : bool
         only load median histogram
     """
-    import pdb; pdb.set_trace()
-    mfiles = [get_files(path, '{}_mean_tpagb_{}_hists.dat'.format(t, key))[0]
-              for t in targets]
-    hfiles = [get_files(path, '{}_tpagb_{}_hists.dat'.format(t, key))[0]
-              for t in targets]
+    try:
+        mfiles = [get_files(path, '{}_mean_tpagb_{}_hists.dat'.format(t, key))[0]
+                  for t in targets]
+        hfiles = [get_files(path, '{}_tpagb_{}_hists.dat'.format(t, key))[0]
+                  for t in targets]
+    except IndexError:
+        print('target not found. Perhaps you need to make some {} hists first'.format(key))
+        sys.exit(1)
     meanhs = []
     histss = []
     for mfile in mfiles:
@@ -193,14 +198,23 @@ def load_hists(targets, path, mean_only=False, saved=False, save=True,
         histss = []
         for target in targets:
             print(target)
-            sims = get_files(path, 'out*{}*.dat'.format(target))
-            lf_file, = get_files(path, '*{}*lf.dat'.format(target))
-            bins, hists, meanh = make_hists(load_tpagbs(lf_file, sims, gyr=gyr),
-                                            dm=dm, bins=bins, norm=norm)
+            outfile = '{}_tpagb_{}_hists.dat'.format(target, key)
+            if os.path.isfile(outfile):
+                print('not overwriting {}'.format(outfile))
+                bins, hists, meanh = read_hists([target], path, key=key)
+
+                hists = hists[0]
+                meanh = meanh[0]
+            else:
+                sims = get_files(path, 'out*{}*.dat'.format(target))
+                lf_file, = get_files(path, '*{}*lf.dat'.format(target))
+                bins, hists, meanh = make_hists(load_tpagbs(lf_file, sims, gyr=gyr),
+                                                dm=dm, bins=bins, norm=norm)
+                if save:
+                    save_hists(target, bins, hists, meanh, key=key)
             histss.append(hists)
             meanhs.append(meanh)
-            if save:
-                save_hists(target, bins, hists, meanh, key=key)
+
     return bins, histss, meanhs
 
 
@@ -299,9 +313,9 @@ def default_run():
                'ugca292'][::-1]
     #How to include more galaxies ... set saved=False.
     #new = ['ngc300-wide1', 'ugc4305-2', 'ugca292']
-    #new = ['ddo82']
-    #stacked_plot(targets, path=path, saved=False, save=True, key='logAge')
-    #stacked_plot(targets, path=path, saved=False, save=True, key='m_ini')
+    #new = ['ugc8508']
+    stacked_plot(targets, path=path, saved=False, save=True, key='logAge')
+    stacked_plot(targets, path=path, saved=False, save=True, key='m_ini')
 
     stacked_plot(targets, path=path, saved=True, key='m_ini')
     stacked_plot(targets, path=path, saved=True, key='logAge')

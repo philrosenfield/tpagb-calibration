@@ -6,10 +6,105 @@ from dweisz.match.scripts.fileio import get_files, read_fake, replace_ext
 from dweisz.match.scripts.sfh import SFH
 import numpy as np
 import matplotlib.pyplot as plt
-from ..TPAGBparams import EXT
+from ..TPAGBparams import EXT, snap_src
+from scipy.stats import ks_2samp
+from .plotting import emboss
+
+def cull_data(simgalaxname):
+    """
+    load simgalaxy, recovered stars, and tpagb.
+    """
+    sgal = SimGalaxy(simgalaxname)
+    good, = np.nonzero((sgal.data['F814W_cor'] < 99.) &
+                       (sgal.data['F160W_cor'] < 99.))
+    itps, = np.nonzero(sgal.data['stage'] == 7)
+    inds = list(set(good) & set(itps))
+    mass = sgal.data['m_ini'][good]
+    tot_mass = np.sum(mass)
+    tp_mass =  sgal.data['m_ini'][inds]
+    return sgal, tot_mass, tp_mass, mass
 
 def csfr_masshist():
-    """ Do all
+    # use padua sfh from Dan Weisz and PARSEC sfh from me (third attempt)
+    pd_loc = os.path.join(snap_src, 'varysfh/extpagb/sim_as_phot/padua/')
+    pc_loc = os.path.join(snap_src, 'varysfh/extpagb/sim_as_phot/parsec/')
+    # trilegal simulations from input sfh
+    sims = ['out_eso540-030_f606w_f814w.mcmc.zc_caf09_v1.2s_m36_s12d_ns_nas_bestsfr.dat',
+            'out_ugc5139_f555w_f814w.mcmc.zc_caf09_v1.2s_m36_s12d_ns_nas_bestsfr.dat']
+    # zc merged sfh solutions
+    sfhs= ['eso540-030_f606w_f814w.mcmc.zc.dat',
+           'ugc5139_f555w_f814w.mcmc.zc.dat']
+    # calc sfh output for Av, dmod, etc (not really needed for csfr plots)
+    metas = ['eso540-030_f606w_f814w.sfh',
+             'ugc5139_f555w_f814w.sfh']
+
+    dm = 0.1  # could be input... mass step
+    bins = np.arange(0.8, 12 + dm, dm)
+    for i, sim in enumerate(sims):
+        # make tp-agb and full mass histograms
+        sgalpd, tot_masspd, tp_masspd, masspd = \
+            cull_data(os.path.join(pd_loc, 'caf09_v1.2s_m36_s12d_ns_nas', sim))
+        hpd = np.histogram(tp_masspd, bins=bins)[0] / tot_masspd
+        hfpd = np.histogram(masspd, bins=bins)[0] / tot_masspd
+
+        sgalpc, tot_masspc, tp_masspc, masspc = \
+            cull_data(os.path.join(pc_loc, 'caf09_v1.2s_m36_s12d_ns_nas', sim))
+        hpc = np.histogram(tp_masspc, bins=bins)[0] / tot_masspc
+        hfpc = np.histogram(masspc, bins=bins)[0] / tot_masspc
+
+        # compare tp-agb in both sfh solutions
+        a, p = ks_2samp(hpd, hpc)
+        target = sgalpd.name.split('_')[1]
+        print('TPAGB {} KS: {:.2f} {:.2f}'.format(target, a, p))
+
+        # load sfh for csfr plots
+        sfhpd = SFH(os.path.join(pd_loc, sfhs[i]),
+                    meta_file=os.path.join(pd_loc, metas[i]))
+        sfhpc = SFH(os.path.join(pc_loc, sfhs[i]),
+                    meta_file=os.path.join(pc_loc, metas[i]))
+
+        fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(8, 6))
+        fig.subplots_adjust(hspace=.4, top=0.97, bottom=0.11)
+        # Padua
+        ax1 = sfhpd.plot_csfr(ax=ax1, plt_kw={'color': 'k'},
+                              fill_between_kw={'color': 'gray', 'alpha': 0.3})
+        # Parsec
+        ax1 = sfhpc.plot_csfr(ax=ax1, plt_kw={'color': '#30a2da'},
+                              fill_between_kw={'color': '#30a2da', 'alpha': 0.3})
+
+        # tpagb
+        ax2.plot(bins[:-1], hpd, linestyle='steps-mid', label=r'$\rm{Padua}$',
+                 color='k')
+        ax2.plot(bins[:-1], hpc, linestyle='steps-mid', label=r'$\rm{PARSEC}$',
+                 color='#30a2da')
+        # full
+        ax2.plot(bins[:-1], hfpd, linestyle='steps-mid', color='k', alpha=0.5)
+        ax2.plot(bins[:-1], hfpc, linestyle='steps-mid', color='#30a2da',
+                 alpha=0.5)
+
+        ax2.set_yscale('log')
+        ax2.set_xlim(0.8, 12.)
+        ax2.set_ylim(1e-7, 1)
+        ax2.set_xlabel(r'$\rm{Mass\ (M_\odot)}$')
+        ax2.set_ylabel(r'$\rm{\#/Mass\ bin\ (%.1f\ M_\odot)}$' % dm)
+        ax1.set_xlabel(r'$\rm{Time\ (Gyr)}$')
+        ax1.set_ylabel(r'$\rm{Cumulative\ SF}$')
+        for ax in [ax1, ax2]:
+            ax.legend(loc='best')
+            ax.tick_params(direction='in', which='both')
+        lab = r'$\rm{{{}}}$'.format(target.upper().replace('-1', '').replace('-','\!-\!'))
+        ax1.text(0.05, 0.05, lab, ha='right', fontsize=16, **emboss())
+        outfile = '{}_csfr_mass{}'.format(target, EXT)
+        plt.savefig(outfile)
+        print('wrote {}'.format(outfile))
+
+if __name__ == "__main__":
+    csfr_masshist()
+
+# nothing below is used... kept just in case.
+
+def csfr_masshistold():
+    """ Do all (first attempt at this)
     sgal_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/'
     sgal_files = get_files(sgal_loc, '*cor*dat')
     fake_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/sim_as_phot/caf09_v1.2s_m36_s12d_ns_nas/match_run/fake_run'
@@ -33,7 +128,8 @@ def csfr_masshist():
         ax.plot(bins[1:], h / np.sum(f['mass'][inds]), linestyle='steps-mid')
         ax.set_yscale('log')
         ax.set_title(targets[i])
-    """
+
+    # trilegal as data (second attempt at this)
     data_sfh = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/ugc8508_f475w_f814w.sfh'
     data_hmc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/ugc8508_f475w_f814w.mcmc.zc'
     sfh = SFH(data_sfh, hmc_file=data_hmc)
@@ -65,7 +161,7 @@ def csfr_masshist():
     from scipy.stats import ks_2samp
     a, p = ks_2samp(h, h1)
     print 'KS:', a, p
-    
+
     fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(8, 6))
     fig.subplots_adjust(hspace=.4, top=0.97, bottom=0.11)
     ax1 = sfh.plot_csfr(ax=ax1)
@@ -83,9 +179,13 @@ def csfr_masshist():
     ax1.set_xlabel(r'$\rm{Time\ (Gyr)}$')
     ax1.set_ylabel(r'$\rm{Cummulative\ SF}$')
     plt.savefig('ugc8505_csfr_mass{}'.format(EXT))
-
+    """
+    pass
 
 def cut_sims():
+    """
+    match CMD space with data for first/second attempts
+    """
     sims = ['ugc8508_f475w_f814w_bestsfr_cor.dat',
             'ngc3741_f475w_f814w_bestsfr_cor.dat',
             'ngc2403-halo-6_f606w_f814w_bestsfr_cor.dat',
@@ -207,4 +307,3 @@ if not slurm:
     with open(smft.format(k), 'w') as outp:
         outp.write(line)
 """
-
