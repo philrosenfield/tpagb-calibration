@@ -613,7 +613,7 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
     else:
         test = test_line
         bins = 'knuth'
-        #bins = 5
+        #bins = 3
         #threshlimit = False
 
     filter1 = 'F814W'
@@ -647,9 +647,9 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
         mean_mags.append(mean_mag)
         fs.append(f)
 
-        if len(color_sep) < 2:
-            print('not enough color seps')
-            continue
+        #if len(color_sep) < 2:
+        #    print('not enough color seps: {}'.format(color_sep))
+        #    continue
         # result: lir, ril, lirpl, lirpr, rilpr,
         tpagbs = np.sum([ctm.result[k][1]/ctm.result[k][4] for k in ctm.result.keys() if len(ctm.result[k]) > 0])
         rhebs = np.sum([ctm.result[k][0]/ctm.result[k][-1] for k in ctm.result.keys() if len(ctm.result[k]) > 0])

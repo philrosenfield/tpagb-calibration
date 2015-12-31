@@ -8,7 +8,7 @@ import os
 import sys
 
 import ResolvedStellarPops as rsp
-from ..TPAGBparams import EXT
+from ..TPAGBparams import EXT, snap_src, matchfake_loc
 from .analyze import get_itpagb, parse_regions, get_trgb
 from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limiting_mag, exclude_gate_inds
 from ..sfhs.star_formation_histories import StarFormationHistories
@@ -19,8 +19,6 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 from argparse import RawTextHelpFormatter
-
-from ..TPAGBparams import snap_src, matchfake_loc
 
 def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
                      sgal=None, tricat=None, nrgbs=None, regions_kw={}, Av=0.,

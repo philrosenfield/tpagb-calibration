@@ -18,9 +18,8 @@ from ..pop_synth.stellar_pops import normalize_simulation, rgb_agb_regions, limi
 from ..sfhs.star_formation_histories import StarFormationHistories
 from ..fileio import load_obs, find_fakes
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
 
 from ..TPAGBparams import snap_src, matchfake_loc
 angst_data = rsp.angst_tables.angst_table.AngstTables()
@@ -55,6 +54,7 @@ def get_trgb(target, filter2='F160W', filter1=None):
 def parse_regions(args):
     """
     """
+
     if not hasattr(args, 'table'):
         args.table = None
     # need the following in opt and nir
@@ -98,10 +98,11 @@ def parse_regions(args):
             colmin, colmax = map(float, args.colorlimits.split(','))
             if colmax < colmin:
                 colmax = colmin + colmax
-                logger.debug('colmax was less than colmin, assuming it is dcol, colmax is set to colmin + dcol')
+                logger.info('colmax was less than colmin, assuming it is dcol, colmax is set to colmin + dcol')
 
         if args.maglimits is not None:
             magfaint, magbright = map(float, args.maglimits.split(','))
+            print magfaint
         else:
             magbright = trgb + args.trgbexclude
             magfaint = trgb + args.trgboffset
@@ -124,8 +125,8 @@ def parse_regions(args):
                                                                 comp_mag2)
                     magfaint = comp_mag2
                 else:
-                    logger.debug('magfaint: {} comp_mag2: {} using magfaint'.format(magfaint, comp_mag2))
-            logger.debug('faint mag limit for rgb norm set to {}'.format(msg))
+                    logger.info('magfaint: {} comp_mag2: {} using magfaint'.format(magfaint, comp_mag2))
+            logger.info('faint mag limit for rgb norm set to {}'.format(msg))
 
     regions_kw = {'offset': args.trgboffset,
                   'trgb_exclude': args.trgbexclude,
@@ -134,7 +135,9 @@ def parse_regions(args):
                   'col_max': colmax,
                   'mag_bright': magbright,
                   'mag_faint': magfaint}
-    logger.debug('regions: {}'.format(regions_kw))
+
+    logger.info('regions: {}'.format(regions_kw))
+    
     return regions_kw
 
 

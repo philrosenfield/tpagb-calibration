@@ -8,6 +8,32 @@ from palettable.wesanderson import Darjeeling2_5
 import matplotlib.pyplot as plt
 import numpy as np
 
+def tpagb_mass(targets, path):
+    for target in targets:
+        print(target)
+        #sims = get_files(path, 'out*{}*.dat'.format(target))
+        lf_file, = get_files(path, '*{}*lf.dat'.format(target))
+        lfd = load_lf_file(lf_file)
+
+        # not all sims were included because of normalization factor threshold
+        idx = map(int, np.concatenate(lfd['idx']))
+        mtpagbs = np.array([])
+        for i in idx:
+            # this will not actually work -- need to find the index by filename...
+            inorm = lfd['sgal_agb'][i]
+            sim, = get_files(path, 'out*{}*{:03d}.dat'.format(target, i))
+            sgal = SimGalaxy(sim)
+            mtpagb = sgal.data[inorm][sgal.data[inorm]['stage']==7]['m_ini']
+            mtpagbs = np.append(mtpagbs, mtpagb)
+            #print('{} {:.2f} {:.2f} {:.2f}'.format(i, np.min(mtpagb),
+            #                                       np.median(mtpagb),
+            #                                       np.max(mtpagb)))
+            del sgal
+        print('{} {:.2f} {:.2f} {:.2f} {:.2f}'.format(target, np.min(mtpagbs),
+                np.median(mtpagbs), np.mean(mtpagbs), np.max(mtpagbs)))
+    return
+
+
 def load_tpagbs(lf_file, sims, key='m_ini', gyr=False):
     """
     Load the scaled simulation TP-AGB distribution of some key
@@ -29,12 +55,14 @@ def load_tpagbs(lf_file, sims, key='m_ini', gyr=False):
         the scaled tp_agb values of key (sim_agb)
     """
     lfd = load_lf_file(lf_file)
+    target = lf_file.split('_')[1]
     # not all sims were included because of normalization factor threshold
     idx = map(int, np.concatenate(lfd['idx']))
     tpagbs = []
     for i in idx:
         # this will not actually work -- need to find the index by filename...
-        sgal = SimGalaxy(sims[i])
+        sim, = get_files(path, 'out*{}*{:03d}.dat'.format(target, i))
+        sgal = SimGalaxy(sim)
         if gyr:
             key = 'logAge'
             data = 10 ** (sgal.data[key] - 9)
@@ -42,8 +70,11 @@ def load_tpagbs(lf_file, sims, key='m_ini', gyr=False):
             data = sgal.data[key]
         tpagbs.append(data[lfd['sim_agb'][i]])
         del sgal
+    if key == 'm_ini':
+        print('{} {} {:.2f} {:.2f}'.format(os.path.split(lf_file)[1], key,
+                                           np.min(np.concatenate(tpagbs)),
+                                           np.max(np.concatenate(tpagbs))))
     return tpagbs
-
 
 
 def make_hists(tpagbs, dm=0.5, bins=None, norm=True):
@@ -116,6 +147,7 @@ def save_hists(target, bins, hists, meanh, key='m_ini'):
         out.write(line)
         out.write(mline)
     return
+
 
 def read_hists(targets, path, key='m_ini', mean_only=False):
     """
@@ -197,12 +229,12 @@ def load_hists(targets, path, mean_only=False, saved=False, save=True,
         meanhs = []
         histss = []
         for target in targets:
+            # this is for when some targets are saved, others not.
             print(target)
             outfile = '{}_tpagb_{}_hists.dat'.format(target, key)
             if os.path.isfile(outfile):
                 print('not overwriting {}'.format(outfile))
                 bins, hists, meanh = read_hists([target], path, key=key)
-
                 hists = hists[0]
                 meanh = meanh[0]
             else:
@@ -273,24 +305,29 @@ def stacked_plot(targets, path=None, save=False, saved=False,
         bins, _, meanhs = load_hists(targets, path, key=key, save=save,
                                      mean_only=True, bins=bins)
 
-    colors = Darjeeling2_5.mpl_colors
-    colors.append(colors[0])  # see iterations with barh below
-    colors.pop(0)
+    sys.exit()
     # bug? Does not make the plots the same width
     if key == 'logAge':
         right = 1.135
+        colors = Darjeeling2_5.mpl_colors
     else:
+        colors = Darjeeling2_5.mpl_colors[::-1]
         right = 0.98
+
+    bcolors = colors[:]
+    bcolors.append(colors[0])  # see iterations with barh below
+    bcolors.pop(0)
+
     fig, ax = plt.subplots(figsize=(14,6))
     fig.subplots_adjust(right=right, left=0.2, bottom=0.05, top=0.98)
 
     for i, target in enumerate(targets):
         meanh = meanhs[i] / np.sum(meanhs[i])
-        ax.barh(i, meanh[0], 0.8, color=colors[-1], align='center')
+        ax.barh(i, meanh[0], 0.8, color=bcolors[-1], align='center')
         [ax.barh(i, meanh[j+1], 0.8, left=np.cumsum(meanh)[j],
-          align='center', color=colors[j]) for j in range(len(meanh))[:-1]]
+          align='center', color=bcolors[j]) for j in range(len(meanh))[:-1]]
 
-    decorate(ax, bins, targets, Darjeeling2_5.mpl_colors, key)
+    decorate(ax, bins, targets, colors, key)
     outfile = 'tpagb_{}_hists{}'.format(key, EXT)
     plt.savefig(outfile)
     plt.close()
@@ -304,7 +341,7 @@ def default_run():
                'ngc2403-deep',
                'ngc2403-halo-6',
                'ugc4459',
-               'eso540-030',
+               #'eso540-030',
                'ugc4305-1',
                'ugc4305-2',
                'ngc3741',
@@ -314,11 +351,12 @@ def default_run():
     #How to include more galaxies ... set saved=False.
     #new = ['ngc300-wide1', 'ugc4305-2', 'ugca292']
     #new = ['ugc8508']
-    stacked_plot(targets, path=path, saved=False, save=True, key='logAge')
-    stacked_plot(targets, path=path, saved=False, save=True, key='m_ini')
+    #stacked_plot(targets, path=path, saved=False, save=False, key='m_ini')
+    #stacked_plot(targets, path=path, saved=False, save=True, key='m_ini')
 
-    stacked_plot(targets, path=path, saved=True, key='m_ini')
-    stacked_plot(targets, path=path, saved=True, key='logAge')
+    #stacked_plot(targets, path=path, saved=True, key='m_ini')
+    #stacked_plot(targets, path=path, saved=True, key='logAge')
+    tpagb_mass(targets, path)
 
 if __name__ == "__main__":
     default_run()

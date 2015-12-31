@@ -56,9 +56,9 @@ def default_run():
     sfh_loc = os.getcwd()
     err_loc = os.path.join(snap_src, 'data/dweisz11_csfr')
     print(os.path.isdir(err_loc))
-    targets = ['ngc300-wide1', 'ugc8508', 'ngc4163', 'ngc2403-deep', 'ngc2403-halo-6',
-               'ugc4459', 'eso540-030', 'ngc3741', 'ugc5139', 'ugc4305-1',
-               'ugca292', 'kdg73']
+    targets = ['ngc300-wide1', 'ugc8508', 'ngc4163', 'ngc2403-deep',
+               'ngc2403-halo-6', 'ugc4459', 'ngc3741', 'ugc5139', 'ugc4305-1',
+               'ugc4305-2', 'kdg73', 'ugca292']
 
     fig, axs = plt.subplots(ncols=4, nrows=3, figsize=(16, 8))
     axs = outside_labels(axs, fig=fig, xlabel=r'$\rm{Age (Gyr)}$',
@@ -68,7 +68,7 @@ def default_run():
     for i in range(len(targets)):
         ax = axs[i]
         print targets[i]
-        lab = r'$\rm{{{}}}$'.format(targets[i].upper().replace('-1', '').replace('-','\!-\!'))
+        lab = r'$\rm{{{}}}$'.format(targets[i].upper().replace('-','\!-\!'))
         meta_file, = get_files(sfh_loc, '*{}*sfh'.format(targets[i]))
         sfh_file, = get_files(sfh_loc, '*{}*zc.dat'.format(targets[i]))
 

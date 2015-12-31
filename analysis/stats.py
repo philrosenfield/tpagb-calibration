@@ -94,7 +94,7 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
 
             mtrgb = angst_data.get_tab5_trgb_av_dmod(target,
                                                      filt.replace('_cor', ''))[0]
-            bins = np.arange(16, mtrgb, dmag)
+            bins = np.arange(19, mtrgb, dmag)
             #figx = plt.subplots()
             #ohist, bins, _ = mlhist(mag, bins='knuth')
             #plt.close()
@@ -114,9 +114,9 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
             #chisq, pval = zip(*[chi2(ohist, m) for m in mhists])
             #print '\chi^2 {}\pm{}:'.format(np.mean(chisq), np.std(chisq))
             #print('KS {} {} a < p: {}, {:.3g} {:.6e}'.format(target, filt, am < pm, am, pm))
-            print('KS {} {}:'.format(target, filt))
-            print_stats(np.median, am, pm)
-            print_stats(np.std, am, pm)
+            print('KS {} {}:'.format(target, filt)),
+            print_stats(np.mean, am, pm)
+            #print_stats(np.std, am, pm)
             if '814' in filt:
                 oalphas = np.append(oalphas, np.median(am))
                 opvalues = np.append(opvalues, np.median(pm))

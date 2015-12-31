@@ -23,7 +23,7 @@ else
 fi
 }
 
-doit $1 ddo82_f606w_f814w -c 1.59,0.40
+#doit $1 ddo82_f606w_f814w -c 1.59,0.40
 doit $1 eso540-030_f606w_f814w -c 1.27,0.40
 doit $1 kdg73_f475w_f814w -c 1.33,0.40
 doit $1 ngc2403-deep_f606w_f814w -c 1.62,0.60 -q MAG2_WFPC2,MAG4_IR

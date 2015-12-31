@@ -11,16 +11,13 @@ import numpy as np
 import ResolvedStellarPops as rsp
 angst_data = rsp.angst_tables.angst_data
 
-from ..TPAGBparams import EXT
-from ..analysis.analyze import get_itpagb, parse_regions
+from ..TPAGBparams import EXT, snap_src, matchfake_loc, data_loc
+from ..analysis.analyze import get_itpagb, parse_regions, get_trgb
 from ..fileio import load_obs, find_fakes, find_match_param, load_lf_file
 from ..fileio import load_observation
 from ..utils import minmax
 from ..pop_synth import stellar_pops
 from ..sfhs import star_formation_histories
-
-# where the matchfake files live
-from ..TPAGBparams import snap_src, matchfake_loc, data_loc
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -115,7 +112,7 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
 
     # simulated nrgb and nagb are the mean values
     srgb_text = r'$\langle N_{\rm %s}\rangle =%i$' % (mid_txt, np.mean(mrgb))
-    sagb_text = r'$\langle N_{\rm TP-AGB}\rangle=%i$' % np.mean(magb)
+    sagb_text = r'$\rm{R14}\ \langle N_{\rm TP-AGB}\rangle=%i$' % np.mean(magb)
 
     # one could argue taking the mean isn't the best idea for
     # the ratio errors.
@@ -123,7 +120,7 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
                                        np.mean(ratio_data['ar_ratio_err']))
 
     drgb_text = r'$N_{\rm %s}=%i$' % (mid_txt, nrgb)
-    dagb_text = r'$N_{\rm TP-AGB}=%i$' % nagb
+    dagb_text = r'$\rm{Data}\ N_{\rm TP-AGB}=%i$' % nagb
     dratio_text = '$f = %.3f\pm%.3f$' % (dratio, dratio_err)
 
     textss = [[sagb_text, srgb_text, sratio_text],
@@ -196,41 +193,22 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
     maxhists = np.max(np.array(hists).T, axis=1)
     #meanhists = np.mean(np.array(hists).T, axis=1)
     meanhists = np.median(np.array(hists).T, axis=1)
-    ax.fill_between(bins[1:], minhists, maxhists, color=plt_kw_lab['color'], alpha='0.2')
-    ax.plot(bins[1:], minhists, linestyle='steps-mid', color=plt_kw_lab['color'], lw=2)
-    ax.plot(bins[1:], maxhists, linestyle='steps-mid', color=plt_kw_lab['color'], lw=2)
-    ax.plot(bins[1:], meanhists, linestyle='steps-mid', lw=3, **plt_kw_lab)
-    """
-    plt_kw = dict({'linestyle': 'steps-mid', 'color': model_default_color,
-                   'alpha': 0.2}.items() + plt_kw.items())
+    edges = np.repeat(bins, 2)
+    fminhist = np.hstack((0, np.repeat(minhists, 2), 0))
+    fmaxhist = np.hstack((0, np.repeat(maxhists, 2), 0))
 
-    for i in range(len(mag2s)):
-        if inorm is not None:
-            try:
-                mag2 = mag2s[i][inorm[i]]
-                norm = 1.
-            except:
-                import pdb; pdb.set_trace()
+    ax.fill_between(edges, fminhist, fmaxhist, color=plt_kw_lab['color'],
+                    alpha='0.2')
 
-        else:
-            mag2 = mag2s[i]
-            norm = norms[i]
+    #ax.fill_between(bins[1:], minhists, maxhists, color=plt_kw_lab['color'],
+    #                alpha='0.2')
+    ax.plot(bins[1:], minhists, linestyle='steps', color=plt_kw_lab['color'],
+            lw=2)
+    ax.plot(bins[1:], maxhists, linestyle='steps', color=plt_kw_lab['color'],
+            lw=2)
+    l, = ax.plot(bins[1:], meanhists, linestyle='steps', lw=3, **plt_kw_lab)
 
-        if maglimit is not None:
-            inds, = np.nonzero(mag2 <= maglimit)
-        else:
-            inds = np.arange(len(mag2))
-
-        hist = np.histogram(mag2[inds], bins=bins)[0]
-        # only write legend once
-        if i != 0:
-            kw = plt_kw
-        else:
-            kw = plt_kw_lab
-
-        ax.plot(bins[1:], hist * norm, **kw)
-        """
-    return ax
+    return ax, l
 
 
 def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
@@ -238,7 +216,7 @@ def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
     target = target.replace('-', '\!-\!').upper()
-    plot_kw = dict({'drawstyle': 'steps-mid', 'lw': 1,
+    plot_kw = dict({'drawstyle': 'steps', 'lw': 1,
                     'color': data_default_color,
                     'label': '${}$'.format(target)}.items() + plot_kw.items())
 
@@ -252,41 +230,48 @@ def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
         err = np.sqrt(hist)
         plot_kw['lw'] += 1
 
-    ax.errorbar(bins[1:], hist, yerr=err, **plot_kw)
-
+    gl, = ax.plot(bins[1:], hist, **plot_kw)
+    # mid bin
+    ax.errorbar(bins[1:] - 0.05, hist, yerr=err, fmt='none',
+                ecolor=plot_kw['color'])
+    glt = None
     if over_plot is not None:
         hist = np.histogram(mag2[over_plot], bins=bins)[0]
         if fake_file is not None:
             hist /= comp_corr[1:]
         err = np.sqrt(hist)
         plot_kw['color'] = data_tpagb_default_color
-        plot_kw['label'] = '${}\ TP\!-\!AGB$'.format(target)
-        ax.errorbar(bins[1:], hist, yerr=err, **plot_kw)
+        #plot_kw['label'] = '${}\ TP\!-\!AGB$'.format(target)
+        plot_kw['label'] = '$TP\!-\!AGB$'.format(target)
+        glt, = ax.plot(bins[1:], hist, **plot_kw)
+        # mid bin
+        ax.errorbar(bins[1:] - 0.05, hist, yerr=err, fmt='none',
+                    ecolor=plot_kw['color'])
 
-    return ax
+    return ax, gl, glt
 
 
-def plot_models(lf_file, bins, filt, maglimit=None, ax=None, plt_kw=None,
+def plot_models(lfd, bins, filt, maglimit=None, ax=None, plt_kw=None,
                 agb_mod=None):
     plt_kw = plt_kw or {}
-    lfd = load_lf_file(lf_file)
-
     mags = lfd[filt]
 
-    ax = plot_model(mag2s=mags, bins=bins, inorm=lfd['idx_norm'],
-                    maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod=agb_mod)
+    ax, ml = plot_model(mag2s=mags, bins=bins, inorm=lfd['idx_norm'],
+                        maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod=agb_mod)
 
     plt_kw['color'] = tpagb_model_default_color
-    ax = plot_model(mag2s=mags, bins=bins, inorm=lfd['sim_agb'],
-                    maglimit=maglimit, ax=ax, plt_kw=plt_kw,
-                    agb_mod='{}\ TP\!-\!AGB'.format(agb_mod))
-    return ax
+    ax, mlt = plot_model(mag2s=mags, bins=bins, inorm=lfd['sim_agb'],
+                        maglimit=maglimit, ax=ax, plt_kw=plt_kw,
+                        agb_mod='TP\!-\!AGB')
+                        #agb_mod='{}\ TP\!-\!AGB'.format(agb_mod))
+
+    return ax, ml, mlt
 
 
 def mag2Mag(mag2, target, filter2):
     angst_target = \
-    difflib.get_close_matches(target.upper(),
-                              angst_data.targets)[0].replace('-', '_')
+        difflib.get_close_matches(target.upper(),
+                                  angst_data.targets)[0].replace('-', '_')
 
     if 'F160W' in filter2:
         _, av, dmod = angst_data.get_snap_trgb_av_dmod(angst_target)
@@ -302,7 +287,6 @@ def mag2Mag(mag2, target, filter2):
 
     mag = rsp.astronomy_utils.mag2Mag(mag2, filter2, 'wfc3snap', Av=av,
                                       dmod=dmod)
-
     return mag
 
 
@@ -379,9 +363,9 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
             sdiff = dmdiff / data
 
             axs[0].errorbar(Mbins[1:], model, yerr=np.sqrt(err),
-                            linestyle='steps-mid')
-            axs[1].plot(Mbins[1:], dmdiff, drawstyle='steps-mid')
-            axs[2].plot(Mbins[1:], sdiff, drawstyle='steps-mid')
+                            linestyle='steps')
+            axs[1].plot(Mbins[1:], dmdiff, drawstyle='steps')
+            axs[2].plot(Mbins[1:], sdiff, drawstyle='steps')
 
     for axs in [opt_axs, nir_axs]:
         axs[0].set_yscale('log')
@@ -420,10 +404,14 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
     '''
     agb_mod = translate_agbmod(agb_mod)
     target = os.path.split(lf_file)[1].split('_')[0]
+    ir_mtrgb = get_trgb(target, filter2='F160W', filter1=None)
+    opt_mtrgb = get_trgb(target, filter2='F814W')
+    trgb_color = opt_mtrgb - ir_mtrgb
 
     mag1, mag2 = load_observation(observation, col1, col2,
                                   match_param=match_param)
-    data_tpagb = get_itpagb(target, mag1 - mag2, mag2, col2)
+    data_tpagb = get_itpagb(target, mag1 - mag2, mag2, col2,
+                            off=trgb_color)
     #ogal, ngal = load_obs(target)
     #mag1 = ogal.data['MAG2_ACS']
     #mag2 = ngal.data['MAG2_IR']
@@ -440,22 +428,26 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
         if not '_ast_cor' in extra_str:
             extra_str += '_ast_cor'
 
+    lfd = load_lf_file(lf_file)
     for filt, fake_file in zip([filter1, filter2], [optfake, nirfake]):
-
         if filt == filter1:
             mag = mag1
             xlim = xlims[0]
+            xlim[-1] = angst_data.get_50compmag(target.replace('-', '_').upper(),
+                                                'F814W')
             ylim = ylims[0]
         else:
             mag = mag2
             xlim = xlims[1]
+            xlim[-1] = angst_data.get_snap_50compmag(target.upper(), 'F160W')
             ylim = ylims[1]
 
         bins = np.arange(mag.min(), mag.max(), step=dmag)
-        ax = plot_models(lf_file, bins, filt, plt_kw=mplt_kw, agb_mod=agb_mod)
+
+        ax, ml, mlt = plot_models(lfd, bins, filt, plt_kw=mplt_kw, agb_mod=agb_mod)
 
         # plot galaxy data
-        ax = plot_gal(mag, bins, ax=ax, target=target, fake_file=fake_file,
+        ax, gl, glt = plot_gal(mag, bins, ax=ax, target=target, fake_file=fake_file,
                       plot_kw=dplot_kw, over_plot=data_tpagb)
 
         ax.set_yscale('log')
@@ -463,18 +455,20 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
             ax.set_ylim(ylim)
         else:
             ax.set_ylim(1, ax.get_ylim()[-1])
-
         if xlim is not None:
             ax.set_xlim(xlim)
 
         band = 'nir'
         if '814' in filt:
             band = 'opt'
-        ax = add_trgb(ax, target, band)
+        ax = add_trgb(ax, target, band, regions_kw=regions_kw)
 
-        ax.legend(loc='lower right')
+        #ax.legend(loc='center left', handles=[ml, gl, mlt, glt], ncol=2)
+        lab = r'$\rm{{{}}}$'.format(target.upper().replace('-1', '').replace('-','\!-\!'))
+        ax.text(0.98, 0.05, lab, ha='right', fontsize=20, transform=ax.transAxes,
+                **emboss())
         ax.set_xlabel('${}$'.format(filt.replace('_cor', '')), fontsize=20)
-
+        ax.set_ylabel('${\#}$', fontsize=20)
         if narratio_file is not None:
             ax = add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB')
 
@@ -485,33 +479,26 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
     return
 
 
-def add_trgb(ax, target, band, lf=True):
+def add_trgb(ax, target, band, lf=True, regions_kw=None):
     offset = 1.
-    opt_fake, nir_fake = find_fakes(target)
-    faint_color = 'grey'
-
-    if 'ir' in band.lower():
-        trgb = angst_data.get_snap_trgb_av_dmod(target.upper())[0]
-        comp1, comp2 = stellar_pops.limiting_mag(nir_fake, 0.9)
-        trgb_exclude = 0.2
-    else:
-        trgb = angst_data.get_tab5_trgb_av_dmod(target.upper())[0]
-        comp1, comp2 = stellar_pops.limiting_mag(opt_fake, 0.9)
-        trgb_exclude = 0.1
-
-    ## hack ... always plot 90% completeness
-    ## undo hack: uncomment next lines
-    #mag_faint = trgb + offset  # 1 mag below TRGB
-    #if comp2 < mag_faint and comp2 > trgb:
-        # comp2 is between 1 mag below TRGB and TRGB use it.
-    ## undo hack: tab these in under if statement
-    mag_faint = comp2
+    #opt_fake, nir_fake = find_fakes(target)
+    #comp1, comp2 = stellar_pops.limiting_mag(nir_fake, 0.9)
     faint_color = 'k'
-    ## end hack ...
 
-    ax = add_lines_to_plot(ax, trgb_exclude=trgb_exclude,
-                           trgb=trgb, mag_faint=mag_faint,
-                           faint_color=faint_color, lf=lf)
+    if not 'ir' in band.lower():
+        trgb = angst_data.get_tab5_trgb_av_dmod(target.upper())[0]
+        trgb_exclude = 0.1
+        magbright = trgb + trgb_exclude
+        magfaint = trgb + offset
+        regions_kw = {'offset': offset,
+                      'trgb_exclude': trgb_exclude,
+                      'trgb': trgb,
+                      'mag_bright': magbright,
+                      'mag_faint': magfaint}
+
+
+    ax = add_lines_to_plot(ax, faint_color=faint_color, lf=lf,
+                           **regions_kw)
     return ax
 
 def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=0.,
@@ -633,9 +620,9 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
                                 ybins=50, slice_inds=inds, ylim=ylim, xlim=maglim)
         dhist = np.histogram(gal.data[mag2], bins=magbins)[0]
         mhist = np.histogram(sgal.data[filter2][inds], bins=magbins)[0]
-        axs[0].plot(magbins[1:], dhist, color='k', linestyle='steps-pre', lw=2,
+        axs[0].plot(magbins[1:], dhist, color='k', linestyle='steps', lw=2,
                     zorder=1, alpha=0.3)
-        axs[0].plot(magbins[1:], mhist, color='r', linestyle='steps-pre', lw=2,
+        axs[0].plot(magbins[1:], mhist, color='r', linestyle='steps', lw=2,
                     zorder=1, alpha=0.3)
 
         outfile = '{}_{}_{}_scatterhist{}'.format(outfmt, zstr, band, EXT)
@@ -753,7 +740,7 @@ def main(argv):
         compare_to_gal(args.lf_file, args.observation,
                        narratio_file=args.narratio_file, filter1=filter1,
                        agb_mod=agb_mod, regions_kw=regions_kw,
-                       xlims=[(19,28), (18, 25)], filter2=filter2,
+                       xlims=[[19,28], [18, 25]], filter2=filter2,
                        col1=col1, col2=col2, match_param=args.match_param)
 
 if __name__ == '__main__':
