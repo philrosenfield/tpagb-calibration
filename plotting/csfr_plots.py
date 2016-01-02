@@ -61,7 +61,7 @@ def default_run():
                'ugc4305-2', 'kdg73', 'ugca292']
 
     fig, axs = plt.subplots(ncols=4, nrows=3, figsize=(16, 8))
-    axs = outside_labels(axs, fig=fig, xlabel=r'$\rm{Age (Gyr)}$',
+    axs = outside_labels(axs, fig=fig, xlabel=r'$\rm{Age\ (Gyr)}$',
                          ylabel=r'$\rm{Cumulative\ SF}$')
     fig.subplots_adjust(wspace=0.1, hspace=0.1, left=0.1)
     line = ''

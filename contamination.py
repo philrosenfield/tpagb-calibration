@@ -740,7 +740,7 @@ def rgb_cut(full=False):
     fits_files = get_files(data_loc + '/copy', '*fits')
 
     if not full:
-        targets = ['ESO540-030',
+        targets = [#'ESO540-030',
                    'KDG73',
                    'NGC2403',
                    'NGC3741',
@@ -751,8 +751,8 @@ def rgb_cut(full=False):
                    'UGC4459',
                    'UGC5139',
                    'UGC8508',
-                   'UGCA292',
-                   'DDO82']
+                   'UGCA292']#,
+                   #'DDO82']
 
         fits_files = np.concatenate([[s for s in fits_files if t.lower() in s]
                                      for t in targets])

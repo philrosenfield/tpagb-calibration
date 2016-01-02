@@ -48,7 +48,7 @@ def outside_labels(axs, fig=None, xlabel=None, ylabel=None, rows=True,
         np.ravel(axs)
     """
     ndim = len(np.shape(axs))
-    print(ndim)
+    #print(ndim)
     text_kw = dict({'ha': 'center', 'va': 'center', 'fontsize': 24}.items() + text_kw.items())
     if ndim == 1:
         if rows:
@@ -464,7 +464,7 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
         ax = add_trgb(ax, target, band, regions_kw=regions_kw)
 
         #ax.legend(loc='center left', handles=[ml, gl, mlt, glt], ncol=2)
-        lab = r'$\rm{{{}}}$'.format(target.upper().replace('-1', '').replace('-','\!-\!'))
+        lab = r'$\rm{{{}}}$'.format(target.upper().replace('-','\!-\!'))
         ax.text(0.98, 0.05, lab, ha='right', fontsize=20, transform=ax.transAxes,
                 **emboss())
         ax.set_xlabel('${}$'.format(filt.replace('_cor', '')), fontsize=20)

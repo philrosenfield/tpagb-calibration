@@ -2,39 +2,88 @@ import sys, os
 
 from ..fileio import load_lf_file, get_files
 from ResolvedStellarPops.galaxies.simgalaxy import SimGalaxy
-from .plotting import outside_labels, emboss, tpagb_model_default_color
+from .plotting import outside_labels, emboss, tpagb_model_default_color, plot_model
 from ..TPAGBparams import snap_src, EXT
 from palettable.wesanderson import Darjeeling2_5
 import matplotlib.pyplot as plt
 import numpy as np
 
-def tpagb_mass(targets, path):
-    for target in targets:
-        print(target)
-        #sims = get_files(path, 'out*{}*.dat'.format(target))
-        lf_file, = get_files(path, '*{}*lf.dat'.format(target))
-        lfd = load_lf_file(lf_file)
-
-        # not all sims were included because of normalization factor threshold
-        idx = map(int, np.concatenate(lfd['idx']))
-        mtpagbs = np.array([])
-        for i in idx:
-            # this will not actually work -- need to find the index by filename...
-            inorm = lfd['sgal_agb'][i]
-            sim, = get_files(path, 'out*{}*{:03d}.dat'.format(target, i))
-            sgal = SimGalaxy(sim)
-            mtpagb = sgal.data[inorm][sgal.data[inorm]['stage']==7]['m_ini']
-            mtpagbs = np.append(mtpagbs, mtpagb)
-            #print('{} {:.2f} {:.2f} {:.2f}'.format(i, np.min(mtpagb),
-            #                                       np.median(mtpagb),
-            #                                       np.max(mtpagb)))
-            del sgal
-        print('{} {:.2f} {:.2f} {:.2f} {:.2f}'.format(target, np.min(mtpagbs),
-                np.median(mtpagbs), np.mean(mtpagbs), np.max(mtpagbs)))
-    return
+def plot_labels(dm=0.5):
+    ylab = r'$\rm{{Number\ of\ TP\!-\!AGB\ Stars\ /\ {:.1f}\ M_\odot}}$'.format(dm)
+    xlab = r'$\rm{Initial\ Mass\ (M_\odot)}$'
+    return xlab, ylab
 
 
-def load_tpagbs(lf_file, sims, key='m_ini', gyr=False):
+def tpagb_mass(targets, path, oneplot=True, save=True, dm=0.1,
+               saved=False):
+    axs = [None] * len(targets)
+
+    if oneplot:
+        fig, axs = plt.subplots(nrows=len(targets), figsize=(16,16))
+        xlab, ylab = plot_labels(dm=dm)
+        axs = outside_labels(axs, fig=fig, xlabel=xlab, ylabel=ylab)
+        from matplotlib import ticker
+
+    bins = np.arange(0.8, 10. + dm, dm)
+    bins, histss, meanhs = load_hists(targets, path, saved=saved, save=save,
+                                      key='m_ini', dm=dm, bins=bins)
+
+    for i, target in enumerate(targets):
+        ax = axs[i]
+        #import pdb; pdb.set_trace()
+        minhists = np.min(np.array(histss[i]).T, axis=1)
+        maxhists = np.max(np.array(histss[i]).T, axis=1)
+        meanhists = np.median(np.array(histss[i]).T, axis=1)
+        edges = np.repeat(bins, 2)
+        fminhist = np.hstack((0, np.repeat(minhists, 2), 0))
+        fmaxhist = np.hstack((0, np.repeat(maxhists, 2), 0))
+
+        ax.fill_between(edges, fminhist, fmaxhist, color='k',
+                        alpha='0.2')
+
+        ax.plot(bins[1:], minhists, linestyle='steps', color='k',
+                lw=2)
+        ax.plot(bins[1:], maxhists, linestyle='steps', color='k',
+                lw=2)
+        ax.plot(bins[1:], meanhists, linestyle='steps', lw=3, color='k')
+
+        #ax, l =  plot_model(mag2s=histss[i], bins=bins, ax=ax,
+        #                    norms=np.ones(len(histss[i])))
+
+        if oneplot:
+            ax.text(0.98, 0.9,
+                    r'$\rm{{{}}}$'.format(target.upper()).replace('-', '\!-\!'),
+                    transform=ax.transAxes, va='top', ha='right')
+        else:
+            outfile = 'tpagb_{}_hist_{}{}'.format(key, target, EXT)
+            plt.close()
+
+    for ax in axs:
+        ax.set_yscale('log')
+        ax.set_xlim(0.8, 10)
+
+    if oneplot:
+        for ax in axs:
+            ax.tick_params(labelsize=24)
+            ax.yaxis.set_major_locator(ticker.MaxNLocator(prune='both'))
+                                                          #nbins=1))
+        fig.subplots_adjust(hspace=0., left=0.1, bottom=0.1, top=0.95)
+    outfile = 'big_tpagb_m_ini_hist{}'.format(EXT)
+    plt.savefig(outfile)
+    print('wrote {}'.format(outfile))
+"""
+
+        #print('{} {:.2f} {:.2f} {:.2f} {:.2f}'.format(target, np.min(mtpagbs),
+        #        np.median(mtpagbs), np.mean(mtpagbs), np.max(mtpagbs))),
+        #bins = np.arange(0.8, 10.1, 0.1)
+        #mhist = np.histogram(mtpagbs, bins=bins)[0]
+        #print bins
+        #print mhist
+        #print np.max(bins[np.nonzero(mhist>100)])
+        ##import pdb; pdb.set_trace()
+"""
+
+def load_tpagbs(lf_file, sims, path, key='m_ini', gyr=False):
     """
     Load the scaled simulation TP-AGB distribution of some key
     Parameters
@@ -55,13 +104,17 @@ def load_tpagbs(lf_file, sims, key='m_ini', gyr=False):
         the scaled tp_agb values of key (sim_agb)
     """
     lfd = load_lf_file(lf_file)
-    target = lf_file.split('_')[1]
+    target = os.path.split(lf_file)[1].split('_')[0]
     # not all sims were included because of normalization factor threshold
     idx = map(int, np.concatenate(lfd['idx']))
     tpagbs = []
     for i in idx:
         # this will not actually work -- need to find the index by filename...
-        sim, = get_files(path, 'out*{}*{:03d}.dat'.format(target, i))
+        try:
+            sim, = get_files(path, 'out*{}*{:03d}.dat'.format(target, i))
+        except:
+            print get_files(path, 'out*{}*{:03d}.dat'.format(target, i))
+            import pdb; pdb.set_trace()
         sgal = SimGalaxy(sim)
         if gyr:
             key = 'logAge'
@@ -240,7 +293,7 @@ def load_hists(targets, path, mean_only=False, saved=False, save=True,
             else:
                 sims = get_files(path, 'out*{}*.dat'.format(target))
                 lf_file, = get_files(path, '*{}*lf.dat'.format(target))
-                bins, hists, meanh = make_hists(load_tpagbs(lf_file, sims, gyr=gyr),
+                bins, hists, meanh = make_hists(load_tpagbs(lf_file, sims, path, gyr=gyr),
                                                 dm=dm, bins=bins, norm=norm)
                 if save:
                     save_hists(target, bins, hists, meanh, key=key)
@@ -305,7 +358,6 @@ def stacked_plot(targets, path=None, save=False, saved=False,
         bins, _, meanhs = load_hists(targets, path, key=key, save=save,
                                      mean_only=True, bins=bins)
 
-    sys.exit()
     # bug? Does not make the plots the same width
     if key == 'logAge':
         right = 1.135
@@ -356,66 +408,7 @@ def default_run():
 
     #stacked_plot(targets, path=path, saved=True, key='m_ini')
     #stacked_plot(targets, path=path, saved=True, key='logAge')
-    tpagb_mass(targets, path)
+    tpagb_mass(targets[::-1], path, save=False, saved=True)
 
 if __name__ == "__main__":
     default_run()
-
-
-# not used
-
-def big_mass_hist(targets, path=None, oneplot=False, save=False,
-         read_hists=False, dm=0.5):
-    axs = [None] * len(targets)
-    kw = {}
-
-    if oneplot:
-        fig, axs = plt.subplots(nrows=len(targets), figsize=(16,16))
-        xlab, ylab = plot_labels(dm=dm)
-        axs = outside_labels(axs, fig=fig, xlabel=xlab, ylabel=ylab)
-        from matplotlib import ticker
-        kw['axes_labels'] = False
-
-    bins, histss, meanhs = load_hists(targets, path, saved=False, save=False,
-                                      key='m_ini', dm=0.5)
-
-    for i, target in enumerate(targets):
-        ax = _plot(bins, histss[i], meanhs[i], ax=axs[i], **kw)
-        if oneplot:
-            ax.text(0.98, 0.9,
-                    r'$\rm{{{}}}$'.format(target.upper()).replace('-', '\!-\!'),
-                    transform=ax.transAxes, va='top', ha='right')
-        else:
-            outfile = 'tpagb_{}_hist_{}{}'.format(key, target, EXT)
-            plt.close()
-
-    if oneplot:
-        for ax in axs:
-            ax.tick_params(labelsize=24)
-            ax.yaxis.set_major_locator(ticker.MaxNLocator(prune='both',
-                                                          nbins=4))
-        fig.subplots_adjust(hspace=0., left=0.1, bottom=0.1, top=0.95)
-    outfile = 'tpagb_mass_hists{}'.format(EXT)
-    plt.savefig(outfile)
-
-
-def plot_labels(dm=0.5):
-    ylab = r'$\rm{{Fraction\ of\ TP\!-\!AGB\ Stars\ /\ {:.1f}\ M_\odot}}$'.format(dm)
-    xlab = r'$\rm{Initial\ Mass\ (M_\odot)}$'
-    return xlab, ylab
-
-def _plot(bins, hists, meanh, ax=None, axes_labels=True):
-    if ax is None:
-        fig, axs = plt.subplots(figsize=(12,6))
-
-    [ax.plot(bins[:-1], h, alpha=0.1, color='k', lw=1,
-             drawstyle='steps-mid') for h in hists]
-
-    ax.plot(bins[:-1], meanh, drawstyle='steps-mid',
-            color=tpagb_model_default_color, lw=4)
-
-    if axes_labels:
-        xlab, ylab = tpagb_hist_labels(dm=dm)
-        ax.set_ylabel(ylab)
-        ax.set_xlabel(xlab)
-    return ax

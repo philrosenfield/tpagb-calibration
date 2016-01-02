@@ -113,15 +113,18 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, metafiles=None,
     you gotta choose, documenting or coding? (See the nice -f hack around argparse)
     """
     def _plot(ax, targets, f, massfrac, m2d, m2d_err, massfrac_perr,
-              massfrac_merr):
+              massfrac_merr, wmean=None):
+        if wmean is None:
+            wmean = np.nanmean(m2d)
         ax = make_melbourne_plot(ax=ax, targets=None, flux=f)
         color = '#30a2da'
         ax.plot(massfrac, m2d, 'o', color=color, label='R14', ms=10, zorder=1000)
         ax.errorbar(massfrac, m2d, yerr=np.array(m2d_err) / 2,
                     xerr=[massfrac_perr, massfrac_merr],
                     fmt='none', ecolor=color, zorder=1000)
-        ax.axhline(np.nanmean(m2d), ls='--', color=color)
+        ax.axhline(wmean, ls='--', color=color)
         ax.axhline(1., color='k', lw=2)
+        print(wmean)
         return ax
 
     if metafiles is None:
@@ -193,9 +196,11 @@ def make_melbourne_plot(tablefile='default', ax=None, targets=None, flux=False):
     if flux:
         n10 = 'fAGB10_ftot'
         n08 = 'fAGB08_ftot'
+        wmeans = {n10: 2.3, n08: 2.5}
     else:
         n10 = 'NAGB10'
         n08 = 'NAGB08'
+        wmeans = {n10: 1.5, n08: 2.2}
 
     kws = [{'color': 'gray', 'ms': 10, 'marker': 'd', 'mfc': 'w', 'label': 'Padova08'},
            {'color': 'gray', 'ms': 10, 'marker': 's', 'mfc': 'w', 'label': 'Padova10'}]
@@ -206,7 +211,8 @@ def make_melbourne_plot(tablefile='default', ax=None, targets=None, flux=False):
         yerr = meltab['{}_err'.format(n)][inds] / 2
         ax.errorbar(x, y, yerr=yerr, xerr=xerr, fmt='none', ecolor=kws[i]['color'])
         ax.plot(x, y, linestyle='none', **kws[i])
-        ax.axhline(np.mean(y), ls='--', color=kws[i]['color'])
+        ax.axhline(wmeans[n], ls='--', color=kws[i]['color'])
+        print(np.mean(y))
     return ax
 
 def ftpagb_model_data(lffile, observation):
@@ -241,7 +247,7 @@ def ftpagb_model_data(lffile, observation):
     #for i in range(len(mtpagbs)):
     #    print lffile.split('_')[0], magbfluxs[i]
 
-    return np.mean(magbfluxs / dagbflux), np.std(magbfluxs / dagbflux)
+    return np.mean(magbfluxs / dagbflux), 1.5 * np.std(magbfluxs / dagbflux)
 
 def latexify(string):
     """.format is so pretty with latex and curly brackets"""
