@@ -65,7 +65,7 @@ def tpagb_mass(targets, path, oneplot=True, save=True, dm=0.1,
     if oneplot:
         for ax in axs:
             ax.tick_params(labelsize=24)
-            ax.yaxis.set_major_locator(ticker.MaxNLocator(prune='both'))
+            ax.yaxis.set_major_locator(ticker.MaxNLocator(prune='both')
                                                           #nbins=1))
         fig.subplots_adjust(hspace=0., left=0.1, bottom=0.1, top=0.95)
     outfile = 'big_tpagb_m_ini_hist{}'.format(EXT)
