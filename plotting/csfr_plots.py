@@ -150,7 +150,7 @@ def default_run():
             #import pdb; pdb.set_trace()
             print('systematic uncertainty file {} not found'.format(targets[i]))
 
-        d = param_table()
+        d = param_table(sfh)
         line += d['fmt'].format(**d)
         if 'HALO' in lab or 'UGCA' in lab:
             ax.text(13.95, 0.95, lab, ha='left', va='top', fontsize=16, **emboss())
