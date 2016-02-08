@@ -1,6 +1,6 @@
 ## With MATCH outputs:
 e.g.,
-```cd /Users/rosenfield/research/TP-AGBcalib/SNAP/match_runs/extpagb```
+```cd /Users/rosenfield/research/TP-AGBcalib/SNAP/match_runs/extpagb/final_hope```
 ### Make the csfr figure and basic table
 wherever the zc merge files are:
 ``` python -m tpagb_calibration.plotting.csfr_plots -f ```

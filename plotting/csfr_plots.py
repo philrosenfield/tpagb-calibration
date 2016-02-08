@@ -7,6 +7,7 @@ import ResolvedStellarPops as rsp
 from ..fileio import get_files
 from .plotting import outside_labels, emboss
 from dweisz.match.scripts.sfh import SFH
+import numpy as np
 
 plt.style.use('presentation')
 
