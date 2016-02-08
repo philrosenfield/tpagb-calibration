@@ -6,48 +6,13 @@ import matplotlib.pyplot as plt
 import ResolvedStellarPops as rsp
 from ..fileio import get_files
 from .plotting import outside_labels, emboss
-from dweisz.match.scripts.sfh import SFH
+from dweisz.match.scripts.sfh import SFH, quadriture
+from dweisz.match.scripts.fileio import read_binned_sfh, parse_pipeline
+from dweisz.match.scripts.utils import convertz
+
 import numpy as np
 
 plt.style.use('presentation')
-
-def quadriture(x):
-    return np.sqrt(np.sum(x * x))
-
-def convertz(z=None, oh=None, mh=None, feh=None, oh_sun=8.76, z_sun=0.01524,
-             y0=.2485, dy_dz=1.80):
-    '''
-    input:
-    metallicity as z
-    [O/H] as oh
-    [M/H] as mh
-    [Fe/H] as feh
-
-    initial args can be oh_sun, z_sun, y0, and dy_dz
-
-    returns oh, z, y, x, feh, mh where y = He and X = H mass fractions
-    '''
-
-    if oh is not None:
-        feh = oh - oh_sun
-        z = z_sun * 10 ** (feh)
-
-    if mh is not None:
-        z = (1 - y0) / ((10 ** (-1. * mh) / 0.0207) + (1. + dy_dz))
-
-    if z is not None:
-        feh = np.log10(z / z_sun)
-
-    if feh is not None:
-        z = z_sun * 10 ** feh
-
-    oh = feh + oh_sun
-    y = y0 + dy_dz * z
-    x = 1. - z - y
-    if mh is None:
-        mh = np.log10((z / x) / 0.0207)
-
-    return oh, z, y, x, feh, mh
 
 def param_table(sfh, angst=True, agesplit=[1e9, 3e9], target='',
                 filters=['','']):
