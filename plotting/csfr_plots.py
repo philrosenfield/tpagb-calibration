@@ -53,11 +53,11 @@ def param_table(sfh, angst=True, agesplit=[1e9, 3e9], target='',
                 filters=['','']):
     try:
         d = {'bestfit': sfh.bestfit, 'Av': sfh.Av, 'dmod': sfh.dmod}
-        dist = 10 ** (sfh.dmod / 5. + 1)
+        d['dist'] = 10 ** (sfh.dmod / 5. + 1)
     except:
         print('No bestfit info')
         d = {'bestfit': np.nan, 'Av': np.nan, 'dmod': np.nan}
-        dist = 0.
+        d['dist'] = 0.
 
     d['header'] = \
         (r'Galaxy & Optical Filters & A$_V$ & $(m\!-\!M)_0$ & $D$ &'
