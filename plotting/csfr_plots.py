@@ -11,6 +11,9 @@ import numpy as np
 
 plt.style.use('presentation')
 
+def quadriture(x):
+    return np.sqrt(np.sum(x * x))
+
 def convertz(z=None, oh=None, mh=None, feh=None, oh_sun=8.76, z_sun=0.01524,
              y0=.2485, dy_dz=1.80):
     '''
