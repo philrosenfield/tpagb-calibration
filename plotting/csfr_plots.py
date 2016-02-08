@@ -10,6 +10,73 @@ from dweisz.match.scripts.sfh import SFH
 
 plt.style.use('presentation')
 
+
+def param_table(sfh, angst=True, agesplit=[1e9, 3e9], target='',
+                filters=['','']):
+    try:
+        d = {'bestfit': sfh.bestfit, 'Av': sfh.Av, 'dmod': sfh.dmod}
+        dist = 10 ** (sfh.dmod / 5. + 1)
+    except:
+        print('No bestfit info')
+        d = {'bestfit': np.nan, 'Av': np.nan, 'dmod': np.nan}
+        dist = 0.
+
+    d['header'] = \
+        (r'Galaxy & Optical Filters & A$_V$ & $(m\!-\!M)_0$ & $D$ &'
+         r'$\% \frac{{\rm{{SF}}}}{{\rm{{SF_{{TOT}}}}}}$ &'
+         r'$\langle \mbox{{[Fe/H]}} \rangle$ &'
+         r'$\% \frac{{\rm{{SF}}}}{{\rm{{SF_{{TOT}}}}}}$ &'
+         r'$\langle \mbox{{[Fe/H]}} \rangle$ & $bestfit$ \\ & & & & '
+         r'\multicolumn{{2}}{{c}}{{$<{0}\rm{{Gyr}}$}} & '
+         r'\multicolumn{{2}}{{c}}{{${0}-{1}\rm{{Gyr}}$}} & \\ \hline'
+         '\n'.format(*agesplit))
+
+    d['target'] = target
+    if angst:
+        try:
+            d['target'], filters = parse_pipeline(sfh.name)
+        except:
+            pass
+
+    d['filters'] = ','.join(filters)
+
+    fyoung, fyoung_errp, fyoung_errm = sfh.mass_fraction(0, agesplit[0])
+    finter, finter_errp, finter_errm = sfh.mass_fraction(agesplit[0], agesplit[1])
+
+    # logZ = 0 if there is no SF, that will add error to mean Fe/H
+    iyoung = sfh.nearest_age(agesplit[0], i=False)
+    iinter = sfh.nearest_age(agesplit[1], i=False)
+
+    iyoungs, = np.nonzero(sfh.data.mh[:iyoung + 1] != 0)
+    iinters, = np.nonzero(sfh.data.mh[:iinter + 1] != 0)
+    iinters = list(set(iinters) - set(iyoungs))
+
+    feh_young = convertz(z=0.02 * 10 ** np.mean(sfh.data.mh[iyoungs]))[-2]
+    feh_inter = convertz(z=0.02 * 10 ** np.mean(sfh.data.mh[iinters]))[-2]
+    feh_young_errp = convertz(z=0.02 * 10 ** quadriture(sfh.data.mh_errp[iyoungs]))[-2]
+    feh_young_errm = convertz(z=0.02 * 10 ** quadriture(sfh.data.mh_errm[iyoungs]))[-2]
+    feh_inter_errp = convertz(z=0.02 * 10 ** quadriture(sfh.data.mh_errp[iinters]))[-2]
+    feh_inter_errm = convertz(z=0.02 * 10 ** quadriture(sfh.data.mh_errm[iinters]))[-2]
+
+    maf = '${0: .2f}^{{+{1: .2f}}}_{{-{2: .2f}}}$'
+
+    d['fyoung'], d['finter'] = [maf.format(v, p, m)
+                                for v,p,m in zip([fyoung, finter],
+                                                 [fyoung_errp, finter_errp],
+                                                 [fyoung_errm, finter_errm])]
+    d['feh_young'], d['feh_inter'] = [maf.format(v, p, m)
+                                      for v,p,m in zip([feh_young, feh_inter],
+                                                       [feh_young_errp, feh_inter_errp],
+                                                       [feh_young_errm, feh_inter_errm])]
+
+    line = ['{target}', '{filters}', '{Av: .2f}', '{dmod: .2f}', '{dist: .2f}',
+            '{fyoung}', '{feh_young}','{finter}',
+            '{feh_inter}']#, '{bestfit: .1f}']
+
+    d['fmt'] = '%s \\\\ \n' % (' & '.join(line))
+    return d
+
+
 def main(argv):
     parser = argparse.ArgumentParser(description="make csfr plots")
 
@@ -83,7 +150,7 @@ def default_run():
             #import pdb; pdb.set_trace()
             print('systematic uncertainty file {} not found'.format(targets[i]))
 
-        d = sfh.param_table()
+        d = param_table()
         line += d['fmt'].format(**d)
         if 'HALO' in lab or 'UGCA' in lab:
             ax.text(13.95, 0.95, lab, ha='left', va='top', fontsize=16, **emboss())
