@@ -9,10 +9,7 @@ from .plotting import outside_labels, emboss
 from dweisz.match.scripts.sfh import SFH, quadriture
 from dweisz.match.scripts.fileio import read_binned_sfh, parse_pipeline
 from dweisz.match.scripts.utils import convertz
-
 import numpy as np
-
-plt.style.use('presentation')
 
 def param_table(sfh, angst=True, agesplit=[1e9, 3e9], target='',
                 filters=['','']):
