@@ -5,6 +5,7 @@ import seaborn as sns
 import sys
 
 from matplotlib.ticker import MaxNLocator
+from palettable.wesanderson import Darjeeling2_5
 
 from ..TPAGBparams import EXT
 from tpagb_calibration.utils import minmax
@@ -18,25 +19,85 @@ def replace_(s, rdict):
         s = s.replace(k, v)
     return s
 
-aa = [3., 4., 5.]
-aa = [1., 2.]
-for a in aa:
-    for agb in agbs:
-        if agb.Z not in [0.001, 0.004, 0.008]:
-            continue
-        #plt.plot(agbs[i].data['ageyr'], agbs[i].data['L_star'])
-        ind1, ind2 = agb.ml_regimes()
-        if not None in [ind1, ind2] or ind1 != ind2:
-            if agb.mass != a:
-                continue
-            age = agb.data['ageyr'] / 1e5
-            mass = agb.data['M_star']
-            #print sum(agb.data['dt'][np.nonzero(agb.data['L_star'] < 3.4)[0]])
-            print '{:g} {:g} {:.2f} {:.2f} {:.2f} {:.2f}'.format(agb.Z, agb.mass,
-                    age[ind1], age[ind2]-age[ind1], age[-1]-age[ind2], age[-1])
-    plt.plot(agbs1[i].data['ageyr'][ind1]/np.max(agbs1[i].data['ageyr']), agbs1[i].Z,'o', color='gray')
-    plt.plot(agbs1[i].data['ageyr'][ind2]/np.max(agbs1[i].data['ageyr']), agbs1[i].Z,'o', color='b')
+def duration_masslost(agbs, justprint=False):
+    if justprint:
+        aa = [3., 4., 5.]
+        for a in aa:
+            for agb in agbs:
+                if agb.Z not in [0.001, 0.004, 0.008]:
+                    continue
+                #plt.plot(agbs[i].data['ageyr'], agbs[i].data['L_star'])
+                ind1, ind2 = agb.ml_regimes()
+                if not None in [ind1, ind2] or ind1 != ind2:
+                    if agb.mass != a:
+                        continue
+                    age = agb.data['ageyr'] / 1e5
+                    mass = agb.data['M_star']
+                    #print sum(agb.data['dt'][np.nonzero(agb.data['L_star'] < 3.4)[0]])
+                    print(ind1, ind2)
+                    print '{:g} {:g} {:.2f} {:.2f} {:.2f} {:.2f}'.format(agb.Z, agb.mass,
+                            age[ind1], age[ind2]-age[ind1], age[-1]-age[ind2], age[-1])
 
+    fig, axs = plt.subplots(nrows=3, ncols=2, sharey=True, figsize=(8, 4))
+    #sns.despine()
+    col1, col2 = axs.T[0], axs.T[1]
+    colors = Darjeeling2_5.mpl_colors[1:-1]
+    kw = {'linewidth': 0, 'align':'edge'}
+    for agb in agbs:
+        if agb.mass >= 3.2 and agb.mass <= 5.:
+            for i, col in enumerate([col1, col2]):
+                if agb.Z == 0.001:
+                    ax = col[0]
+                if agb.Z == 0.004:
+                    ax = col[1]
+                if agb.Z == 0.008:
+                    ax = col[2]
+
+                ipd, = np.nonzero(agb.data['M_predust'] == agb.data['dMdt'])
+                idd, = np.nonzero(agb.data['Mdust'] == agb.data['dMdt'])
+                iall = np.arange(len(agb.data['dMdt']))
+                isw = np.array(list(set(iall) - set(ipd) - set(idd)))
+
+                ttp = 1e5
+                tpd = np.sum(agb.data['dt'][ipd]) / ttp
+                tdd = np.sum(agb.data['dt'][idd]) / ttp
+                tsw = np.sum(agb.data['dt'][isw]) / ttp
+                if agb.Z == 0.001 and agb.mass == 5. and i == 0:
+                    ax.barh(agb.mass, tpd, 0.2, color=colors[0], label=r'$\dot{M}_{pd}$', **kw)
+                    ax.barh(agb.mass, tdd, 0.2, color=colors[1], label=r'$\dot{M}_{dd}$', left=tpd, **kw)
+                    ax.barh(agb.mass, tsw, 0.2, color=colors[2], label=r'$\dot{M}_{sw}$', left=tdd+tpd, **kw)
+                    ax.legend(labelspacing=0.02, loc='upper right', fontsize=10,  handlelength=1)
+                else:
+                    if i > 0:
+                        ttp = 1 # agb.mass
+                        tpd = np.sum(agb.data['dt'][ipd] * agb.data['dMlost'][ipd]) / ttp
+                        tdd = np.sum(agb.data['dt'][idd] * agb.data['dMlost'][idd]) / ttp
+                        tsw = np.sum(agb.data['dt'][isw] * agb.data['dMlost'][isw]) / ttp
+                        if agb.mass == 5.:
+                            ax.text(0.98, 0.02, r'$\rm{Z}=%g$' % agb.Z, fontsize=16,
+                                    transform=ax.transAxes, ha='right')
+
+                    ax.barh(agb.mass, tpd, 0.2, color=colors[0], **kw)
+                    ax.barh(agb.mass, tdd, 0.2, color=colors[1], left=tpd, **kw)
+                    ax.barh(agb.mass, tsw, 0.2, color=colors[2], left=tdd+tpd, **kw)
+
+    for ax in axs.flatten():
+        ax.tick_params(direction='out', color='k', size=2.6, width=0.5)
+        #ax.grid(lw=0.6, color='k')
+        ax.grid()
+        ax.set_xlim(ax.set_xlim(0, 4.5))
+        ax.set_ylim(3.2, 5.2)
+
+    [ax.tick_params(labelbottom='off') for ax in axs.T[0:2, 0:2].flatten()]
+    [ax.tick_params(labelright='on') for ax in col2]
+    N = len(axs[-1, -1].get_xticks())
+    axs[-1, -1].xaxis.set_major_locator(MaxNLocator(N, prune='lower'))
+    axs[-1, 0].set_xlabel(r'$\rm{TP-AGB\ Age\ (10^5\ yr)}$')
+    axs[-1, -1].set_xlabel(r'$\rm{Mass\ Lost\ (M_\odot)}$')
+    axs[1, 0].set_ylabel(r'$\rm{Initial\ TP-AGB\ Mass}$')
+    fig.subplots_adjust(left=0.1, hspace=0.05, wspace=0.05, right=0.92, bottom=0.2, top=0.98)
+    plt.savefig('duration_masslost.png')
+    return fig, axs
 
 class AGBTrack(object):
     """
