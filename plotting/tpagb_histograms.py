@@ -8,6 +8,11 @@ from palettable.wesanderson import Darjeeling2_5
 import matplotlib.pyplot as plt
 import numpy as np
 
+import seaborn as sns
+sns.set()
+sns.set_context('paper')
+plt.style.use('paper')
+
 def plot_labels(dm=0.5):
     ylab = r'$\rm{{Number\ of\ TP\!-\!AGB\ Stars\ /\ {:.1f}\ M_\odot}}$'.format(dm)
     xlab = r'$\rm{Initial\ Mass\ (M_\odot)}$'
@@ -21,7 +26,8 @@ def tpagb_mass(targets, path, oneplot=True, save=True, dm=0.1,
     if oneplot:
         fig, axs = plt.subplots(nrows=len(targets), figsize=(16,16))
         xlab, ylab = plot_labels(dm=dm)
-        axs = outside_labels(axs, fig=fig, xlabel=xlab, ylabel=ylab)
+        axs = outside_labels(axs, fig=fig, xlabel=xlab, ylabel=ylab,
+                             ylabel_xval=0.05)
         from matplotlib import ticker
 
     bins = np.arange(0.8, 10. + dm, dm)
@@ -60,14 +66,16 @@ def tpagb_mass(targets, path, oneplot=True, save=True, dm=0.1,
 
     for ax in axs:
         ax.set_yscale('log')
-        ax.set_xlim(0.8, 10)
+        ax.set_xlim(0.8, 6)
 
     if oneplot:
         for ax in axs:
             ax.tick_params(labelsize=24)
-            ax.yaxis.set_major_locator(ticker.MaxNLocator(prune='both')
+            ax.yaxis.set_major_locator(ticker.MaxNLocator(prune='both'))
                                                           #nbins=1))
+            ax.grid()
         fig.subplots_adjust(hspace=0., left=0.1, bottom=0.1, top=0.95)
+    #plt.tight_layout()
     outfile = 'big_tpagb_m_ini_hist{}'.format(EXT)
     plt.savefig(outfile)
     print('wrote {}'.format(outfile))

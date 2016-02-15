@@ -3,13 +3,20 @@ import difflib
 import logging
 import os
 import sys
+import ResolvedStellarPops as rsp
+angst_data = rsp.angst_tables.angst_data
 
 import matplotlib as mpl
 import matplotlib.pylab as plt
+import seaborn as sns
+sns.set()
+sns.set_context('paper')
+try:
+    plt.style.use('paper')
+except:
+    pass
 
 import numpy as np
-import ResolvedStellarPops as rsp
-angst_data = rsp.angst_tables.angst_data
 
 from ..TPAGBparams import EXT, snap_src, matchfake_loc, data_loc
 from ..analysis.analyze import get_itpagb, parse_regions, get_trgb
@@ -23,14 +30,16 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 tpagb_model_default_color = '#156692'
-data_tpagb_default_color = '#E1999E'
-data_default_color = '#853E43'
+#data_tpagb_default_color = '#E1999E'
+#data_default_color = '#853E43'
 model_default_color = '#01141F'
+data_tpagb_default_color = '#bc0003'
+data_default_color = '#5e5e5e'
 
-try:
-    plt.style.use('presentation')
-except:
-    pass
+nar_text_fontsize = 18
+gal_fontsize = 22
+label_fontsize = 28
+ticklabel_fontsize = 24
 
 
 def emboss(fg='w', lw=3):
@@ -40,7 +49,7 @@ def emboss(fg='w', lw=3):
 
 
 def outside_labels(axs, fig=None, xlabel=None, ylabel=None, rows=True,
-                   text_kw={}):
+                   text_kw={}, ylabel_xval=0.06):
     """
     make an ndarray of axes only have lables on the outside of the grid
     also add common x and y label if fig, xlabel, ylabel passed.
@@ -80,12 +89,12 @@ def outside_labels(axs, fig=None, xlabel=None, ylabel=None, rows=True,
         fig.text(0.5, 0.04, xlabel, **text_kw)
 
     if ylabel is not None:
-        fig.text(0.06, 0.5, ylabel, rotation='vertical', **text_kw)
+        fig.text(ylabel_xval, 0.5, ylabel, rotation='vertical', **text_kw)
     return axs
 
 
 def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
-    stext_kw = dict({'color': model_default_color, 'fontsize': 14, 'ha': 'center'}.items() +
+    stext_kw = dict({'color': model_default_color, 'fontsize': nar_text_fontsize, 'ha': 'center'}.items() +
                     emboss().items())
     dtext_kw = dict(stext_kw.items() + {'color': data_default_color}.items())
 
@@ -101,7 +110,6 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
     mrgb = np.mean(np.array(ratio_data[indx]['nrgb'], dtype=float))
     magb = np.mean(np.array(ratio_data[indx]['nagb'], dtype=float))
 
-    #yval = 1.2  # text yloc found by eye, depends on fontsize
     stext_kw['transform'] = ax.transAxes
     dtext_kw['transform'] = ax.transAxes
     yval = 0.95
@@ -140,7 +148,8 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
 
 
 def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
-               plt_kw={}, maglimit=None, agb_mod=None):
+               plt_kw={}, maglimit=None, agb_mod=None, mean=True,
+               edgs=True):
     '''plot lf files
     Parameters
     ----------
@@ -181,7 +190,7 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
         plt_kw_lab = plt_kw
 
     if ax is None:
-        fig, (ax) = plt.subplots(figsize=(12, 6))
+        fig, (ax) = plt.subplots(figsize=(10, 6))
 
     if inorm is not None:
         ms = [mag2s[i][inorm[i]] for i in range(len(mag2s))]
@@ -202,13 +211,16 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
 
     #ax.fill_between(bins[1:], minhists, maxhists, color=plt_kw_lab['color'],
     #                alpha='0.2')
-    ax.plot(bins[1:], minhists, linestyle='steps', color=plt_kw_lab['color'],
-            lw=2)
-    ax.plot(bins[1:], maxhists, linestyle='steps', color=plt_kw_lab['color'],
-            lw=2)
-    l, = ax.plot(bins[1:], meanhists, linestyle='steps', lw=3, **plt_kw_lab)
-
-    return ax, l
+    if edgs:
+        ax.plot(bins[1:], minhists, linestyle='steps', color=plt_kw_lab['color'],
+                lw=0.8)
+        ax.plot(bins[1:], maxhists, linestyle='steps', color=plt_kw_lab['color'],
+                lw=0.8)
+    l = None
+    if mean:
+        l, = ax.plot(bins[1:], meanhists, linestyle='steps', **plt_kw_lab)
+    ylim = np.max(maxhists)
+    return ax, l, ylim
 
 
 def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
@@ -216,7 +228,7 @@ def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
     target = target.replace('-', '\!-\!').upper()
-    plot_kw = dict({'drawstyle': 'steps', 'lw': 1,
+    plot_kw = dict({'drawstyle': 'steps', 'lw': 0.8,
                     'color': data_default_color,
                     'label': '${}$'.format(target)}.items() + plot_kw.items())
 
@@ -228,14 +240,16 @@ def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
         hist = np.histogram(mag2, bins=bins)[0]
         hist /= comp_corr[1:]
         err = np.sqrt(hist)
-        plot_kw['lw'] += 1
+        plot_kw['lw'] += 0.8
 
     gl, = ax.plot(bins[1:], hist, **plot_kw)
+    ylim = np.max(hist)
     # mid bin
     ax.errorbar(bins[1:] - 0.05, hist, yerr=err, fmt='none',
-                ecolor=plot_kw['color'])
+                ecolor=plot_kw['color'], lw=plot_kw['lw']-0.1)
     glt = None
     if over_plot is not None:
+        plot_kw['lw'] += 0.2
         hist = np.histogram(mag2[over_plot], bins=bins)[0]
         if fake_file is not None:
             hist /= comp_corr[1:]
@@ -246,9 +260,9 @@ def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
         glt, = ax.plot(bins[1:], hist, **plot_kw)
         # mid bin
         ax.errorbar(bins[1:] - 0.05, hist, yerr=err, fmt='none',
-                    ecolor=plot_kw['color'])
+                    ecolor=plot_kw['color'], lw=plot_kw['lw']-0.1)
 
-    return ax, gl, glt
+    return ax, gl, glt, ylim
 
 
 def plot_models(lfd, bins, filt, maglimit=None, ax=None, plt_kw=None,
@@ -256,16 +270,17 @@ def plot_models(lfd, bins, filt, maglimit=None, ax=None, plt_kw=None,
     plt_kw = plt_kw or {}
     mags = lfd[filt]
 
-    ax, ml = plot_model(mag2s=mags, bins=bins, inorm=lfd['idx_norm'],
-                        maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod=agb_mod)
+    ax, ml, y = plot_model(mag2s=mags, bins=bins, inorm=lfd['idx_norm'], mean=False,
+                        maglimit=maglimit, ax=ax, plt_kw=plt_kw, agb_mod=agb_mod,
+                        edgs=False)
 
     plt_kw['color'] = tpagb_model_default_color
-    ax, mlt = plot_model(mag2s=mags, bins=bins, inorm=lfd['sim_agb'],
+    ax, mlt, _ = plot_model(mag2s=mags, bins=bins, inorm=lfd['sim_agb'],
                         maglimit=maglimit, ax=ax, plt_kw=plt_kw,
                         agb_mod='TP\!-\!AGB')
                         #agb_mod='{}\ TP\!-\!AGB'.format(agb_mod))
 
-    return ax, ml, mlt
+    return ax, ml, mlt, y
 
 
 def mag2Mag(mag2, target, filter2):
@@ -380,6 +395,7 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
     [nir_axs[i].set_xlim(-10, -1) for i in range(3)]
     [opt_axs[i].set_ylim(-500, 500) for i in [1,2]]
     [nir_axs[i].set_ylim(-500, 500) for i in [1,2]]
+
     fig1.savefig('{}_{}_comp_lfs{}'.format(extra_str, filter1, EXT))
     fig2.savefig('{}_{}_comp_lfs{}'.format(extra_str, filter2, EXT))
     return opt_axs, nir_axs
@@ -429,6 +445,7 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
             extra_str += '_ast_cor'
 
     lfd = load_lf_file(lf_file)
+
     for filt, fake_file in zip([filter1, filter2], [optfake, nirfake]):
         if filt == filter1:
             mag = mag1
@@ -444,17 +461,19 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
 
         bins = np.arange(mag.min(), mag.max(), step=dmag)
 
-        ax, ml, mlt = plot_models(lfd, bins, filt, plt_kw=mplt_kw, agb_mod=agb_mod)
+        ax, ml, mlt, ylm = plot_models(lfd, bins, filt, plt_kw=mplt_kw, agb_mod=agb_mod)
 
         # plot galaxy data
-        ax, gl, glt = plot_gal(mag, bins, ax=ax, target=target, fake_file=fake_file,
+        ax, gl, glt, yld = plot_gal(mag, bins, ax=ax, target=target, fake_file=fake_file,
                       plot_kw=dplot_kw, over_plot=data_tpagb)
+
+        ylim1 = np.max([ylm, yld])
 
         ax.set_yscale('log')
         if ylim is not None:
             ax.set_ylim(ylim)
         else:
-            ax.set_ylim(1, ax.get_ylim()[-1])
+            ax.set_ylim(1, np.round(ylim1 * 1e-3, 1) * 1e3)
         if xlim is not None:
             ax.set_xlim(xlim)
 
@@ -465,15 +484,18 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
 
         #ax.legend(loc='center left', handles=[ml, gl, mlt, glt], ncol=2)
         lab = r'$\rm{{{}}}$'.format(target.upper().replace('-','\!-\!'))
-        ax.text(0.98, 0.05, lab, ha='right', fontsize=20, transform=ax.transAxes,
+        ax.text(0.98, 0.05, lab, ha='right', fontsize=gal_fontsize, transform=ax.transAxes,
                 **emboss())
-        ax.set_xlabel('${}$'.format(filt.replace('_cor', '')), fontsize=20)
-        ax.set_ylabel('${\#}$', fontsize=20)
+        ax.set_xlabel('${}$'.format(filt.replace('_cor', '').replace('F', 'm_{F').replace('W', 'W}')), fontsize=label_fontsize)
+        ax.set_ylabel('${\#}$', fontsize=label_fontsize)
         if narratio_file is not None:
             ax = add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB')
 
-        plt.tick_params(labelsize=16)
+        #plt.tick_params(labelsize=16)
         outfile = '{}_{}{}_lfs{}'.format(lf_file.split('_lf')[0], filt, extra_str, EXT)
+        plt.tight_layout()
+        ax.grid()
+        ax.tick_params(labelsize=ticklabel_fontsize)
         plt.savefig(outfile)
         logger.info('wrote {}'.format(outfile))
     return
@@ -655,6 +677,8 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
                 ax = add_lines_to_plot(ax, lf=False, **regions_kw)
 
         outfile = '{}_{}_{}{}'.format(outfmt, zstr, band, EXT)
+        ax.tick_params(labelsize=ticklabel_fontsize)
+        plt.tight_layout()
         plt.savefig(outfile)
         logger.info('wrote {}'.format(outfile))
     return

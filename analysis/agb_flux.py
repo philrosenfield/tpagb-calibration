@@ -116,11 +116,12 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, metafiles=None,
               massfrac_merr, wmean=None):
         if wmean is None:
             wmean = np.nanmean(m2d)
-        ax = make_melbourne_plot(ax=ax, targets=None, flux=f)
+        ax = make_melbourne_plot(ax=ax, targets=targets, flux=f)
         color = '#30a2da'
-        ax.plot(massfrac, m2d, 'o', color=color, label='R14', ms=10, zorder=1000)
-        ax.errorbar(massfrac, m2d, yerr=np.array(m2d_err) / 2,
-                    xerr=[massfrac_perr, massfrac_merr],
+        imassfrac = np.arange(len(massfrac))
+        ax.plot(imassfrac, m2d, 'o', color=color, label='R14', ms=10, zorder=1000)
+        ax.errorbar(imassfrac, m2d, yerr=np.array(m2d_err) / 2,
+                    xerr=None, #[massfrac_perr, massfrac_merr],
                     fmt='none', ecolor=color, zorder=1000)
         ax.axhline(wmean, ls='--', color=color)
         ax.axhline(1., color='k', lw=2)
@@ -145,8 +146,10 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, metafiles=None,
     flux = [False, True]
     ytitles = [latexify('\# TP-AGB (model) / \# TP-AGB (data)'),
                latexify('TP-AGB Flux (model) / TP-AGB Flux (data)')]
-
+    i = 0
     for m2d, m2d_err, f in zip([agbm2d, fagbm2d], [agbm2d_err, fagbm2d_err], flux):
+        i += 1
+
         fig, ax = plt.subplots()
         top = 0.95
         fig.subplots_adjust(left=0.12, bottom=0.15, top=top)
@@ -156,11 +159,11 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, metafiles=None,
         if f:
             ax.set_ylabel(ytitles[1])
             title = 'agbflux_m2d{}'.format(EXT)
-            ylim = [0, 11]
+            ylim = [0, 5]
         else:
             ax.set_ylabel(ytitles[0])
             title = 'magb_m2d{}'.format(EXT)
-            ylim = [0, 7]
+            ylim = [0, 4]
         if inset:
             yext = [0.6, 0.90]
             iylim = [0.3, 2]
@@ -170,10 +173,20 @@ def make_plot(narratio_files, sfhfiles, lffiles, observations, metafiles=None,
             _plot(ax1, targets, f, massfrac, m2d, m2d_err, massfrac_perr,
                   massfrac_merr)
 
-        ax.set_xlabel(latexify('Mass Fraction of Young Stars (<2 Gyr)'))
-        ax.set_xlim(-0.01, 0.45)
+        #ax.set_xlabel(latexify('Mass Fraction of Young Stars (<2 Gyr)'))
+        #ax.set_xlim(-0.01, 0.45)
         ax.set_ylim(ylim)
+        ax.set_xlim(-0.1, 10.1)
+        ylabs = [r'$\rm{{{}}}$'.format(target.upper()).replace('-', '\!-\!')
+                 for target in targets]
+
+        plt.xticks(np.arange(len(targets)), ylabs, rotation=45, ha='right')
+        #lots_adjust(bottom=0.25, left=0.2)
+        plt.tight_layout()
+        #[spine.set_visible(False) for spine in ax.spines.itervalues()]
+        import pdb; pdb.set_trace()
         plt.savefig(title)
+
     return ax
 
 def make_melbourne_plot(tablefile='default', ax=None, targets=None, flux=False):
@@ -187,7 +200,7 @@ def make_melbourne_plot(tablefile='default', ax=None, targets=None, flux=False):
     if targets is None:
         inds = np.arange(len(meltab['Galaxy']))
     else:
-        inds = np.concatenate([[i for i, g in enumerate(meltab['Galaxy']) if t.upper() in g] for t in targets])
+        inds = np.concatenate([[i for i, g in enumerate(meltab['Galaxy']) if t.replace('300','0300').upper() in g] for t in targets])
         inds = map(int, inds)
 
     if ax is None:
@@ -202,15 +215,21 @@ def make_melbourne_plot(tablefile='default', ax=None, targets=None, flux=False):
         n08 = 'NAGB08'
         wmeans = {n10: 1.5, n08: 2.2}
 
-    kws = [{'color': 'gray', 'ms': 10, 'marker': 'd', 'mfc': 'w', 'label': 'Padova08'},
-           {'color': 'gray', 'ms': 10, 'marker': 's', 'mfc': 'w', 'label': 'Padova10'}]
+    kws = [{'color': '#9e9e9e', 'ms': 10, 'marker': 'd', 'label': 'Padova08',
+            'linestyle': 'none'},
+           {'color': '#d3d3d3',  'ms': 10, 'marker': 's', 'label': 'Padova10',
+           'linestyle': 'none'}]
     for i, n in enumerate([n08, n10]):
         x = meltab['fmass_y_2gr'][inds]
         y = meltab[n][inds]
+        x = np.arange(len(y))
+        #[ax.text(x[k],y[k],meltab['Galaxy'][inds[k]]) for k in range(len(inds))]
         xerr = meltab['fmass_y_2gr_err'][inds] / 2
+        xerr=None
         yerr = meltab['{}_err'.format(n)][inds] / 2
-        ax.errorbar(x, y, yerr=yerr, xerr=xerr, fmt='none', ecolor=kws[i]['color'])
-        ax.plot(x, y, linestyle='none', **kws[i])
+        ax.errorbar(x, y, yerr=yerr, xerr=xerr, fmt='none', ecolor=kws[i]['color'],
+                    lw=0.8)
+        ax.plot(x, y, **kws[i])
         ax.axhline(wmeans[n], ls='--', color=kws[i]['color'])
         print(np.mean(y))
     return ax
@@ -238,10 +257,11 @@ def ftpagb_model_data(lffile, observation):
         color = gal.data['MAG2_WFPC2'] - gal.data['MAG4_IR']
 
     mag2 = gal.data['MAG4_IR']
-    dtpagb = get_itpagb(lffile.split('_')[0], color, mag2, 'F160W', dmod=dmod, Av=Av, mtrgb=mtrgb,
-                        off=trgb_color)
+    dtpagb = get_itpagb(lffile.split('_')[0], color, mag2, 'F160W', dmod=dmod,
+                        Av=Av, mtrgb=mtrgb, off=trgb_color)
     dagbflux = np.sum(10 ** (-.4 * mag2[dtpagb]))
-    magbfluxs = [np.sum(10 ** (-.4 * mags[i][mtpagbs[i]])) for i in range(len(mags))]
+    magbfluxs = [np.sum(10 ** (-.4 * mags[i][mtpagbs[i]]))
+                 for i in range(len(mags))]
 
     #print 'data', dagbflux
     #for i in range(len(mtpagbs)):
@@ -256,11 +276,15 @@ def latexify(string):
 def default_run():
     """Will you stop writing code and publish for f*s sake. """
     import os
+    targets = ['ngc300-wide1','ugc8508','ngc4163','ngc2403-halo-6','ugc4459','ugc4305-1','ugc4305-2','ngc3741','ugc5139','kdg73','ugca292']
+
     lf_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/final_hope/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
     obs_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/data/opt_ir_matched_v2/copy/'
     sfh_loc = '/Volumes/tehom/research/TP-AGBcalib/SNAP/varysfh/extpagb/final_hope/'
 
     lf_files = get_files(lf_loc, '*lf.dat')
+    lf_files = [l for l in lf_files if not 'deep' in l]
+    lf_files = np.concatenate([[l for l in lf_files if t in l] for t in targets])
     targets = [os.path.split(l)[1].split('_')[0] for l in lf_files]
     observations = [get_files(obs_loc, '{}*fits'.format(t))[0] for t in targets]
     narratio_files = [get_files(lf_loc, '{}*nar*dat'.format(t))[0] for t in targets]
@@ -294,7 +318,8 @@ def main(argv):
 
     args = parser.parse_args(argv)
 
-    make_plot(args.narratio_files, args.sfhfiles, args.lffiles, args.observations, metafiles=args.metafiles)
+    make_plot(args.narratio_files, args.sfhfiles, args.lffiles,
+              args.observations, metafiles=args.metafiles)
 
 if __name__ == '__main__':
     if '-f' in sys.argv[1:]:

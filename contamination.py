@@ -21,12 +21,12 @@ import logging
 logger = logging.getLogger()
 
 import matplotlib.pyplot as plt
-plt.style.use('presentation')
+#plt.style.use('presentation')
 
 def test_line(mag, off=0.0):
     return tpagb_rheb_line(mag, off=off)
 
-def tpagb_rheb_line(mag, b=-7.2, m=-9.03226, dmod=0., Av=0.0, off=0.0):
+def tpagb_rheb_line(mag, b=-7, m=-9.03226, dmod=0., Av=0.0, off=0.0):
     """
     Default values found in this code using UGC5139 and NGC3741
     b=6.21106, m=-8.97165
@@ -37,13 +37,13 @@ def tpagb_rheb_line(mag, b=-7.2, m=-9.03226, dmod=0., Av=0.0, off=0.0):
     set dmod and Av to 0 for absmag
     adjusted from median by eye:
     b=7.453127, m=-9.03226
-    with off = f814w-f160w trgb
+    with off = abs mag f814w-f160w trgb
     b=-7, m=-9.03226
     """
     ah = 0.20443
     ai = 0.60559
     c = (ah + m * (ah - ai))
-    return (mag - b - dmod - c * Av) / m + off
+    return (mag - b - dmod - c * Av) / m + off + (ah - ai) * Av
 
 
 def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
@@ -349,7 +349,7 @@ class Contamination(object):
 
     def mag_steps(self, color, mag, verts=None, test=None, diag_plot=False,
                   thresh=20, threshlimit=True, nanlimit=True, bins='knuth',
-                  trgb_color=0.0):
+                  trgb_color=0.0, ax=None, fig=None):
         if verts is not None:
             points = np.column_stack((color, mag))
             inds, = np.nonzero(utils.points_inside_poly(points, verts))
@@ -428,7 +428,8 @@ class Contamination(object):
         cs = np.array([])
         ms = np.array([])
         carr = np.linspace(scolor.min(), scolor.max(), 10000)
-        fig, ax = plt.subplots()
+        if ax is None:
+            fig, ax = plt.subplots()
         ax.scatter(color, mag, marker='.', s=8, c='k', alpha=1)
         ax.set_ylim(-3, -10)
         ax.set_xlim(-1, 4)
@@ -566,6 +567,7 @@ def test_contamination_line(filenames, diag_plot=False):
             ax.set_ylabel('$F160W$')
             ax.set_ylim(26, ax.get_ylim()[0])
             plt.legend(loc='best')
+
             plt.savefig(fname + '_contam{}'.format(EXT))
             plt.close()
         ftpinrhebs = np.append(ftpinrhebs, ftpinrheb)
@@ -582,8 +584,7 @@ def test_contamination_line(filenames, diag_plot=False):
 
 
 def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=True,
-                            threshlimit=True, nanlimit=True, result_plot=False,
-                            off=0.0):
+                            threshlimit=True, nanlimit=True, off=0.0):
     """
     The test suite... to get the b, m to try.
     fitsfiles = !! ls *fits
@@ -621,9 +622,6 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
     xlabel = r'${}-{}$'.format(filter1, filter2)
     ylabel = r'${}$'.format(filter2)
 
-    if result_plot:
-        fig1, ax1 = plt.subplots()
-
     color_seps = []
     mean_mags = []
     fs = []
@@ -637,11 +635,21 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
         color, mag, verts, mtrgb = load_data(fitsfile, absmag=absmag)
         if len(color) == 0:
             continue
-
-        color_sep, mean_mag, f, ax, fig  = \
+        fig, ax2 = plt.subplots()
+        ax1 = ax2.twinx()
+        color_sep, mean_mag, f, ax2, fig  = \
             ctm.mag_steps(color, mag, verts=verts, nanlimit=nanlimit,
                           diag_plot=diag_plot, threshlimit=threshlimit,
-                          bins=bins, trgb_color=trgb_color)
+                          bins=bins, trgb_color=trgb_color, ax=ax2,
+                          fig=fig)
+        _, av, dmod = g.trgb_av_dmod('F160W')
+        mlims = rsp.astronomy_utils.Mag2mag(ax2.get_ylim(), 'F160W', 'wfc3ir',
+                                            dmod=dmod, Av=av)
+        print(mlims)
+        xlims = ax2.get_xlim()
+        ax1.plot(100,100)
+        ax1.set_ylim(mlims)
+        ax1.set_xlim(xlims)
 
         color_seps.append(color_sep)
         mean_mags.append(mean_mag)
@@ -662,24 +670,30 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
 
         if diag_plot:
             #ax.set_title(gal.target)
-            ax.set_xlabel(xlabel)
-            ax.set_ylabel(ylabel)
-            ax.axhline(mtrgb, ls='--', color='k', lw=1)
+            fig.subplots_adjust(right=0.85)
+            ax1.set_xlabel(xlabel.replace('F', 'm_{F').replace('W', 'W}'))
+            ax1.set_ylabel(ylabel.replace('F', 'm_{F').replace('W', 'W}'))
+            ax2.set_ylabel(ylabel.replace('F', 'M_{F').replace('W', 'W}'))
+            ax2.axhline(mtrgb, ls='--', color='k', lw=1)
 
-            yarr = np.arange(*ax.get_xlim(), step=0.1)
-            ax.fill_betweenx(yarr, mtrgb + 0.2, mtrgb - 0.2, color='k', alpha=0.2)
-            ax.text(ax.get_xlim()[1] - 0.01, ax.get_ylim()[0] - 0.2, r'$\rm{{{}}}$'.format(target.replace('-', '\!-\!').upper()),
-            fontsize=20, ha='right', **emboss())
+            yarr = np.arange(*ax2.get_xlim(), step=0.1)
+            ax2.fill_betweenx(yarr, mtrgb + 0.2, mtrgb - 0.2, color='k', alpha=0.2)
+            ax2.text(ax2.get_xlim()[1] - 0.01, ax2.get_ylim()[0] - 0.2,
+                     r'$\rm{{{}}}$'.format(target.replace('-', '\!-\!').upper()),
+                     fontsize=20, ha='right', **emboss())
             if test is not None:
-                ax.plot(test(mag[mag < mtrgb], off=trgb_color), mag[mag < mtrgb], lw=2, color='k')
+                ax2.plot(test(mag[mag < mtrgb], off=trgb_color),
+                              mag[mag < mtrgb], lw=2, color='k')
+
+
             fig.savefig('{}_{}-{}_contam{}'.format(target, filter1, filter2, EXT))
 
-        if result_plot and f[0] > 0:
-            xarr = np.arange(color.min(), color.max(), step=0.1)
-            yarr = f[0] * xarr + f[1]
-            ax1.plot(color, mag, ',', color='k', alpha=0.3)
-            ax1.plot(color_sep, mean_mag, 'o', zorder=100, color='r', mec='none')
-            ax1.plot(xarr, yarr, lw=2, label=target)
+        #if result_plot and f[0] > 0:
+        #    xarr = np.arange(color.min(), color.max(), step=0.1)
+        #    yarr = f[0] * xarr + f[1]
+        #    ax1.plot(color, mag, ',', color='k', alpha=0.3)
+        #    ax1.plot(color_sep, mean_mag, 'o', zorder=100, color='r', mec='none')
+        #    ax1.plot(xarr, yarr, lw=2, label=target)
 
     cs = np.concatenate(color_seps)
     ms = np.concatenate(mean_mags)
@@ -689,15 +703,15 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
     else:
         y = np.array([np.nan]) * 3
 
-    if result_plot:
-        xarr = np.arange(color.min(), color.max(), step=0.1)
-        yarr = y[0] * xarr + y[1]
-        ax1.plot(xarr, yarr, lw=3)
-        ax1.set_ylim(ax1.get_ylim()[::-1])
-        ax1.set_xlabel(xlabel)
-        ax1.set_ylabel(ylabel)
-        ax1.legend(loc='best')
-        fig1.savefig('tp-agb_rheb_contam{}'.format(EXT))
+    #if result_plot:
+    #    xarr = np.arange(color.min(), color.max(), step=0.1)
+    #    yarr = y[0] * xarr + y[1]
+    #    ax1.plot(xarr, yarr, lw=3)
+    #    ax1.set_ylim(ax1.get_ylim()[::-1])
+    #    ax1.set_xlabel(xlabel)
+    #    ax1.set_ylabel(ylabel)
+    #    ax1.legend(loc='best')
+    #    fig1.savefig('tp-agb_rheb_contam{}'.format(EXT))
 
     return color_seps, mean_mags, fs, y
 
@@ -759,6 +773,8 @@ def rgb_cut(full=False):
 
     gals = [rsp.galaxy.Galaxy(f) for f in fits_files]
     fig, ax = plt.subplots()
+    # for a four panel journal figure
+    fig.subplots_adjust(right=0.92)
 
     tab = Table.read(snap_src + '/tables/tab1.tex', format='latex',
                      data_start=1, delimiter='&', guess=False, header_start=0)
@@ -796,9 +812,10 @@ def rgb_cut(full=False):
     ax.axvline(-17, color='k', ls='--')
     ax.set_xlim(ax.get_xlim()[::-1])
     ax.set_xlabel(r'$M_{B_T}$')
-    ax.set_ylabel(r'$\rm{(F814W-F160W)_{TRGB}}$')
+    ax.set_ylabel(r'$(m_{\rm{F814W}}-m_{\rm{F160W}})_{\rm{TRGB}}$')
     if not full:
         ax.set_xlim(-10, -20)
+
     fig.savefig('rgb_color_cut{}'.format(EXT))
 
     with open('rgb_color_cut.dat', 'w') as out:
@@ -807,7 +824,8 @@ def rgb_cut(full=False):
     return
 
 def contam_cmd(g, blue, ir_mtrgb, db, trgb_color, dmod, Av, target):
-    fig1, ax1 = plt.subplots()
+    fig1, ax2 = plt.subplots()
+    ax1 = ax2.twinx()
     try:
         color = g.data['MAG2_ACS'] - g.data['MAG4_IR']
         mag = g.data['MAG4_IR']
@@ -815,8 +833,8 @@ def contam_cmd(g, blue, ir_mtrgb, db, trgb_color, dmod, Av, target):
         color = g.data['MAG2_WFPC2'] - g.data['MAG4_IR']
         mag = g.data['MAG4_IR']
 
-    ax1.plot(color, mag, 'o', ms=3, mec='none', c='k', alpha=0.5)
-
+    #ax1.plot(color, mag, 'o', ms=3, mec='none', c='k', alpha=0.5)
+    ax1.scatter(color, mag, marker='.', s=8, c='k', alpha=1)
     verts = np.array([[blue, ir_mtrgb + 1],
                       [blue, ir_mtrgb],
                       [blue + db, ir_mtrgb],
@@ -829,17 +847,31 @@ def contam_cmd(g, blue, ir_mtrgb, db, trgb_color, dmod, Av, target):
     ax1.plot(cs, m, color='k')
     itpagb = get_itpagb(target, color, mag, 'F160W', dmod=dmod, Av=Av,
                         off=trgb_color)[0]
-    ax1.plot(color[itpagb], mag[itpagb], 'o', ms=5, mfc='none',
-             mec='#156692', alpha=0.5)
-    ax1.set_xlim(-0.5, 4)
-    ax1.set_ylim(25.1, 17)
+    ax1.plot(color[itpagb], mag[itpagb], 'o', ms=5, mfc='#156692', alpha=0.5,
+             mec='white')
+
+    xlabel = r'$F814W-F160W$'
+    ylabel = r'$F160W$'
+
+    _, av, dmod = g.trgb_av_dmod('F160W')
+    ax1.plot(100, 100)
+    ax2.set_ylim(-3, -10)
+    mlims = rsp.astronomy_utils.Mag2mag(ax2.get_ylim(), 'F160W', 'wfc3ir',
+                                        dmod=dmod, Av=av)
+    ax1.set_ylim(mlims)
+    ax1.set_xlim(-1, 4)
+
+    fig1.subplots_adjust(right=0.85)
+    ax1.set_xlabel(xlabel.replace('F', 'm_{F').replace('W', 'W}'))
+    ax2.set_xlabel(xlabel.replace('F', 'm_{F').replace('W', 'W}'))
+    ax1.set_ylabel(ylabel.replace('F', 'm_{F').replace('W', 'W}'))
+    ax2.set_ylabel(ylabel.replace('F', 'M_{F').replace('W', 'W}'))
     ax1.text(ax1.get_xlim()[1] - 0.01,
              ax1.get_ylim()[0] - 0.2,
              r'$\rm{{{}}}$'.format(target.replace('-', '\!-\!').upper()),
              fontsize=20, ha='right', **emboss())
 
-    ax1.set_xlabel(r'$\rm{F814W-F160W}$')
-    ax1.set_ylabel(r'$\rm{F160W}$')
+
     fig1.savefig('{}_contam_cmd{}'.format(target, EXT))
     plt.close()
 
@@ -864,8 +896,8 @@ def main(argv):
     parser.add_argument('-s', '--search', action='store_true',
                         help='with -d find the RHeB-TPAGB line')
 
-    parser.add_argument('-r', '--result_plot', action='store_true',
-                        help='with -d and -s make result plot')
+    #parser.add_argument('-r', '--result_plot', action='store_true',
+    #                    help='with -d and -s make result plot')
 
     parser.add_argument('-f', '--rgb_cut', action='store_true',
                         help='make contam plots and trgb color vs MB')
@@ -888,7 +920,7 @@ def main(argv):
     elif args.data:
         find_data_contamination(args.input_files, search=args.search,
                                 diag_plot=args.diag_plot, threshlimit=True,
-                                nanlimit=True, result_plot=args.result_plot,
+                                nanlimit=True, #result_plot=args.result_plot,
                                 absmag=args.absmag)
 
 if __name__ == '__main__':

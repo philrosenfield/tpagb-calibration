@@ -1,5 +1,6 @@
 #!/bin/bash
-LOC="/Users/rosenfield/research/TP-AGBcalib/SNAP/data/opt_ir_matched_v2/copy"
+#LOC="/Users/rosenfield/research/TP-AGBcalib/SNAP/data/opt_ir_matched_v2/copy"
+LOC="/Users/rosenfield/research/TP-AGBcalib/SNAP/paper2/final_data/data"
 
 function doit {
 if [ $1 == "normit" ]
