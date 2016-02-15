@@ -24,7 +24,7 @@ def duration_masslost(agbs, justprint=False):
         aa = [3., 4., 5.]
         for a in aa:
             for agb in agbs:
-                if agb.Z not in [0.001, 0.004, 0.008]:
+                if agb.Z not in [0.001, 0.008]:
                     continue
                 #plt.plot(agbs[i].data['ageyr'], agbs[i].data['L_star'])
                 ind1, ind2 = agb.ml_regimes()
@@ -38,7 +38,7 @@ def duration_masslost(agbs, justprint=False):
                     print '{:g} {:g} {:.2f} {:.2f} {:.2f} {:.2f}'.format(agb.Z, agb.mass,
                             age[ind1], age[ind2]-age[ind1], age[-1]-age[ind2], age[-1])
 
-    fig, axs = plt.subplots(nrows=3, ncols=2, sharey=True, figsize=(8, 4))
+    fig, axs = plt.subplots(nrows=2, ncols=2, sharey=True, figsize=(8, 4))
     #sns.despine()
     col1, col2 = axs.T[0], axs.T[1]
     colors = Darjeeling2_5.mpl_colors[1:-1]
