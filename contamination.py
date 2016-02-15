@@ -20,8 +20,8 @@ angst_data = rsp.angst_tables.angst_data
 import logging
 logger = logging.getLogger()
 
-import matplotlib.pyplot as plt
-plt.style.use('presentation')
+#import matplotlib.pyplot as plt
+#plt.style.use('presentation')
 
 def test_line(mag, off=0.0):
     return tpagb_rheb_line(mag, off=off)
