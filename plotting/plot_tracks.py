@@ -99,6 +99,7 @@ def duration_masslost(agbs, justprint=False):
     plt.savefig('duration_masslost.png')
     return fig, axs
 
+
 class AGBTrack(object):
     """
     AGBTrack adapted from colibri2trilegal
