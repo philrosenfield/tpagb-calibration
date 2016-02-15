@@ -49,9 +49,9 @@ def duration_masslost(agbs, justprint=False):
                 if agb.Z == 0.001:
                     ax = col[0]
                 if agb.Z == 0.004:
-                    ax = col[1]
+                    continue
                 if agb.Z == 0.008:
-                    ax = col[2]
+                    ax = col[1]
 
                 ipd, = np.nonzero(agb.data['M_predust'] == agb.data['dMdt'])
                 idd, = np.nonzero(agb.data['Mdust'] == agb.data['dMdt'])
