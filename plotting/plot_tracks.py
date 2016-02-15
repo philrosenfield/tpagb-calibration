@@ -19,7 +19,7 @@ def replace_(s, rdict):
     return s
 
 aa = [3., 4., 5.]
-aa = [1., 2.]
+#aa = [1., 2.]
 for a in aa:
     for agb in agbs:
         if agb.Z not in [0.001, 0.004, 0.008]:
@@ -30,10 +30,11 @@ for a in aa:
             if agb.mass != a:
                 continue
             age = agb.data['ageyr'] / 1e5
-            mass = agb.data['M_star']
+            age = agb.data['M_star']
             #print sum(agb.data['dt'][np.nonzero(agb.data['L_star'] < 3.4)[0]])
             print '{:g} {:g} {:.2f} {:.2f} {:.2f} {:.2f}'.format(agb.Z, agb.mass,
-                    age[ind1], age[ind2]-age[ind1], age[-1]-age[ind2], age[-1])
+                    #age[ind1], age[ind2]-age[ind1], age[-1]-age[ind2], age[-1])
+                    agb.mass - age[ind1], age[ind1] - age[ind2], age[ind2] - age[-1], age[-1])
     plt.plot(agbs1[i].data['ageyr'][ind1]/np.max(agbs1[i].data['ageyr']), agbs1[i].Z,'o', color='gray')
     plt.plot(agbs1[i].data['ageyr'][ind2]/np.max(agbs1[i].data['ageyr']), agbs1[i].Z,'o', color='b')
 
