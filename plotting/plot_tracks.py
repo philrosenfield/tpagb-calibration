@@ -19,7 +19,7 @@ def replace_(s, rdict):
         s = s.replace(k, v)
     return s
 
-def duration_masslost(agbs, justprint=False):
+def duration_masslost(agbs, justprint=False, norm=False):
     if justprint:
         aa = [3., 4., 5.]
         for a in aa:
@@ -42,7 +42,7 @@ def duration_masslost(agbs, justprint=False):
     #sns.despine()
     col1, col2 = axs.T[0], axs.T[1]
     colors = Darjeeling2_5.mpl_colors[1:-1]
-    kw = {'linewidth': 0, 'align':'edge'}
+    kw = {'align':'edge'}
     for agb in agbs:
         if agb.mass >= 3.2 and agb.mass <= 5.:
             for i, col in enumerate([col1, col2]):
@@ -52,13 +52,13 @@ def duration_masslost(agbs, justprint=False):
                     continue
                 if agb.Z == 0.008:
                     ax = col[1]
-
                 ipd, = np.nonzero(agb.data['M_predust'] == agb.data['dMdt'])
                 idd, = np.nonzero(agb.data['Mdust'] == agb.data['dMdt'])
                 iall = np.arange(len(agb.data['dMdt']))
                 isw = np.array(list(set(iall) - set(ipd) - set(idd)))
-
                 ttp = 1e5
+                if norm:
+                    ttp = np.sum(agb.data['dt'])
                 tpd = np.sum(agb.data['dt'][ipd]) / ttp
                 tdd = np.sum(agb.data['dt'][idd]) / ttp
                 tsw = np.sum(agb.data['dt'][isw]) / ttp
@@ -66,13 +66,23 @@ def duration_masslost(agbs, justprint=False):
                     ax.barh(agb.mass, tpd, 0.2, color=colors[0], label=r'$\dot{M}_{pd}$', **kw)
                     ax.barh(agb.mass, tdd, 0.2, color=colors[1], label=r'$\dot{M}_{dd}$', left=tpd, **kw)
                     ax.barh(agb.mass, tsw, 0.2, color=colors[2], label=r'$\dot{M}_{sw}$', left=tdd+tpd, **kw)
-                    ax.legend(labelspacing=0.02, loc='upper right', fontsize=10,  handlelength=1)
+                    if norm:
+                        loc = 'upper left'
+                        frameon = True
+                    else:
+                        loc='upper right'
+                        frameon = False
+                    ax.legend(labelspacing=0.02, loc=loc, frameon=frameon, fontsize=10,  handlelength=1)
                 else:
                     if i > 0:
-                        ttp = 1 # agb.mass
+                        ttp = 1
+                        if norm:
+                            ttp = agb.mass
                         tpd = np.sum(agb.data['dt'][ipd] * agb.data['dMlost'][ipd]) / ttp
                         tdd = np.sum(agb.data['dt'][idd] * agb.data['dMlost'][idd]) / ttp
                         tsw = np.sum(agb.data['dt'][isw] * agb.data['dMlost'][isw]) / ttp
+                        if norm:
+                            ax.set_xlim(0, 1)
                         if agb.mass == 5.:
                             ax.text(0.98, 0.02, r'$\rm{Z}=%g$' % agb.Z, fontsize=16,
                                     transform=ax.transAxes, ha='right')
@@ -85,18 +95,30 @@ def duration_masslost(agbs, justprint=False):
         ax.tick_params(direction='out', color='k', size=2.6, width=0.5)
         #ax.grid(lw=0.6, color='k')
         ax.grid()
-        ax.set_xlim(ax.set_xlim(0, 4.5))
+        if not norm:
+            ax.set_xlim(ax.set_xlim(0, 4.5))
         ax.set_ylim(3.2, 5.2)
 
-    [ax.tick_params(labelbottom='off') for ax in axs.T[0:2, 0:2].flatten()]
+    [ax.tick_params(labelbottom='off') for ax in axs.flatten()[:-2]]
     [ax.tick_params(labelright='on') for ax in col2]
     N = len(axs[-1, -1].get_xticks())
     axs[-1, -1].xaxis.set_major_locator(MaxNLocator(N, prune='lower'))
-    axs[-1, 0].set_xlabel(r'$\rm{TP-AGB\ Age\ (10^5\ yr)}$')
-    axs[-1, -1].set_xlabel(r'$\rm{Mass\ Lost\ (M_\odot)}$')
-    axs[1, 0].set_ylabel(r'$\rm{Initial\ TP-AGB\ Mass}$')
+    if norm:
+        axs[-1, 0].set_xlabel(r'$\rm{TP-AGB\ Lifetime}$')
+        axs[-1, -1].set_xlabel(r'$\rm{Fraction\ of\ Initial\ Mass\ Lost}$')
+        [ax.set_xlim(0, 0.9) for ax in axs[:, 1]]
+        [ax.set_xlim(0, 1) for ax in axs[:, 0]]
+    else:
+        axs[-1, 0].set_xlabel(r'$\rm{TP-AGB\ Age\ (10^5\ yr)}$')
+        axs[-1, -1].set_xlabel(r'$\rm{Mass\ Lost\ (M_\odot)}$')
+
+    fig.text(0.03, 0.58, r'$\rm{TP-AGB\ Initial\ Mass (M_\odot)}$', rotation='vertical', ha='center', va='center',
+             fontsize=20)
     fig.subplots_adjust(left=0.1, hspace=0.05, wspace=0.05, right=0.92, bottom=0.2, top=0.98)
-    plt.savefig('duration_masslost.png')
+    if norm:
+        plt.savefig('duration_masslost_norm.png')
+    else:
+        plt.savefig('duration_masslost.png')
     return fig, axs
 
 
