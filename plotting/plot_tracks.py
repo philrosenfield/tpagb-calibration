@@ -99,7 +99,7 @@ def duration_masslost(agbs, justprint=False, norm=False):
             ax.set_xlim(ax.set_xlim(0, 4.5))
         ax.set_ylim(3.2, 5.2)
 
-    [ax.tick_params(labelbottom='off') for ax in axs.flatten()[:-2]]
+    #[ax.tick_params(labelbottom='off') for ax in axs.flatten()[:-2]]
     [ax.tick_params(labelright='on') for ax in col2]
     N = len(axs[-1, -1].get_xticks())
     axs[-1, -1].xaxis.set_major_locator(MaxNLocator(N, prune='lower'))
@@ -309,10 +309,20 @@ def main(argv):
     parser.add_argument('-z', '--compare', action='store_true',
                         help='one plot')
 
+    parser.add_argument('-f', '--dmplot', action='store_true',
+                        help='duration mass lost plot')
+
+    parser.add_argument('-n', '--norm', action='store_false',
+                        help='with -f do not norm (use units)')
+
     args = parser.parse_args(argv)
 
     ylims = [args.tlim, args.llim, args.plim, args.clim, args.mlim, args.dmlim]
     xlim = args.xlim
+
+    if args.dmplot:
+        agbs = [AGBTrack(infile) for infile in args.infiles]
+        duration_masslost(agbs, norm=args.norm)
 
     if args.compare:
         agbs = [AGBTrack(infile) for infile in args.infiles]
