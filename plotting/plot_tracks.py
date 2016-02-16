@@ -99,7 +99,7 @@ def duration_masslost(agbs, justprint=False, norm=False):
             ax.set_xlim(ax.set_xlim(0, 4.5))
         ax.set_ylim(3.2, 5.2)
 
-    #[ax.tick_params(labelbottom='off') for ax in axs.flatten()[:-2]]
+    [ax.tick_params(labelbottom='off') for ax in axs.flatten()[:-2]]
     [ax.tick_params(labelright='on') for ax in col2]
     N = len(axs[-1, -1].get_xticks())
     axs[-1, -1].xaxis.set_major_locator(MaxNLocator(N, prune='lower'))
