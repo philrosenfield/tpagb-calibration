@@ -101,16 +101,16 @@ def duration_masslost(agbs, justprint=False, norm=False):
 
     [ax.tick_params(labelbottom='off') for ax in axs.flatten()[:-2]]
     [ax.tick_params(labelright='on') for ax in col2]
-    N = len(axs[-1, -1].get_xticks())
-    [ax.xaxis.set_major_locator(MaxNLocator(N, prune='lower')) for ax in axs[:, 1]]
+    N = len(col2[-1].get_xticks())
+    [ax.xaxis.set_major_locator(MaxNLocator(N, prune='lower')) for ax in col2]
     if norm:
-        axs[-1, 0].set_xlabel(r'$\rm{TP-AGB\ Lifetime}$')
-        axs[-1, -1].set_xlabel(r'$\rm{Fraction\ of\ Initial\ Mass\ Lost}$')
-        [ax.set_xlim(0, 0.9) for ax in axs[:, 1]]
-        [ax.set_xlim(0, 1) for ax in axs[:, 0]]
+        col1[-1].set_xlabel(r'$\rm{TP-AGB\ Lifetime}$')
+        col1[-1].set_xlabel(r'$\rm{Fraction\ of\ Initial\ Mass\ Lost}$')
+        [ax.set_xlim(0, 0.9) for ax in col2]
+        [ax.set_xlim(0, 1) for ax in col1]
     else:
-        axs[-1, 0].set_xlabel(r'$\rm{TP-AGB\ Age\ (10^5\ yr)}$')
-        axs[-1, -1].set_xlabel(r'$\rm{Mass\ Lost\ (M_\odot)}$')
+        col1[-1].set_xlabel(r'$\rm{TP-AGB\ Age\ (10^5\ yr)}$')
+        col1[-1].set_xlabel(r'$\rm{Mass\ Lost\ (M_\odot)}$')
 
     fig.text(0.03, 0.58, r'$\rm{TP-AGB\ Initial\ Mass (M_\odot)}$', rotation='vertical', ha='center', va='center',
              fontsize=20)
