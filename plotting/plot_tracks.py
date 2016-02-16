@@ -324,7 +324,7 @@ def main(argv):
         agbs = [AGBTrack(infile) for infile in args.infiles]
         duration_masslost(agbs, norm=args.norm)
 
-    if args.compare:
+    elif args.compare:
         agbs = [AGBTrack(infile) for infile in args.infiles]
         outfile = 'tpagb_comp'
         if agbs[0].mass == agbs[1].mass:
@@ -334,12 +334,12 @@ def main(argv):
         outfile += EXT
 
         compare_vw93(agbs, outfile=outfile, xlim=xlim, ylims=ylims)
-
-    for infile in args.infiles:
-        agb = AGBTrack(infile)
-        outfile = infile.replace('.dat', EXT)
-        agb.vw93_plot(outfile=outfile, xlim=xlim, ylims=ylims)
-        plt.close()
+    else:
+        for infile in args.infiles:
+            agb = AGBTrack(infile)
+            outfile = infile.replace('.dat', EXT)
+            agb.vw93_plot(outfile=outfile, xlim=xlim, ylims=ylims)
+            plt.close()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
