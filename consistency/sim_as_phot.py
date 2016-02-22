@@ -68,7 +68,7 @@ def csfr_masshist():
         sfhpc = SFH(os.path.join(pc_loc, sfhs[i]),
                     meta_file=os.path.join(pc_loc, metas[i]))
 
-        fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(16, 6))
+        fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(16, 8))
         fig.subplots_adjust(hspace=.4, top=0.97, bottom=0.11)
         # Padua
         ax1 = sfhpd.plot_csfr(ax=ax1, plt_kw={'color': 'k'},

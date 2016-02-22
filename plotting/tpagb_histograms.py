@@ -354,6 +354,7 @@ def stacked_plot(targets, path=None, save=False, saved=False,
         [spine.set_visible(False) for spine in ax.spines.itervalues()]
         ax.tick_params(labelbottom='off', bottom='off', top='off',
                        left='off', right='off')
+        ax.grid()
 
     if saved:
         bins, _, meanhs = load_hists(targets, path, saved=True, key=key,
@@ -394,7 +395,8 @@ def stacked_plot(targets, path=None, save=False, saved=False,
     print('wrote {}'.format(outfile))
 
 def default_run():
-    path = snap_src + '/varysfh/extpagb/final_hope/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
+    #path = snap_src + '/varysfh/extpagb/final_hope/keep/all_run/caf09_v1.2s_m36_s12d_ns_nas'
+    path = os.getcwd()
     targets = ['ngc300-wide1',
                'ugc8508',
                'ngc4163',
@@ -416,7 +418,8 @@ def default_run():
 
     #stacked_plot(targets, path=path, saved=True, key='m_ini')
     #stacked_plot(targets, path=path, saved=True, key='logAge')
-    tpagb_mass(targets[::-1], path, save=False, saved=True)
+    tpagb_mass(targets[::-1], path, save=True, saved=False)
 
 if __name__ == "__main__":
+    import pdb; pdb.set_trace()
     default_run()
