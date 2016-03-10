@@ -20,6 +20,10 @@ def replace_(s, rdict):
     return s
 
 def duration_masslost(agbs, justprint=False, norm=False):
+    """
+    Where S_NOV13 lives:
+    python -m tpagb_calibration.plotting.plot_tracks -f S12_Z0.001_Y0.250/agb_*Mdot50*dat S12_Z0.008_Y0.263/agb_*Mdot50*dat
+    """
     if justprint:
         aa = [3., 4., 5.]
         for a in aa:
