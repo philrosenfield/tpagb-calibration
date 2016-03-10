@@ -45,3 +45,9 @@ see tpagb_calibration/plotting.sh or go from scratch...
 ### make tpagb mass and age distribution figure
 (check hard coded links and save=True/saved=True)
 ```python -m tpagb_calibration.plotting.tpagb_histograms```
+
+### make VW looking plot:
+python -m tpagb_calibration.plotting.plot_tracks -z ~/research/TP-AGBcalib/AGBTracks/CAF09/S_NOV13/S12_Z0.001_Y0.250/agb_4.00_Z0.00100000_Mdot50_eta0.40_Mc0.00_dMc0.00_Tbd6.40_L0.00_dL0.00_C0.00_Nr3.00_rates0_KOPv_KMOLv.dat ~/research/TP-AGBcalib/AGBTracks/CAF09/S_NOV13/S12_Z0.008_Y0.263/agb_4.00_Z0.00800000_Mdot50_eta0.40_Mc0.00_dMc0.00_Tbd6.40_L0.00_dL0.00_C0.00_Nr3.00_rates0_KOPv_KMOLv.dat
+
+### make mass loss duration / mass lost plot:
+python -m tpagb_calibration.plotting.plot_tracks -f ~/research/TP-AGBcalib/AGBTracks/CAF09/S_NOV13/S12_Z0.001_Y0.250/agb_*Mdot50*.dat ~/research/TP-AGBcalib/AGBTracks/CAF09/S_NOV13/S12_Z0.008_Y0.263/agb_*Mdot50*.dat

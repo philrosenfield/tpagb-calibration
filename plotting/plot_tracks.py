@@ -120,9 +120,9 @@ def duration_masslost(agbs, justprint=False, norm=False):
              fontsize=20)
     fig.subplots_adjust(left=0.1, hspace=0.05, wspace=0.05, right=0.92, bottom=0.2, top=0.98)
     if norm:
-        plt.savefig('duration_masslost_norm.png')
+        plt.savefig('duration_masslost_norm{}'.format(EXT))
     else:
-        plt.savefig('duration_masslost.png')
+        plt.savefig('duration_masslost{}'.format(EXT))
     return fig, axs
 
 
@@ -178,6 +178,7 @@ class AGBTrack(object):
 
         for i in range(len(axs)):
             ycol = ycols[i]
+            ylim = ylims[i]
             ax = axs[i]
             #ax.grid(ls='-', color='k', alpha=0.1, lw=0.5)
             ax.grid()
@@ -190,10 +191,11 @@ class AGBTrack(object):
                 ax.axhline(1, linestyle='dashed', color='k', alpha=0.5, lw=1)
             ax.set_ylabel(translate_colkey(ycol), fontsize=20)
             ax.yaxis.set_major_locator(MaxNLocator(5, prune='upper'))
-            if ylims[i] is not None:
-                ax.sey_ylim(ylims[i])
+            if ylim is not None:
+                print ylim
+                ax.set_ylim(ylim)
         if xlim is not None:
-            ax.set_xlim()
+            ax.set_xlim(xlim)
         axs[0].yaxis.set_major_locator(MaxNLocator(5, prune=None))
         ax.set_xlabel(translate_colkey('ageyr', agescale=agescale), fontsize=20)
         [ax.get_yaxis().set_label_coords(-.16,0.5) for ax in axs]
@@ -344,6 +346,10 @@ def main(argv):
             outfile = infile.replace('.dat', EXT)
             agb.vw93_plot(outfile=outfile, xlim=xlim, ylims=ylims)
             plt.close()
+
+def default_run():
+    print('python -m tpagb_calibration.plotting.plot_tracks -f ~/research/TP-AGBcalib/AGBTracks/CAF09/S_NOV13/S12_Z0.001_Y0.250/agb_*Mdot50*.dat ~/research/TP-AGBcalib/AGBTracks/CAF09/S_NOV13/S12_Z0.008_Y0.263/agb_*Mdot50*.dat')
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
