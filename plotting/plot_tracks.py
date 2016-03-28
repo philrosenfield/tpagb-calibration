@@ -136,8 +136,12 @@ class AGBTrack(object):
         """
         self.load_agbtrack(filename)
         # period is either P0 or P1 based on value of Pmod
-        self.period = np.array([self.data['P{:.0f}'.format(p)][i]
-                                for i, p in enumerate(self.data['Pmod'])])
+        try:
+            self.period = np.array([self.data['P{:.0f}'.format(p)][i]
+                                    for i, p in enumerate(self.data['Pmod'])])
+        except TypeError, e:
+            print(filename, e)
+            self.period = self.data['Pmod']
         self.mass = float(filename.split('agb_')[1].split('_')[0])
         self.Z = float(filename.split('agb_')[1].split('_')[1].replace('Z',''))
 
