@@ -172,13 +172,13 @@ class AGBTrack(object):
         Make a plot similar to Vassiliadis and Wood 1993. Instead of Vesc,
         I plot C/O.
         """
-        ylims = ylims or [None] * 6
+        ycols = ['T_star', 'Tbot', 'L_star', 'CO', 'M_star', 'dMdt']
+        ylims = ylims or [None] * len(ycols)
+
         if axs is None:
-            fig, axs = plt.subplots(nrows=6, sharex=True, figsize=(5.4, 10))
+            fig, axs = plt.subplots(nrows=len(ycols), sharex=True, figsize=(5.4, 10))
             fig.subplots_adjust(hspace=0.05, right=0.97, top=0.97, bottom=0.07,
                                 left=0.2)
-
-        ycols = ['T_star', 'L_star', 'period', 'CO', 'M_star', 'dMdt']
 
         for i in range(len(axs)):
             ycol = ycols[i]
@@ -241,7 +241,8 @@ def translate_colkey(col, agescale=1.):
             u = '10^%i\ ' % int(np.log10(scale))
         return u
 
-    tdict = {'T_star': r'$log\ \rm{T}_{\rm{eff}}\ \rm{(K)}$',
+    tdict = {'Tbot': r'$log\ \rm{T}_{\rm{bce}}\ \rm{(K)}$',
+             'T_star': r'$log\ \rm{T}_{\rm{eff}}\ \rm{(K)}$',
              'L_star': r'$log\ L\ (L_\odot)$',
              'period': r'$\rm{P\ (days)}$',
              'CO': r'$\rm{C/O}$',
@@ -262,7 +263,7 @@ def compare_vw93(agbs, outfile=None, xlim=None, ylims=None):
         fmt = r'$\rm{Z}=%g$'
         annotations = [fmt % agbs[0].Z, fmt % agbs[1].Z]
     # sharex is off because I want one column pruned.
-    fig, axs = plt.subplots(nrows=6, ncols=2, figsize=(8.4, 10))
+    fig, axs = plt.subplots(nrows=6, ncols=2, figsize=(9, 10))
     col1 = axs.T[0]
     col2 = axs.T[1]
 
