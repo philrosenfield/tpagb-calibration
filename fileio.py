@@ -3,21 +3,13 @@ import os
 import sys
 import glob
 import numpy as np
-from ResolvedStellarPops import StarPop
 
 from astropy.io import ascii
 from astropy.table import Table
-from TPAGBparams import snap_src, phat_src
-
-from pop_synth.stellar_pops import limiting_mag, exclude_gate_inds
+from .TPAGBparams import snap_src, phat_src
 
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-data_loc = os.path.join(snap_src, 'data', 'galaxies')
-match_run_loc = os.path.join(snap_src, 'match')
-phat_data_loc =  os.path.join(phat_src, 'low_av', 'phot')
-phat_match_run_loc =  os.path.join(phat_src, 'low_av', 'fake')
 
 
 def ensure_file(f, mad=True):
@@ -90,7 +82,9 @@ def load_table(filename, target, optfilter1=None, opt=True):
 
     return tbl[indx]
 
+
 def load_phat(target):
+    from .pop_synth.starpop import StarPop
     galname, = get_files(phat_data_loc, '*{}*match'.format(target))
     optgal = StarPop()
     optgal.data = np.genfromtxt(galname, unpack=True, names=['F475W', 'F814W'])
@@ -103,6 +97,7 @@ def find_phatfake(target):
 
 def load_obs(target, optfilter1=''):
     """return in NIR and OPT galaxy as StarPop objects -- not 4 filter"""
+    from .pop_synth.starpop import StarPop
     from astropy.io import fits
     if 'm31' in target or 'B' in target:
         optgal, nirgal = load_phat(target)
@@ -152,7 +147,8 @@ def find_match_param(target, optfilter1=''):
         mparam, = get_files(loc, search_str)
     except ValueError:
         if optfilter1 == '':
-            raise ValueError, 'Need to pass optfilter1'
+            print('Need to pass optfilter1')
+            raise ValueError
         else:
             raise ValueError
 
@@ -186,8 +182,46 @@ def load_lf_file(lf_file):
                     for l in lines[i::ncols] if len(l.split())>0]
     return lfd
 
+def remove_all(string, badchars):
+    for b in badchars:
+        string = string.replace(b, '')
+    return string
 
-def load_observation(filename, colname1, colname2, match_param=None,
+def readfile(filename, col_key_line=0, comment_char='#', string_column=None,
+             string_length=16, only_keys=None, delimiter=' '):
+    '''
+    reads a file as a np array, uses the comment char and col_key_line
+    to get the name of the columns.
+    '''
+    if col_key_line == 0:
+        with open(filename, 'r') as f:
+            line = f.readline()
+        col_line = line.replace(comment_char, '')
+        col_keys = remove_all(col_line, '/[]-').split()
+    else:
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+        col_keys = lines[col_key_line].replace(comment_char, '').strip().translate(None, '/[]').split()
+    usecols = range(len(col_keys))
+
+    if only_keys is not None:
+        only_keys = [o for o in only_keys if o in col_keys]
+        usecols = list(np.sort([col_keys.index(i) for i in only_keys]))
+        col_keys = list(np.array(col_keys)[usecols])
+
+    dtype = [(c, '<f8') for c in col_keys]
+    if string_column is not None:
+        if type(string_column) is list:
+            for s in string_column:
+                dtype[s] = (col_keys[s], '|U%i' % string_length)
+        else:
+            dtype[string_column] = (col_keys[string_column], '|U%i' % string_length)
+    data = np.genfromtxt(filename, dtype=dtype, invalid_raise=False,
+                         usecols=usecols, skip_header=col_key_line + 1)
+    return data
+
+
+def load_observation(filename, colname1=None, colname2=None, match_param=None,
                      exclude_gates=None):
     """
     Convienince routine for loading mags from a fits file or photometry file
@@ -215,6 +249,7 @@ def load_observation(filename, colname1, colname2, match_param=None,
     mag1, mag2 : np.arrays
         could be sliced to exclude the indices within the exclude gates.
     """
+    from .pop_synth.stellar_pops import exclude_gate_inds
     if filename.endswith('fits'):
         data = Table.read(filename, format='fits')
         mag1 = data[colname1]
@@ -280,6 +315,7 @@ def load_photometry(lf_file, observation, filter1='F814W_cor',
     If flatten is true, will concatenate all mags from the lf_file.
     If it's false, mags coming back will be an array of arrays.
     """
+    from .pop_synth.stellar_pops import limiting_mag
     def limit_mags(mag1, mag2, smag1, smag2, comp2=90.):
         # for opt_nir_matched data, take the obs limits from the data
         inds, = np.nonzero((smag1 <= mag1.max()) & (smag2 <= mag2.max()) &

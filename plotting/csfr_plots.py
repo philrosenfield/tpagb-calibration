@@ -3,12 +3,13 @@ import os
 import sys
 from ..TPAGBparams import EXT, snap_src
 import matplotlib.pyplot as plt
-import ResolvedStellarPops as rsp
+
+from ..utils.plotting_utils import discrete_colors
 from ..fileio import get_files
 from .plotting import outside_labels, emboss
 from dweisz.match.scripts.sfh import SFH, quadriture
-from dweisz.match.scripts.fileio import read_binned_sfh, parse_pipeline
-from dweisz.match.scripts.utils import convertz
+from ..sfhs.match_sfh import read_binned_sfh
+from ..utils import convertz, parse_pipeline
 import numpy as np
 
 def param_table(sfh, angst=True, agesplit=[1e9, 3e9], target='',
@@ -100,7 +101,7 @@ def main(argv):
 
     if args.one_plot:
         fig, ax = plt.subplots()
-        colors = rsp.graphics.discrete_colors(len(sfhs), cmap=plt.cm.RdYlBu)
+        colors = discrete_colors(len(sfhs), cmap=plt.cm.RdYlBu)
     else:
         ax = None
         colors = ['k'] * len(sfhs)

@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 from astroML.plotting import hist as mlhist
 from scipy.stats import ks_2samp, ttest_ind
 
-import ResolvedStellarPops as rsp
-from ResolvedStellarPops.angst_tables import angst_data
+from ..angst_tables import angst_data
 
 from ..analysis.analyze import get_itpagb
 from ..TPAGBparams import EXT, data_loc
-from ..fileio import load_lf_file, load_observation, find_fakes, get_files
+from ..fileio import load_lf_file, load_observation, find_fakes, get_files, readfile
+from .. import utils
 from ..pop_synth.stellar_pops import completeness_corrections
 
 logger = logging.getLogger()
@@ -59,7 +59,7 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
     opvalues = np.array([])
     for i, lf_file in enumerate(lf_files):
         target = os.path.split(lf_file)[1].split('_')[0]
-        observation, = rsp.fileio.get_files(data_loc + '/copy', '*{}*fits'.format(target))
+        observation, = fileio.get_files(data_loc + '/copy', '*{}*fits'.format(target))
         try:
             mag1, mag2 = load_observation(observation, col1, col2)
         except:
@@ -163,7 +163,7 @@ def narratio_table(nartables, verbose=False, latex=True, full=True):
         delimiter = ' '
 
     for i, nartable in enumerate(nartables):
-        ratio_data = rsp.fileio.readfile(nartable, string_length=36,
+        ratio_data = fileio.readfile(nartable, string_length=36,
                                          string_column=[0, 1, 2])
         try:
             targets = np.unique([t for t in ratio_data['target']
@@ -183,13 +183,13 @@ def narratio_table(nartables, verbose=False, latex=True, full=True):
             nrgb = float(ratio_data[dindx]['nrgb'])
 
             dratio = nagb / nrgb
-            dratio_err = rsp.utils.count_uncert_ratio(nagb, nrgb)
+            dratio_err = utils.count_uncert_ratio(nagb, nrgb)
 
             mrgb = np.mean(map(float, ratio_data[indx]['nrgb']))
             magb = np.mean(map(float, ratio_data[indx]['nagb']))
 
             mratio = magb / mrgb
-            mratio_err = rsp.utils.count_uncert_ratio(magb, mrgb)
+            mratio_err = utils.count_uncert_ratio(magb, mrgb)
 
             pct_diff = 1 - (mratio / dratio)
             pct_diff_err = np.abs(pct_diff * (mratio_err / mratio + dratio_err / dratio))

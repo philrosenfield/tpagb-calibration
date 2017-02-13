@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import ks_2samp
 
-from ResolvedStellarPops import SimGalaxy
-from dweisz.match.scripts.sfh import SFH
+from ..pop_synth import SimGalaxy
+from ..sfhs.match_sfh import SFH
 
 from ..TPAGBparams import EXT, snap_src
 from ..plotting.plotting import emboss

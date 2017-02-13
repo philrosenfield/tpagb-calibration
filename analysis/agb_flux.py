@@ -5,11 +5,11 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 from ..TPAGBparams import EXT
-from ResolvedStellarPops.fileio import readfile, get_files
-from ResolvedStellarPops.utils import count_uncert_ratio
-from ResolvedStellarPops.galaxies.galaxy import Galaxy
+from ..fileio import readfile, get_files
+from ..utils import count_uncert_ratio
+from ..pop_synth import Galaxy
 
-from dweisz.match.scripts.sfh import SFH as MatchSFH
+from ..sfhs.match_sfh import SFH
 from ..fileio import load_lf_file, load_observation
 from .analyze import get_itpagb
 
@@ -80,7 +80,7 @@ def ntpagb_model_data(narratiofile, sfhfile, metafile=None):
     mean_nagb = np.mean(ratiodata['nagb'][1:])
     agbm2d = mean_nagb / ratiodata['nagb'][0]
 
-    sfh = MatchSFH(sfhfile, meta_file=metafile)
+    sfh = SFH(sfhfile, meta_file=metafile)
     massfrac, massfrac_perr, massfrac_merr = sfh.mass_fraction(0, 2e9)
 
     agbm2d_err = count_uncert_ratio(np.mean(ratiodata['nagb'][1:]),

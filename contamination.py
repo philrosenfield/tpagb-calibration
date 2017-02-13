@@ -5,8 +5,7 @@ import argparse
 import sys
 import numpy as np
 import os
-import ResolvedStellarPops as rsp
-from ResolvedStellarPops import utils
+
 from astropy.io import fits
 from astropy.table import Table
 from TPAGBparams import EXT, data_loc, snap_src
@@ -15,7 +14,12 @@ from .fileio import get_files
 from plotting.plotting import emboss
 from astroML.plotting import hist as mlhist
 from scipy import integrate
-angst_data = rsp.angst_tables.angst_data
+from .utils import astronomy_utils
+from . import utils
+from . import angst_tables
+from .pop_synth.galaxy import Galaxy
+from .pop_synth.simgalaxy import SimGalaxy
+angst_data = angst_tables.angst_data
 
 import logging
 logger = logging.getLogger()
@@ -57,7 +61,7 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
                 logger.error('Target not found: get_snap_trgb_av_dmod {}'.format(target))
                 return [np.nan] * 2
             if absmag:
-                mtrgb =  rsp.astronomy_utils.mag2Mag(mtrgb, 'F160W', 'wfc3ir',
+                mtrgb =  astronomy_utils.mag2Mag(mtrgb, 'F160W', 'wfc3ir',
                                                      dmod=dmod, Av=Av)
                 dmod = 0.
                 Av = 0.
@@ -71,7 +75,7 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
             mtrgb, Av, dmod = angst_data.get_tab5_trgb_av_dmod(target.upper(),
                                                                filters=col)
             if absmag:
-                mtrgb = rsp.astronomy_utils.mag2Mag(mtrgb, col, 'acs_wfc',
+                mtrgb = astronomy_utils.mag2Mag(mtrgb, col, 'acs_wfc',
                                                     dmod=dmod, Av=Av)
         redward_of_rheb = np.arange(len(color))
         blueward_of_rheb = np.arange(len(color))
@@ -475,7 +479,7 @@ class Contamination(object):
 
 
 def load_data(fname, absmag=False):
-    gal = rsp.galaxy.Galaxy(fname)
+    gal = Galaxy(fname)
     mtrgb, Av, dmod = gal.trgb_av_dmod('F160W')
     verts = np.array([[1, mtrgb], [1, 19], [3, 19], [3, mtrgb], [1, mtrgb]])
     mag = gal.data['MAG4_IR']
@@ -485,7 +489,7 @@ def load_data(fname, absmag=False):
         logger.error('WFPC2 not supported')
         return [], [], [], np.nan
     if absmag:
-        mtrgb = rsp.astronomy_utils.mag2Mag(mtrgb, 'F160W', 'wfc3ir', dmod=dmod, Av=Av)
+        mtrgb = astronomy_utils.mag2Mag(mtrgb, 'F160W', 'wfc3ir', dmod=dmod, Av=Av)
         verts[1:3, 1] = -11
         verts[(0,3,4), 1] = mtrgb
         mag = gal.absmag('MAG4_IR', 'F160W', photsys='wfc3ir', dmod=dmod, Av=Av)
@@ -501,7 +505,7 @@ def test_contamination_line(filenames, diag_plot=False):
     ntpcontams = np.array([])
     for fname in filenames:
         # load trilegal simulation
-        sgal = rsp.SimGalaxy(fname)
+        sgal = SimGalaxy(fname)
         # find tpagb and rgb stars using the line
         try:
             mag1 = sgal.data['F814W_cor']
@@ -596,7 +600,7 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
         absmag = True
         from TPAGBparams import data_loc
         data_loc = os.path.join(data_loc, 'copy/')
-        fitsfiles = rsp.fileio.get_files(data_loc, '*fits')
+        fitsfiles = fileio.get_files(data_loc, '*fits')
         plist = ['sn-ngc2403-pr_f606w_f814w_f110w_f160w.fits',
                  'ngc7793-halo-6_f606w_f814w_f110w_f160w.fits',
                  #'ngc404-deep_f606w_f814w_f110w_f160w.fits',
@@ -628,7 +632,7 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
     y = []
     for fitsfile in fitsfiles:
         target = os.path.split(fitsfile)[1].split('_')[0]
-        g = rsp.galaxy.Galaxy(fitsfile)
+        g = Galaxy(fitsfile)
         trgb_color = g.trgb_av_dmod('F814W')[0] - g.trgb_av_dmod('F160W')[0]
         logger.debug(fitsfile)
         ctm = Contamination()
@@ -643,7 +647,7 @@ def find_data_contamination(fitsfiles, search=False, diag_plot=False, absmag=Tru
                           bins=bins, trgb_color=trgb_color, ax=ax2,
                           fig=fig)
         _, av, dmod = g.trgb_av_dmod('F160W')
-        mlims = rsp.astronomy_utils.Mag2mag(ax2.get_ylim(), 'F160W', 'wfc3ir',
+        mlims = astronomy_utils.Mag2mag(ax2.get_ylim(), 'F160W', 'wfc3ir',
                                             dmod=dmod, Av=av)
         print(mlims)
         xlims = ax2.get_xlim()
@@ -771,7 +775,7 @@ def rgb_cut(full=False):
         fits_files = np.concatenate([[s for s in fits_files if t.lower() in s]
                                      for t in targets])
 
-    gals = [rsp.galaxy.Galaxy(f) for f in fits_files]
+    gals = [Galaxy(f) for f in fits_files]
     fig, ax = plt.subplots()
     # for a four panel journal figure
     fig.subplots_adjust(right=0.92)
@@ -856,7 +860,7 @@ def contam_cmd(g, blue, ir_mtrgb, db, trgb_color, dmod, Av, target):
     _, av, dmod = g.trgb_av_dmod('F160W')
     ax1.plot(100, 100)
     ax2.set_ylim(-3, -10)
-    mlims = rsp.astronomy_utils.Mag2mag(ax2.get_ylim(), 'F160W', 'wfc3ir',
+    mlims = astronomy_utils.Mag2mag(ax2.get_ylim(), 'F160W', 'wfc3ir',
                                         dmod=dmod, Av=av)
     ax1.set_ylim(mlims)
     ax1.set_xlim(-1, 4)

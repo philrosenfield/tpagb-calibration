@@ -5,10 +5,12 @@ import sys
 
 import matplotlib.pylab as plt
 import numpy as np
-import ResolvedStellarPops as rsp
-from dweisz.match import scripts as match
-from ResolvedStellarPops.convertz import convertz
+from .match_sfh import read_binned_sfh
 from scipy.interpolate import interp1d
+
+from .. import fileio
+from .. import utils
+from ..pop_synth import SimGalaxy
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,14 +39,14 @@ def parse_sfh_data(sfh_file, hmc_file=None):
     np.recarray of the sfh file with hmc_file uncertainties overwritten.
     '''
     try:
-        data = match.fileio.read_binned_sfh(sfh_file)
+        data = read_binned_sfh(sfh_file)
     except:
         logger.error('please add a new data reader, {}'.format(sys.exc_info()))
         sys.exit(2)
 
     if hmc_file is not None:
         logger.error('Overwriting uncertainties with hmc_file!!!')
-        hmc_data = match.utils.read_binned_sfh(hmc_file)
+        hmc_data = read_binned_sfh(hmc_file)
         data.sfr_errp = hmc_data.sfr_errp
         data.sfr_errm = hmc_data.sfr_errm
     return data
@@ -59,7 +61,7 @@ class StarFormationHistories(object):
         self.sfr_files = sfr_files
         self.sfh_ext = sfh_ext
         if sfr_file_loc is not None and search_fmt is not None:
-            self.sfr_files = rsp.fileIO.get_files(sfr_file_loc, search_fmt)
+            self.sfr_files = fileio.get_files(sfr_file_loc, search_fmt)
 
     def random_draw_within_uncertainty(self, attr, npoints=2e5):
         '''
@@ -166,7 +168,7 @@ class StarFormationHistories(object):
         f = interp1d(sfh['t1'][somesf], sfh['met'][somesf],
                      bounds_error=False)
         somemet = np.nonzero(np.isfinite(f(age)))
-        f, mh = rsp.utils.extrap1d(age[somemet], f(age)[somemet], age)
+        f, mh = utils.extrap1d(age[somemet], f(age)[somemet], age)
         return age1a, age1p, age2a, age2p, sfr, mh
 
     def interp_null_values(self):
@@ -183,7 +185,7 @@ class StarFormationHistories(object):
         somesf, = np.nonzero(self.data.sfr != 0)
 
         if len(somesf) > 1:
-            f, mh_interp = rsp.utils.extrap1d(self.data.lagei[somesf],
+            f, mh_interp = utils.extrap1d(self.data.lagei[somesf],
                                               self.data.mh[somesf],
                                               self.data.lagei)
 
@@ -270,7 +272,7 @@ class StarFormationHistories(object):
         if attr_str == 'mh':
             val_arrs = np.array([10**(val_arr/.2) for val_arr in val_arrs])
         if attr_str == 'feh':
-            val_arrs = np.array([convertz.convertz(feh=feh)[1]
+            val_arrs = np.array([utils.convertz(feh=feh)[1]
                                  for feh in val_arrs])
 
         return val_arrs
@@ -396,7 +398,7 @@ class StarFormationHistories(object):
         Two plots, one M/H vs Age for match and trilegal, the other
         sfr for match vs age and number of stars of a given age for trilegal.
         '''
-        sgal = rsp.SimGalaxy(trilegal_catalog)
+        sgal = SimGalaxy(trilegal_catalog)
         sgal.lage = sgal.data['logAge']
         sgal.mh = sgal.data['MH']
         issfr, = np.nonzero(self.sfr > 0)

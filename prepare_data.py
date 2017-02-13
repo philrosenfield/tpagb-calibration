@@ -16,9 +16,9 @@ import logging
 import os
 import sys
 
-import ResolvedStellarPops as rsp
-
-from ResolvedStellarPops.tpagb_path_config import tpagb_path
+import .trilegal
+from .tpagb_path_config import tpagb_path as TPAGB_PATH
+from .utils import parse_pipeline
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,8 +29,9 @@ if __name__ == '__main__':
 else:
     from .pop_synth.stellar_pops import limiting_mag, rgb_agb_regions
 
-angst_data = rsp.angst_tables.angst_data
-
+from . import angst_tables
+angst_data = angst_tables.angst_data
+from . import fileio
 
 def load_sim_masses(target):
     '''
@@ -53,7 +54,7 @@ def load_sim_masses(target):
     return mass
 
 
-def prepare_from_directory(directory, search_str, inp_extra):
+def prepare_from_directory(directory, search_str, inp_extra, tpagb_path=None):
     """
     Make a partial input file culled from information in several different files
     inp_extra should be used to specify filter1 if more than one filter is in
@@ -61,25 +62,25 @@ def prepare_from_directory(directory, search_str, inp_extra):
     """
     directory = os.path.abspath(directory)
     assert os.path.isdir(directory), 'Must supply valid directory name'
-
+    tpagb_path = tpagb_path or TPAGB_PATH
     # get matchphot, fake, sfh_file, Hybric MC file
-    pars = {'sfh_file': rsp.fileio.get_files(directory,
+    pars = {'sfh_file': fileio.get_files(directory,
                                              search_str.format('sfh'))[0]}
 
     try:
-        pars['hmc_file'] = rsp.fileio.get_files(directory,
+        pars['hmc_file'] = fileio.get_files(directory,
                                                 search_str.format('zc'))[0]
     except:
         pass
 
-    matchphot = rsp.fileio.get_files(directory,
+    matchphot = fileio.get_files(directory,
                                      search_str.format('match'))[0]
 
-    target, (filter1, filter2) = rsp.parse_pipeline(matchphot)
+    target, (filter1, filter2) = parse_pipeline(matchphot)
     target = target.lower()
 
     outfile_loc = os.path.join(tpagb_path, 'SNAP/varysfh', target)
-    rsp.fileio.ensure_dir(outfile_loc)
+    fileio.ensure_dir(outfile_loc)
 
     galaxy_input = os.path.join(outfile_loc, '{0}{1}.galinp'.format(target,
                                                                     inp_extra))
@@ -88,7 +89,7 @@ def prepare_from_directory(directory, search_str, inp_extra):
                  'filter1': filter1,
                  'filter2': filter2,
                  'galaxy_input': galaxy_input})
-    inp = rsp.fileio.InputParameters()
+    inp = fileio.InputParameters()
     inp.add_params(pars)
 
     return inp
@@ -99,7 +100,7 @@ def prepare_galaxy_inputfile(inps, fake_file, inp_extra):
     # If match was run with setz, this is the logz dispersion.
     # Only useful for clusters, also it is not saved in the match output files
     # Only set in the match parameter file.
-    #matchphot = rsp.fileio.get_files(directory,
+    #matchphot = fileio.get_files(directory,
     #                                 search_str.format('match'))[0],
     # trilegal sfr filename
     gal_dict = {'photsys': 'wfc3snap',
@@ -123,10 +124,10 @@ def prepare_galaxy_inputfile(inps, fake_file, inp_extra):
                      'object_sfr_file': object_sfr_file,
                      'filter1': inps.filter2})
 
-    trigal_dict = rsp.trilegal.utils.galaxy_input_dict(**gal_dict)
-    gal_inp = rsp.fileio.InputParameters(default_dict=trigal_dict)
+    trigal_dict = trilegal.utils.galaxy_input_dict(**gal_dict)
+    gal_inp = fileio.InputParameters(default_dict=trigal_dict)
     gal_inp.write_params(inps.galaxy_input,
-                         rsp.trilegal.utils.galaxy_input_fmt())
+                         trilegal.utils.galaxy_input_fmt())
     return
 
 
@@ -196,7 +197,7 @@ def main(argv):
                            '{0}{1}.vsfhinp'.format(inps.target, inp_extra))
     inps.write_params(outfile)
 
-    fake_file = rsp.fileio.get_files(args.name, search_str.format('fake'))[0]
+    fake_file = fileio.get_files(args.name, search_str.format('fake'))[0]
     prepare_galaxy_inputfile(inps, fake_file, inp_extra)
     return
 

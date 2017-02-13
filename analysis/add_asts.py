@@ -6,8 +6,10 @@ import logging
 import os
 import sys
 
-import ResolvedStellarPops as rsp
 
+from ..pop_synth.asts import ASTs, ast_correct_starpop
+from ..pop_synth import SimGalaxy
+from .. import fileio
 # where the matchfake files live
 from ..TPAGBparams import snap_src
 matchfake_loc = os.path.join(snap_src, 'data', 'galaxies')
@@ -21,7 +23,7 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
                          fake=None):
     """
     apply ast corrections from fake files found in matchfake_loc/*[target]*
-    see rsp.ast_correct_starpop
+    see asts.ast_correct_starpop
     """
     if type(outfiles) is str:
         outfmt = 'default'
@@ -32,18 +34,18 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
         # search string for fake files
         search_str = '*{}*.matchfake'.format(target.upper())
 
-        fakes = rsp.fileio.get_files(matchfake_loc, search_str)
+        fakes = fileio.get_files(matchfake_loc, search_str)
         logger.info('fake files found: {}'.format(fakes))
     else:
         fakes = [fake]
 
-    asts = [rsp.ASTs(f) for f in fakes]
+    asts = [ASTs(f) for f in fakes]
     logger.debug('{}'.format(trilegal_catalogs))
 
     for i, trilegal_catalog in enumerate(trilegal_catalogs):
         logger.info('working on {}'.format(trilegal_catalog))
 
-        sgal = rsp.SimGalaxy(trilegal_catalog)
+        sgal = SimGalaxy(trilegal_catalog)
         # "overwrite" (append columns) to the existing catalog by default
         if outfmt == 'default':
             outfile = trilegal_catalog
@@ -65,7 +67,7 @@ def make_ast_corrections(trilegal_catalogs, target, outfiles='default',
                 else:
                     continue
 
-            rsp.ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
+            ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
                                     outfile=outfile, diag_plot=diag_plot,
                                     hdf5=hdf5, correct=correct)
     return
@@ -130,7 +132,7 @@ def main(argv):
     if args.directory:
         if args.name[0].endswith('/'):
             args.name[0] = args.name[0][:-1]
-        tricats = rsp.fileio.get_files(args.name[0], '*_???.dat')
+        tricats = fileio.get_files(args.name[0], '*_???.dat')
     else:
         tricats = args.name
 

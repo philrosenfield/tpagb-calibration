@@ -17,7 +17,7 @@ def load_tracks(z, src='/Users/rosenfield/research/AGBTracks/CAF09/S_NOV13/'):
     agbdir = os.path.join(src, glob.glob1(src, '*{}_*'.format(z))[0])
     agbfiles = get_files(agbdir, 'agb_*')
     return [AGBTrack(a) for a in agbfiles]
-    
+
 
 def age_interp():
     zs = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.014,
@@ -26,8 +26,8 @@ def age_interp():
     zsprime = [0.00011, 0.00024, 0.00059, 0.0012, 0.0021, 0.0043, 0.0065, 0.0089, 0.0195, 0.014,
                0.022]
     
-    agemin = 6
-    agemax = 10.13
+    agemin = 5.5
+    agemax = 10.15
     
     for z in zsprime:
         fig, ax = plt.subplots()

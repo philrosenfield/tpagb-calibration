@@ -1,8 +1,10 @@
 import numpy as np
-from dweisz.match import scripts as match
+from ..sfhs.match_sfh import SFH
 import os
-import ResolvedStellarPops as rsp
+
 from TPAGBparams import snap_src
+from .. import fileio
+from ..utils import parse_pipeline
 def within(val, val2, perr=0.0, merr=0.0,  perr2=0.0, merr2=0.0):
     frac_diff = (val - val2) / val2
     nerr = np.nan
@@ -25,7 +27,7 @@ def within(val, val2, perr=0.0, merr=0.0,  perr2=0.0, merr2=0.0):
 
 def MelbourneTable1():
     table1 = os.path.join(snap_src, 'tables/melbourne2012_tab1.dat')
-    tab1 =  rsp.fileio.readfile(table1, string_column=0)
+    tab1 =  fileio.readfile(table1, string_column=0)
     sfh_loc = os.path.join(snap_src, 'varysfh/extpagb')
     sfh_names = ['ddo71_f606w_f814w.sfh',
                  'ddo78_f475w_f814w.sfh',
@@ -56,12 +58,12 @@ def MelbourneTable1():
                  ]
 
     sfh_names = [os.path.join(sfh_loc, s) for s in sfh_names]
-    sfhs = [match.utils.MatchSFH(s) for s in sfh_names]
+    sfhs = [SFH(s) for s in sfh_names]
     wdict = {}
     dmodfs = []
     fs = []
     for s in sfhs:
-        s.target, s.filters = rsp.asts.parse_pipeline(s.name)
+        s.target, s.filters = parse_pipeline(s.name)
         wdict[s.target] = s.sfr_weighted_metallicity()
         dat = tab1[[tab1['target'] == s.target]]
         dmod_f, nnd1, nnd2 = within(s.dmod, dat['mM'], perr=s.dmod_perr, merr=s.dmod_merr)

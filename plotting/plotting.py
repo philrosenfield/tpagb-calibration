@@ -3,8 +3,6 @@ import difflib
 import logging
 import os
 import sys
-import ResolvedStellarPops as rsp
-angst_data = rsp.angst_tables.angst_data
 
 import matplotlib as mpl
 import matplotlib.pylab as plt
@@ -18,13 +16,14 @@ except:
 
 import numpy as np
 
-from ..TPAGBparams import EXT, snap_src, matchfake_loc, data_loc
+from ..TPAGBparams import EXT, matchfake_loc, data_loc
 from ..analysis.analyze import get_itpagb, parse_regions, get_trgb
-from ..fileio import load_obs, find_fakes, find_match_param, load_lf_file
-from ..fileio import load_observation
-from ..utils import minmax
-from ..pop_synth import stellar_pops
+from .. import fileio
+from ..pop_synth import stellar_pops, SimGalaxy
 from ..sfhs import star_formation_histories
+from ..angst_tables import angst_data
+from .. import utils
+from ..utils import astronomy_utils
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -94,9 +93,10 @@ def outside_labels(axs, fig=None, xlabel=None, ylabel=None, rows=True,
 
 
 def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
-    stext_kw = dict({'color': model_default_color, 'fontsize': nar_text_fontsize, 'ha': 'center'}.items() +
-                    emboss().items())
-    dtext_kw = dict(stext_kw.items() + {'color': data_default_color}.items())
+    stext_kw = {'color': model_default_color, 'fontsize': nar_text_fontsize, 'ha': 'center'}
+    stext_kw.update(emboss())
+    dtext_kw = stext_kw
+    dtext_kw.update({'color': data_default_color})
 
     assert ratio_data[0]['target'] == 'data', \
         'the first line of the narratio file needs to be a data measurement'
@@ -104,7 +104,7 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
     nrgb = float(ratio_data[0]['nrgb'])
 
     dratio = nagb / nrgb
-    dratio_err = rsp.utils.count_uncert_ratio(nagb, nrgb)
+    dratio_err = utils.count_uncert_ratio(nagb, nrgb)
 
     indx, = np.nonzero(ratio_data['target'] == target)
     mrgb = np.mean(np.array(ratio_data[indx]['nrgb'], dtype=float))
@@ -119,8 +119,8 @@ def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
     xvals = [xagb_val, xrgb_val, xratio_val]
 
     # simulated nrgb and nagb are the mean values
-    srgb_text = r'$\langle N_{\rm %s}\rangle =%i$' % (mid_txt, np.mean(mrgb))
-    sagb_text = r'$\rm{R14}\ \langle N_{\rm TP-AGB}\rangle=%i$' % np.mean(magb)
+    srgb_text = r'$\langle N_{{\rm {0:s}}}\rangle ={1!s}$'.format(mid_txt, np.mean(mrgb))
+    sagb_text = r'$\rm{{R14}}\ \langle N_{{\rm TP-AGB}}\rangle={0!s}}}$' % np.mean(magb)
 
     # one could argue taking the mean isn't the best idea for
     # the ratio errors.
@@ -181,13 +181,12 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
     -------
     ax: axes instance
     '''
-    plt_kw = dict({'color': model_default_color}.items() + plt_kw.items())
-
+    default = {'color': model_default_color}
+    default.update(plt_kw)
+    plt_kw_lab = default
     if agb_mod is not None:
         label = '${}$'.format(agb_mod)
-        plt_kw_lab = dict(plt_kw.items() + {'label': label}.items())
-    else:
-        plt_kw_lab = plt_kw
+        plt_kw_lab.update({'label': label})
 
     if ax is None:
         fig, (ax) = plt.subplots(figsize=(10, 6))
@@ -198,16 +197,16 @@ def plot_model(mag2s=None, bins=None, norms=None, inorm=None, ax=None,
         ms =[mag2s[i] * norms[i] for i in range(len(mag2s))]
 
     hists = [np.histogram(m, bins=bins)[0] for m in ms]
-    minhists = np.min(np.array(hists).T, axis=1)
-    maxhists = np.max(np.array(hists).T, axis=1)
+    minhists = np.nanmin(np.array(hists).T, axis=1)
+    maxhists = np.nanmax(np.array(hists).T, axis=1)
     #meanhists = np.mean(np.array(hists).T, axis=1)
-    meanhists = np.median(np.array(hists).T, axis=1)
+    meanhists = np.nanmedian(np.array(hists).T, axis=1)
     edges = np.repeat(bins, 2)
     fminhist = np.hstack((0, np.repeat(minhists, 2), 0))
     fmaxhist = np.hstack((0, np.repeat(maxhists, 2), 0))
 
     ax.fill_between(edges, fminhist, fmaxhist, color=plt_kw_lab['color'],
-                    alpha='0.2')
+                    alpha=0.2)
 
     #ax.fill_between(bins[1:], minhists, maxhists, color=plt_kw_lab['color'],
     #                alpha='0.2')
@@ -228,29 +227,31 @@ def plot_gal(mag2, bins, ax=None, target=None, plot_kw={}, fake_file=None,
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
     target = target.replace('-', '\!-\!').upper()
-    plot_kw = dict({'drawstyle': 'steps', 'lw': 0.8,
-                    'color': data_default_color,
-                    'label': '${}$'.format(target)}.items() + plot_kw.items())
+    default = {'drawstyle': 'steps', 'lw': 0.8, 'color': data_default_color,
+               'label': '${}$'.format(target)}
+    default.update(plot_kw)
+    plot_kw = default
 
     hist = np.histogram(mag2, bins=bins)[0]
     err = np.sqrt(hist)
 
     if fake_file is not None:
         comp_corr = stellar_pops.completeness_corrections(fake_file, bins)
-        hist = np.histogram(mag2, bins=bins)[0]
+        hist = np.array(np.histogram(mag2, bins=bins)[0], dtype=float)
+        comp_corr[np.isnan(comp_corr)] = 0.
         hist /= comp_corr[1:]
         err = np.sqrt(hist)
         plot_kw['lw'] += 0.8
 
     gl, = ax.plot(bins[1:], hist, **plot_kw)
-    ylim = np.max(hist)
+    ylim = np.nanmax(hist)
     # mid bin
     ax.errorbar(bins[1:] - 0.05, hist, yerr=err, fmt='none',
                 ecolor=plot_kw['color'], lw=plot_kw['lw']-0.1)
     glt = None
     if over_plot is not None:
         plot_kw['lw'] += 0.2
-        hist = np.histogram(mag2[over_plot], bins=bins)[0]
+        hist = np.array(np.histogram(mag2[over_plot], bins=bins)[0], dtype=float)
         if fake_file is not None:
             hist /= comp_corr[1:]
         err = np.sqrt(hist)
@@ -300,7 +301,7 @@ def mag2Mag(mag2, target, filter2):
         av = target_row[key]['Av']
         dmod = target_row[key]['dmod']
 
-    mag = rsp.astronomy_utils.mag2Mag(mag2, filter2, 'wfc3snap', Av=av,
+    mag = astronomy_utils.mag2Mag(mag2, filter2, 'wfc3snap', Av=av,
                                       dmod=dmod)
     return mag
 
@@ -319,7 +320,7 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
     # model - data / data
     # model - data
     # plot all three
-    galaxies = rsp.fileio.get_files(data_loc, '*fits')
+    galaxies = fileio.get_files(data_loc, '*fits')
 
     fig1, opt_axs = plt.subplots(nrows=3, sharex=True, figsize=(6, 9))
     fig2, nir_axs = plt.subplots(nrows=3, sharex=True, figsize=(6, 9))
@@ -327,15 +328,15 @@ def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
     bins = np.arange(16, 27, dmag)
 
     for i, lf_file in enumerate(lf_files):
-        lfd = load_lf_file(lf_file)
+        lfd = fileio.load_lf_file(lf_file)
         target = os.path.split(lf_file)[1].split('_')[0]
         observation, = [g for g in galaxies if target.upper() in g]
-        mag1, mag2 = load_observation(observation, col1, col2,
+        mag1, mag2 = fileio.load_observation(observation, col1, col2,
                                       match_param=match_param)
         color = mag1 - mag2
 
         search_str = '*{}*.matchfake'.format(target.upper())
-        fakes = rsp.fileio.get_files(matchfake_loc, search_str)
+        fakes = fileio.get_files(matchfake_loc, search_str)
         nirfake, = [f for f in fakes if 'IR' in f]
         optfake = [f for f in fakes if not 'IR' in f][0]
 
@@ -406,7 +407,7 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
                    dmag=0.1, narratio_file=None, make_plot=True,
                    regions_kw=None, xlims=[None, None], ylims=[None, None], extra_str='',
                    agb_mod=None, mplt_kw={}, dplot_kw={},
-                   match_param=None):
+                   match_param=None, mtrgb=None):
     '''
     Plot the LFs and galaxy LF.
 
@@ -420,43 +421,54 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
     '''
     agb_mod = translate_agbmod(agb_mod)
     target = os.path.split(lf_file)[1].split('_')[0]
-    ir_mtrgb = get_trgb(target, filter2='F160W', filter1=None)
-    opt_mtrgb = get_trgb(target, filter2='F814W')
-    trgb_color = opt_mtrgb - ir_mtrgb
+    trgb_color = 0.
+    if mtrgb is None:
+        ir_mtrgb = get_trgb(target, filter2='F160W', filter1=None)
+        opt_mtrgb = get_trgb(target, filter2='F814W')
+        trgb_color = opt_mtrgb - ir_mtrgb
 
-    mag1, mag2 = load_observation(observation, col1, col2,
+
+    mag1, mag2 = fileio.load_observation(observation, col1, col2,
                                   match_param=match_param)
+
     data_tpagb = get_itpagb(target, mag1 - mag2, mag2, col2,
-                            off=trgb_color)
-    #ogal, ngal = load_obs(target)
-    #mag1 = ogal.data['MAG2_ACS']
-    #mag2 = ngal.data['MAG2_IR']
+                            off=trgb_color, mtrgb=mtrgb)
 
     search_str = '*{}*.matchfake'.format(target.upper())
-    fakes = rsp.fileio.get_files(matchfake_loc, search_str)
-    nirfake, = [f for f in fakes if 'IR' in f]
+    fakes = fileio.get_files(matchfake_loc, search_str)
+
+    try:
+        nirfake, = [f for f in fakes if 'IR' in f]
+    except:
+        nirfake = None
     optfake = [f for f in fakes if not 'IR' in f][0]
 
     if narratio_file is not None:
-        ratio_data = rsp.fileio.readfile(narratio_file, string_column=[0, 1, 2])
+        ratio_data = fileio.readfile(narratio_file, string_column=[0, 1, 2])
 
     if 'cor' in filter1:
         if not '_ast_cor' in extra_str:
             extra_str += '_ast_cor'
 
-    lfd = load_lf_file(lf_file)
+    lfd = fileio.load_lf_file(lf_file)
 
     for filt, fake_file in zip([filter1, filter2], [optfake, nirfake]):
         if filt == filter1:
             mag = mag1
             xlim = xlims[0]
-            xlim[-1] = angst_data.get_50compmag(target.replace('-', '_').upper(),
-                                                'F814W')
+            try:
+                xlim[-1] = angst_data.get_50compmag(target.replace('-', '_').upper(),
+                                                    'F814W')
+            except:
+                pass
             ylim = ylims[0]
         else:
             mag = mag2
             xlim = xlims[1]
-            xlim[-1] = angst_data.get_snap_50compmag(target.upper(), 'F160W')
+            try:
+                xlim[-1] = angst_data.get_snap_50compmag(target.upper(), 'F160W')
+            except:
+                pass
             ylim = ylims[1]
 
         bins = np.arange(mag.min(), mag.max(), step=dmag)
@@ -489,7 +501,8 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
         ax.set_xlabel('${}$'.format(filt.replace('_cor', '').replace('F', 'm_{F').replace('W', 'W}')), fontsize=label_fontsize)
         ax.set_ylabel('${\#}$', fontsize=label_fontsize)
         if narratio_file is not None:
-            ax = add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB')
+            pass
+            # ax = add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB')
 
         #plt.tick_params(labelsize=16)
         outfile = '{}_{}{}_lfs{}'.format(lf_file.split('_lf')[0], filt, extra_str, EXT)
@@ -503,20 +516,21 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
 
 def add_trgb(ax, target, band, lf=True, regions_kw=None):
     offset = 1.
-    #opt_fake, nir_fake = find_fakes(target)
+    #opt_fake, nir_fake = fileio.find_fakes(target)
     #comp1, comp2 = stellar_pops.limiting_mag(nir_fake, 0.9)
     faint_color = 'k'
 
-    if not 'ir' in band.lower():
-        trgb = angst_data.get_tab5_trgb_av_dmod(target.upper())[0]
-        trgb_exclude = 0.1
-        magbright = trgb + trgb_exclude
-        magfaint = trgb + offset
-        regions_kw = {'offset': offset,
-                      'trgb_exclude': trgb_exclude,
-                      'trgb': trgb,
-                      'mag_bright': magbright,
-                      'mag_faint': magfaint}
+    if regions_kw is None:
+        if not 'ir' in band.lower():
+            trgb = angst_data.get_tab5_trgb_av_dmod(target.upper())[0]
+            trgb_exclude = 0.1
+            magbright = trgb + trgb_exclude
+            magfaint = trgb + offset
+            regions_kw = {'offset': offset,
+                          'trgb_exclude': trgb_exclude,
+                          'trgb': trgb,
+                          'mag_bright': magbright,
+                          'mag_faint': magfaint}
 
 
     ax = add_lines_to_plot(ax, faint_color=faint_color, lf=lf,
@@ -577,9 +591,9 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
     A two column plot with a data CMD and a scaled model CMD with stages
     pointed out.
     """
-    opt_lfd, nir_lfd = load_lf_file(lf_file)
+    opt_lfd, nir_lfd = fileio.load_lf_file(lf_file)
 
-    sgal = rsp.SimGalaxy(trilegal_catalog)
+    sgal = SimGalaxy(trilegal_catalog)
     if 'dav' in trilegal_catalog.lower():
         print('applying dav')
         dAv = float('.'.join(sgal.name.split('dav')[1].split('.')[:2]).replace('_',''))
@@ -589,7 +603,7 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
     if type(zcolumns) is str:
         zcolumns = [zcolumns]
 
-    optgal, nirgal = load_obs(target, optfilter1=optfilter1)
+    optgal, nirgal = fileio.load_obs(target, optfilter1=optfilter1)
 
     if opt:
         if 'm31' in trilegal_catalog or 'B' in trilegal_catalog:
@@ -664,7 +678,7 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
         for ax in [ax1, ax2]:
             if use_exclude:
                 if filter2 == 'F814W':
-                    match_param = find_match_param(target, optfilter1=optfilter1)
+                    match_param = fileio.find_match_param(target, optfilter1=optfilter1)
                     exg = stellar_pops.get_exclude_gates(match_param)
                     # exg are V-I vs V not V-I vs I...
                     ax.plot(exg[:, 0], exg[:, 1] - exg[:, 0], lw=2)
@@ -722,7 +736,7 @@ def main(argv):
     parser.add_argument('-s', '--scolnames', type=str, default='F814W,F160W',
                         help='comma separated column names in trilegal catalog')
 
-    parser.add_argument('-t', '--trgb', type=str, default=None,
+    parser.add_argument('-t', '--trgb', type=float, default=None,
                         help='trgb mag')
 
     parser.add_argument('-v', '--Av', type=float, default=0.,

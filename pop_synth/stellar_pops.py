@@ -2,9 +2,9 @@ import logging
 import os
 import numpy as np
 
-from ResolvedStellarPops.galaxies.starpop import stars_in_region
-from ResolvedStellarPops.galaxies.asts import ASTs
-from ResolvedStellarPops.utils import points_inside_poly
+from .starpop import stars_in_region
+from .asts import ASTs
+from ..utils import points_inside_poly
 
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -187,6 +187,7 @@ def completeness_corrections(fakefile, mag_bins, mag2=True):
         ast_c = ast.fcomp1(mag_bins)
 
     return ast_c
+
 
 def exclude_gate_inds(mag1, mag2, match_param=None, exclude_gates=None,
                       ms_color_cut=False):

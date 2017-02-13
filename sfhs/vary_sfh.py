@@ -8,13 +8,11 @@ import os
 import sys
 import time
 
-import ResolvedStellarPops as rsp
-import trilegal
+from ..trilegal.utils import galaxy_input_dict, galaxy_input_fmt
 from dweisz.match import scripts as match
-
 from .star_formation_histories import StarFormationHistories as SFH
 from ..pop_synth.stellar_pops import limiting_mag
-from ..fileio import replace_ext
+from .. import fileio
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -56,9 +54,9 @@ class VarySFHs(SFH):
 
         Parameters
         ----------
-            inp_obj : rsp.fileio.InputParameters object
+            inp_obj : fileio.InputParameters object
                 input parameters object
-            input_file : path to file that can be read into a dictionary via rsp.fileio.load_input
+            input_file : path to file that can be read into a dictionary via fileio.load_input
 
             Necessary contents of input_file/inp_obj
             ------------------
@@ -151,7 +149,7 @@ class VarySFHs(SFH):
              'filter1': 'F814W',
              'object_cutoffmass': object_cutoffmass}
 
-        trigal_dict = trilegal.utils.galaxy_input_dict(**gal_dict)
+        trigal_dict = galaxy_input_dict(**gal_dict)
 
         for i in range(len(self.sfr_files)):
             trigal_dict['object_sfr_file'] =  self.sfr_files[i]
@@ -163,8 +161,8 @@ class VarySFHs(SFH):
                 new_out = self.galinp_fmt % i
             self.galaxy_inputs.append(new_out)
             if not os.path.isfile(new_out) or overwrite:
-                gal_inp = rsp.fileio.InputParameters(default_dict=trigal_dict)
-                gal_inp.write_params(new_out, trilegal.utils.galaxy_input_fmt())
+                gal_inp = fileio.InputParameters(default_dict=trigal_dict)
+                gal_inp.write_params(new_out, galaxy_input_fmt())
             else:
                 logger.info('not overwritting {}'.format(new_out))
 
@@ -299,11 +297,11 @@ def main(argv):
     args = parser.parse_args(argv)
 
     target, filter1, filter2 = \
-        os.path.split(replace_ext(args.sfh_file, ''))[1].split('_')[:3]
+        os.path.split(fileio.replace_ext(args.sfh_file, ''))[1].split('_')[:3]
 
     agb_mod = args.cmd_input_file.replace('cmd_input_', '').replace('.dat', '').lower()
     outfile_loc = os.path.join(os.getcwd(), agb_mod)
-    rsp.fileio.ensure_dir(outfile_loc)
+    fileio.ensure_dir(outfile_loc)
 
     indict = {'cmd_input_file': args.cmd_input_file,
               'fake_file': args.fake_file,
