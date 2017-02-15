@@ -40,7 +40,7 @@ def make_ast_corrections(trilegal_catalogs, filters, outfiles=None,
 
     trilegal_catalogs = np.atleast_1d(trilegal_catalogs)
     fakes = np.atleast_1d(fake)
-    asts = [ASTs(f, filters=filters) for f in fakes]
+    asts = [ASTs(f, filters=filters, filterset=filterset) for f in fakes]
 
     logger.debug('{}'.format(trilegal_catalogs))
 
@@ -84,7 +84,7 @@ def main(argv):
     parser.add_argument('-f', '--fake', type=str, help='fake file name')
 
     parser.add_argument('-s', '--filterset', type=int, default=0,
-                        help='if 2 filters, and matchfake has 4, provide which filters to use 0: first or 1: second')
+                        help='if 2 filters, and the fake file has 4, provide which filters to use 0: first two or 1: second two')
 
     parser.add_argument('filters', type=str,
                         help='comma separated list of filters in trilegal catalog')

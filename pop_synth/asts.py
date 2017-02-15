@@ -148,30 +148,14 @@ def ast_correct_starpop(sgal, fake_file=None, outfile=None, overwrite=False,
 
 class ASTs(object):
     '''class for reading and using artificial stars'''
-    def __init__(self, filename, filters=None, filt_extra=''):
+    def __init__(self, filename, filters=None, filt_extra='', filterset=0):
         '''
         if filename has 'match' in it will assume this is a matchfake file.
         if filename has .fits extention will assume it's a binary fits table.
         '''
         self.base, self.name = os.path.split(filename)
         self.filt_extra = filt_extra
-        nfilts = 2
-        if filters is None:
-            _, filters = parse_pipeline(filename)
-            try:
-                self.filter1, self.filter2 = filters
-            except:
-                try:
-                    self.filter1, self.filter2, self.filter3 = filters
-                    nfilts = 3
-                except:
-                    self.filter1 = 'V'
-                    self.filter2 = 'I'
-        else:
-            for i in range(len(filters)):
-                self.__setattr__('filter{0:d}'.format(i+1), filters[i])
-        self.nfilters = len(filters)
-        self.read_file(filename)
+        self.read_file(filename, filters=filters, filterset=filterset)
 
     def recovered(self, threshold=9.99):
         '''
@@ -219,7 +203,7 @@ class ASTs(object):
             self.hess = astronomy_utils.hess(self.colordiff2, mag, binsize,
                                              **hess_kw)
 
-    def read_file(self, filename):
+    def read_file(self, filename, filters=None, filterset=0):
         '''
         read MATCH fake file into attributes
         format is mag1in mag1diff mag2in mag2diff
@@ -241,7 +225,7 @@ class ASTs(object):
                 self.__setattr__(name, self.data[name])
         else:
             assert not None in [self.filter1, self.filter2], \
-                'Must specify filter strings'
+                'fits not supported.'
             self.data = fits.getdata(filename)
             self.mag1 = self.data['{}_IN'.format(self.filter1)]
             self.mag2 = self.data['{}_IN'.format(self.filter2)]
@@ -249,6 +233,26 @@ class ASTs(object):
             mag2out = self.data['{}{}'.format(self.filter2, self.filt_extra)]
             self.mag1diff = self.mag1 - mag1out
             self.mag2diff = self.mag2 - mag2out
+
+        nfilts = len(mags)
+        if filters is None:
+            _, filters = parse_pipeline(filename)
+            if len(filters) == 0:
+                filters = ['filter{0:d}'.format(i+1) for i in range(len(filters))]
+
+        if len(filters) != nfilts:
+            if filterset == 0:
+                # add dummy names for filter3 and filter4
+                filters.extend(['filter3', 'filter4'])
+            else:
+                # add dummy names for filter1 and filter2
+                ftmp = ['filter1', 'filter2']
+                ftmp.extend(filters)
+                filters = ftmp
+
+        for i in range(len(filters)):
+            self.__setattr__('filter{0:d}'.format(i+1), filters[i])
+        self.nfilters = nfilts
 
     def write_matchfake(self, newfile, filterset=0):
         '''write matchfake file'''
