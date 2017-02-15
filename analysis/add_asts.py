@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def make_ast_corrections(trilegal_catalogs, filters, outfiles=None,
                          diag_plot=False, overwrite=True, hdf5=False,
-                         filter1=None, filter2=None, fake=None):
+                         filter1=None, filter2=None, fake=None, filterset=0):
     """
     see asts.ast_correct_starpop
     """
@@ -29,6 +29,14 @@ def make_ast_corrections(trilegal_catalogs, filters, outfiles=None,
     else:
         outfiles = np.atleast_1d(outfiles)
         outfmt = 'supplied'
+
+    if len(filters) == 4:
+        correct = 'all'
+    elif len(filters) == 2:
+        correct = 'both'
+    else:
+        print('Must provide 2 or 4 filters')
+        sys.exit(1)
 
     trilegal_catalogs = np.atleast_1d(trilegal_catalogs)
     fakes = np.atleast_1d(fake)
@@ -50,7 +58,8 @@ def make_ast_corrections(trilegal_catalogs, filters, outfiles=None,
         for ast in asts:
             ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
                                 outfile=outfile, diag_plot=diag_plot,
-                                hdf5=hdf5, correct='all')
+                                hdf5=hdf5, correct=correct,
+                                filterset=filterset)
     return
 
 
@@ -73,6 +82,9 @@ def main(argv):
     parser.add_argument('-o', '--outfile', type=str, help='outfile name')
 
     parser.add_argument('-f', '--fake', type=str, help='fake file name')
+
+    parser.add_argument('-s', '--filterset', type=int, default=0,
+                        help='if 2 filters, and matchfake has 4, provide which filters to use 0: first or 1: second')
 
     parser.add_argument('filters', type=str,
                         help='comma separated list of filters in trilegal catalog')
@@ -97,7 +109,7 @@ def main(argv):
 
     filters = args.filters.split(',')
     make_ast_corrections(args.name, filters=filters, outfiles=args.outfile,
-                         fake=args.fake)
+                         fake=args.fake, filterset=args.filterset)
     return
 
 if __name__ == "__main__":
