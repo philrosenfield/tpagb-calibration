@@ -4,6 +4,37 @@ import numpy as np
 import sys
 import argparse
 
+
+def add_data(old_data, names, new_data):
+    '''
+    use with Starpop, Track, or any object with data attribute that is a
+    np.recarray
+
+    add columns to self.data, update self.key_dict
+    see numpy.lib.recfunctions.append_fields.__doc__
+
+    Parameters
+    ----------
+    old_data : recarray
+        original data to add columns to
+
+    new_data : array or sequence of arrays
+        new columns to add to old_data
+
+    names : string, sequence
+        String or sequence of strings corresponding to the names
+        of the new_data.
+
+    Returns
+    -------
+    array with old_data and new_data
+    '''
+    import numpy.lib.recfunctions as nlr
+    data = nlr.append_fields(np.asarray(old_data), names, new_data).data
+    data = data.view(np.recarray)
+    return data
+
+
 def float2sci(num):
     """mpl has a better way of doing this?"""
     _, exnt = '{0:.0e}'.format(num).split('e')

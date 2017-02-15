@@ -299,9 +299,8 @@ def crazy_histogram2d(x, y, bins=10, weights=None, reduce_w=None, NULL=None,
         else:
             d[key] = [_w[e]]
 
-    _xyi = np.array(d.keys()).T
+    _xyi = np.array(list(d.keys())).T
     _w   = np.array([ reduce_w(v) for v in d.values() ])
-
     # exploit a sparse coo_matrix to build the 2D histogram...
     _grid = sparse.coo_matrix((_w, _xyi), shape=(nx, ny))
 

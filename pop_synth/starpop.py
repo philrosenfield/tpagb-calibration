@@ -287,6 +287,7 @@ class StarPop(object):
         -------
         header
         '''
+
         self.data = utils.add_data(self.data, names, data)
 
         # update key_dict
@@ -446,13 +447,17 @@ class StarPop(object):
     def write_data(self, outfile, overwrite=False, hdf5=False, slice_inds=None):
         '''call fileio.savetxt to write self.data'''
         data = self.data
+        from astropy.table import Table
         if slice_inds is not None:
             data = self.data[slice_inds]
         if not hdf5:
-            fileio.savetxt(outfile, data, fmt='%5g', header=self.get_header(),
-                           overwrite=overwrite)
+            if outfile.endswith('.fits'):
+                tbl = Table(data=data)
+                tbl.write(outfile, overwrite=overwrite)
+            else:
+                if overwrite or not os.isfile(outfile):
+                    np.savetxt(outfile, data, fmt='%5g', header=self.get_header())
         else:
-            from astropy.table import Table
             if not outfile.endswith('.hdf5'):
                 outfile = fileio.replace_ext(outfile, '.hdf5')
             tbl = Table(data)

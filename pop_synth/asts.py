@@ -22,7 +22,8 @@ plt.style.use('ggplot')
 
 def ast_correct_starpop(sgal, fake_file=None, outfile=None, overwrite=False,
                         asts_obj=None, correct_kw={}, diag_plot=False,
-                        plt_kw={}, hdf5=True, correct='both'):
+                        plt_kw={}, hdf5=True, correct='both',
+                        filterset=0):
     '''
     correct mags with artificial star tests, finds filters by fake_file name
 
@@ -63,6 +64,14 @@ def ast_correct_starpop(sgal, fake_file=None, outfile=None, overwrite=False,
     If sgal, adds columns to sgal.data
     '''
     fmt = '{}_cor'
+    if correct == 'all':
+        correct = 'filter1 filter2 filter3 filter4'
+    if correct == 'both':
+        if filterset == 0:
+            correct = 'filter1 filter2'
+        else:
+            correct = 'filter3 filter4'
+
     if asts_obj is None:
         sgal.fake_file = fake_file
         _, filter1, filter2 = parse_pipeline(fake_file)
@@ -70,27 +79,51 @@ def ast_correct_starpop(sgal, fake_file=None, outfile=None, overwrite=False,
             errfmt = '{}, {} ast corrections already in file.'
             logger.warning(errfmt.format(filter1, filter2))
             return sgal.data[fmt.format(filter1)], sgal.data[fmt.format(filter2)]
-        ast = ASTs(fake_file)
+        ast = ASTs(fake_file, filters=[filter1, filter2], usecols=usecols)
     else:
         ast = asts_obj
 
-    mag1 = sgal.data[ast.filter1]
-    mag2 = sgal.data[ast.filter2]
+    default = {'dxy': (0.2, 0.15)}
+    default.update(correct_kw)
+    correct_kw = default
+    if fmt.format(ast.filter1) in sgal.data.dtype.names:
+        correct = correct.replace('filter1', '')
+    if fmt.format(ast.filter2) in sgal.data.dtype.names:
+        correct = correct.replace('filter2', '')
 
-    correct_kw = dict({'dxy': (0.2, 0.15)}.items() + correct_kw.items())
-    cor_mag1, cor_mag2 = ast.correct(mag1, mag2, **correct_kw)
-    if correct == 'filter2':
-        logger.info('adding corrections for {}'.format(ast.filter2))
-        names = [fmt.format(ast.filter2)]
-        data = [cor_mag2]
-    elif correct == 'filter1':
-        logger.info('adding corrections for {}'.format(ast.filter1))
-        names = [fmt.format(ast.filter1)]
-        data = [cor_mag1]
-    else:
-        logger.info('adding corrections for {}, {}'.format(ast.filter1, ast.filter2))
-        names = [fmt.format(ast.filter1), fmt.format(ast.filter2)]
-        data = [cor_mag1, cor_mag2]
+    if '3' in correct:
+        if fmt.format(ast.filter3) in sgal.data.dtype.names:
+            correct = correct.replace('filter3', '')
+    if '4' in correct:
+        if fmt.format(ast.filter4) in sgal.data.dtype.names:
+            correct = correct.replace('filter4', '')
+
+    names = []
+    data = []
+    if 'filter1' in correct or 'filter2' in correct:
+        cor_mag1, cor_mag2 = ast.correct(sgal.data[ast.filter1],
+                                         sgal.data[ast.filter2], **correct_kw)
+        if 'filter1' in correct:
+            names.append(fmt.format(ast.filter1))
+            data.append(cor_mag1)
+        if 'filter2' in correct:
+            names.append(fmt.format(ast.filter2))
+            data.append(cor_mag2)
+    if 'filter3' in correct or 'filter4' in correct:
+        correct_kw['filterset'] = 1
+        cor_mag3, cor_mag4 = ast.correct(sgal.data[ast.filter3],
+                                         sgal.data[ast.filter4], **correct_kw)
+        if 'filter3' in correct:
+            names.append(fmt.format(ast.filter3))
+            data.append(cor_mag3)
+        if 'filter4' in correct:
+            names.append(fmt.format(ast.filter4))
+            data.append(cor_mag4)
+
+    if len(data) == 0:
+        logger.info('no corrections to add')
+        return
+    logger.info('adding corrections for {}'.format(correct))
 
     sgal.add_data(names, data)
 
@@ -110,31 +143,34 @@ def ast_correct_starpop(sgal, fake_file=None, outfile=None, overwrite=False,
         if 'label' in plt_kw.keys():
             [ax.legend(loc=0, frameon=False) for ax in axs]
         plt.savefig(replace_ext(outfile, '_ast_correction.png'))
-    return cor_mag1, cor_mag2
+    return data
 
 
 class ASTs(object):
     '''class for reading and using artificial stars'''
-    def __init__(self, filename, filter1=None, filter2=None, filt_extra=''):
+    def __init__(self, filename, filters=None, filt_extra=''):
         '''
         if filename has 'match' in it will assume this is a matchfake file.
         if filename has .fits extention will assume it's a binary fits table.
         '''
         self.base, self.name = os.path.split(filename)
-        self.filter1 = filter1
-        self.filter2 = filter2
         self.filt_extra = filt_extra
-
-        self.target, filters = parse_pipeline(filename)
-
-        try:
-            self.filter1, self.filter2 = filters
-        except:
+        nfilts = 2
+        if filters is None:
+            _, filters = parse_pipeline(filename)
             try:
-                self.filter1, self.filter2, self.filter3 = filters
+                self.filter1, self.filter2 = filters
             except:
-                self.filter1 = 'V'
-                self.filter2 = 'I'
+                try:
+                    self.filter1, self.filter2, self.filter3 = filters
+                    nfilts = 3
+                except:
+                    self.filter1 = 'V'
+                    self.filter2 = 'I'
+        else:
+            for i in range(len(filters)):
+                self.__setattr__('filter{0:d}'.format(i+1), filters[i])
+        self.nfilters = len(filters)
         self.read_file(filename)
 
     def recovered(self, threshold=9.99):
@@ -156,16 +192,32 @@ class ASTs(object):
         rec1, = np.nonzero(np.abs(self.mag1diff) < threshold)
         rec2, = np.nonzero(np.abs(self.mag2diff) < threshold)
         self.rec = list(set(rec1) & set(rec2))
+        retv = (rec1, rec2)
         if len(self.rec) == len(self.mag1diff):
             logger.warning('all stars recovered')
-        return rec1, rec2
 
-    def make_hess(self, binsize=0.1, yattr='mag2diff', hess_kw={}):
+        if self.nfilters == 4:
+            rec3, = np.nonzero(np.abs(self.mag3diff) < threshold)
+            rec4, = np.nonzero(np.abs(self.mag4diff) < threshold)
+            self.rec2 = list(set(rec3) & set(rec4))
+            retv = (rec1, rec2, rec3, rec4)
+            if len(self.rec2) == len(self.mag3diff):
+                logger.warning('all stars recovered')
+
+        return retv
+
+    def make_hess(self, binsize=0.1, yattr='mag2diff', hess_kw={},
+                  yattr2='mag4diff'):
         '''make hess grid'''
         self.colordiff = self.mag1diff - self.mag2diff
         mag = self.__getattribute__(yattr)
         self.hess = astronomy_utils.hess(self.colordiff, mag, binsize,
                                          **hess_kw)
+        if self.nfilters == 4:
+            self.colordiff2 = self.mag3diff - self.mag4diff
+            mag = self.__getattribute__(yattr2)
+            self.hess = astronomy_utils.hess(self.colordiff2, mag, binsize,
+                                             **hess_kw)
 
     def read_file(self, filename):
         '''
@@ -177,7 +229,12 @@ class ASTs(object):
         mag2diff is assumed to be mag2in-mag2out
         '''
         if not filename.endswith('.fits'):
-            names = ['mag1', 'mag2', 'mag1diff', 'mag2diff']
+            with open(filename, 'r') as inp:
+                cols = inp.readline().strip().split()
+            nmags = len(cols) // 2
+            mags = ['mag{:d}'.format(i+1) for i in range(nmags)]
+            mdifs = ['{:s}diff'.format(m) for m in mags]
+            names = list(np.concatenate([mags, mdifs]))
             self.data = np.genfromtxt(filename, names=names)
             # unpack into attribues
             for name in names:
@@ -193,12 +250,16 @@ class ASTs(object):
             self.mag1diff = self.mag1 - mag1out
             self.mag2diff = self.mag2 - mag2out
 
-    def write_matchfake(self, newfile):
+    def write_matchfake(self, newfile, filterset=0):
         '''write matchfake file'''
-        dat = np.array([self.mag1, self.mag2, self.mag1diff, self.mag2diff]).T
+        if filterset == 1:
+            dat = np.array([self.mag1, self.mag2, self.mag1diff, self.mag2diff]).T
+        else:
+            dat = np.array([self.mag3, self.mag4, self.mag3diff, self.mag4diff]).T
+
         np.savetxt(newfile, dat, fmt='%.3f')
 
-    def bin_asts(self, binsize=0.2, bins=None):
+    def bin_asts(self, binsize=0.2, bins=None, filterset=0):
         '''
         bin the artificial star tests
 
@@ -213,15 +274,33 @@ class ASTs(object):
             which each value in mag1 and mag2 belong (see np.digitize).
         self.ast_bins: bins used for the asts.
         '''
-        if bins is None:
-            ast_max = np.max(np.concatenate((self.mag1, self.mag2)))
-            ast_min = np.min(np.concatenate((self.mag1, self.mag2)))
-            self.ast_bins = np.arange(ast_min, ast_max, binsize)
+        if filterset == 0:
+            mag1 = self.mag1
+            mag2 = self.mag2
+            ast_bins_atr = 'ast_bins'
+            am1_inds_atr = 'am1_inds'
+            am2_inds_atr = 'am2_inds'
         else:
-            self.ast_bins = bins
+            mag1 = self.mag3
+            mag2 = self.mag4
+            ast_bins_atr = 'ast_bins2'
+            am1_inds_atr = 'am3_inds'
+            am2_inds_atr = 'am4_inds'
 
-        self.am1_inds = np.digitize(self.mag1, self.ast_bins)
-        self.am2_inds = np.digitize(self.mag2, self.ast_bins)
+        if hasattr(self, ast_bins_atr):
+            return
+
+        if bins is None:
+            ast_max = np.max(np.concatenate((mag1, mag2)))
+            ast_min = np.min(np.concatenate((mag1, mag2)))
+            ast_bins = np.arange(ast_min, ast_max, binsize)
+        else:
+            ast_bins = bins
+
+        self.__setattr__(am1_inds_atr, np.digitize(mag1, ast_bins))
+        self.__setattr__(am2_inds_atr, np.digitize(mag2, ast_bins))
+        self.__setattr__(ast_bins_atr, ast_bins)
+        return
 
     def _random_select(self, arr, nselections):
         '''
@@ -243,7 +322,8 @@ class ASTs(object):
         return rands
 
     def ast_correction(self, obs_mag1, obs_mag2, binsize=0.2, bins=None,
-                       not_rec_val=np.nan, missing_data1=0., missing_data2=0.):
+                       not_rec_val=np.nan, missing_data1=0., missing_data2=0.,
+                       filterset=0):
         '''
         Apply ast correction to input mags.
 
@@ -284,7 +364,8 @@ class ASTs(object):
         A minor issue unless the depth of the individual filters are
         vastly different.
         '''
-        self.completeness(combined_filters=True, interpolate=True)
+        self.completeness(combined_filters=True, interpolate=True,
+                          filterset=filterset)
 
         nstars = obs_mag1.size
         if obs_mag1.size != obs_mag2.size:
@@ -299,13 +380,27 @@ class ASTs(object):
 
         # need asts to be binned for this method.
         if not hasattr(self, 'ast_bins'):
-            self.bin_asts(binsize=binsize, bins=bins)
-        om1_inds = np.digitize(obs_mag1, self.ast_bins)
+            self.bin_asts(binsize=binsize, bins=bins, filterset=filterset)
+        ast_bins_atr = 'ast_bins'
+        am1_inds = 'am1_inds'
+        fcomp2 = self.fcomp2
+        mag1diff = self.mag1diff
+        mag2diff = self.mag2diff
+        if filterset == 1:
+            ast_bins_atr += '2'
+            am1_ins = 'am3_inds'
+            fcomp2 = self.fcomp4
+            mag1diff = self.mag3diff
+            mag2diff = self.mag4diff
 
-        for i in range(len(self.ast_bins)):
+        am1_inds = self.__getattribute__(am1_ins)
+        ast_bins = self.__getattribute__(ast_bins_atr)
+        om1_inds = np.digitize(obs_mag1, ast_bins)
+
+        for i in range(len(ast_bins)):
             # the obs and artificial stars in each bin
             obsbin, = np.nonzero(om1_inds == i)
-            astbin, = np.nonzero(self.am1_inds == i)
+            astbin, = np.nonzero(am1_inds == i)
 
             nobs = len(obsbin)
             nast = len(astbin)
@@ -315,7 +410,7 @@ class ASTs(object):
             if nast == 0:
                 # no asts in this bin, probably means the simulation
                 # is too deep
-                if self.fcomp2(self.ast_bins[i]) < 0.5:
+                if fcomp2(ast_bins[i]) < 0.5:
                     continue
                 else:
                     # model is producing stars where there was no data.
@@ -325,8 +420,8 @@ class ASTs(object):
             else:
                 # randomly select the appropriate ast correction for obs stars
                 # in this bin
-                cor1 = self._random_select(self.mag1diff[astbin], nobs)
-                cor2 = self._random_select(self.mag2diff[astbin], nobs)
+                cor1 = self._random_select(mag1diff[astbin], nobs)
+                cor2 = self._random_select(mag2diff[astbin], nobs)
 
             # apply corrections
             cor_mag1[obsbin] = obs_mag1[obsbin] + cor1
@@ -338,8 +433,8 @@ class ASTs(object):
             #fin = list(set(fin1) & set(fin2))
         return cor_mag1, cor_mag2
 
-    def correct(self, obs_mag1, obs_mag2, bins=[100,200], xrange=[-0.5, 5.],
-                yrange=[15., 27.], not_rec_val=0., dxy=None):
+    def correct(self, obs_mag1, obs_mag2, bins=[100,200], xrange=None,
+                yrange=None, not_rec_val=0., dxy=None, filterset=0):
         """
         apply AST correction to obs_mag1 and obs_mag2
 
@@ -368,7 +463,7 @@ class ASTs(object):
         cor_mag1, cor_mag2 : arrays len obs_mag1, obs_mag2
             corrections to obs_mag1 and obs_mag2
         """
-        from ..graphics.plotting import crazy_histogram2d as chist
+        from ..utils.plotting_utils import crazy_histogram2d as chist
 
         nstars = obs_mag1.size
         if obs_mag1.size != obs_mag2.size:
@@ -382,16 +477,41 @@ class ASTs(object):
         cor_mag2.fill(not_rec_val)
 
         obs_color = obs_mag1 - obs_mag2
-        ast_color = self.mag1 - self.mag2
+        if filterset == 0:
+            mag1 = self.mag1
+            mag2 = self.mag2
+            mag1diff = self.mag1diff
+            mag2diff = self.mag2diff
+        else:
+            mag1 = self.mag3
+            mag2 = self.mag4
+            mag1diff = self.mag3diff
+            mag2diff = self.mag4diff
+
+        ast_color = mag1 - mag2
 
         if dxy is not None:
             # approx number of bins.
-            bins[0] = len(np.arange(*xrange, step=dxy[0]))
-            bins[1] = len(np.arange(*yrange, step=dxy[1]))
+            if xrange is None:
+                xmin = np.nanmin([np.nanmin(ast_color), np.nanmin(obs_color)])
+                xmax = np.nanmax([np.nanmax(ast_color), np.nanmax(obs_color)])
+            else:
+                xmin, xmax = xrange
+            if yrange is None:
+                m2 = obs_mag2[obs_mag2 < 40.]
+                am2 = mag2[mag2 < 40.]
+                ymin = np.nanmin([np.nanmin(am2), np.nanmin(m2)])
+                ymax = np.nanmax([np.nanmax(am2), np.nanmax(m2)])
+            else:
+                ymin, ymax = yrange
+
+            bins[0] = len(np.arange(xmin, xmax, step=dxy[0]))
+            bins[1] = len(np.arange(ymin, ymax, step=dxy[1]))
 
         ckw = {'bins': bins, 'reverse_indices': True, 'xrange': xrange,
-                    'yrange': yrange}
-        SH, _, _, sixy, sinds = chist(ast_color, self.mag2, **ckw)
+               'yrange': yrange}
+
+        SH, _, _, sixy, sinds = chist(ast_color,mag2, **ckw)
         H, _, _, ixy, inds = chist(obs_color, obs_mag2, **ckw)
 
         x, y = np.nonzero(SH * H > 0)
@@ -401,13 +521,13 @@ class ASTs(object):
             hind, = np.nonzero((ixy[:, 0] == i) & (ixy[:, 1] == j))
             nobs = int(H[i, j])
             xinds = self._random_select(sinds[sind], nobs)
-            cor_mag1[inds[hind]] = self.mag1diff[xinds]
-            cor_mag2[inds[hind]] = self.mag2diff[xinds]
+            cor_mag1[inds[hind]] = mag1diff[xinds]
+            cor_mag2[inds[hind]] = mag2diff[xinds]
 
         return obs_mag1 + cor_mag1, obs_mag2 + cor_mag2
 
     def completeness(self, combined_filters=False, interpolate=False,
-                     binsize=0.2):
+                     binsize=0.2, filterset=0):
         '''
         calculate the completeness of the data in each filter
 
@@ -425,47 +545,76 @@ class ASTs(object):
             the completeness per filter binned with self.ast_bins
         '''
         # calculate stars recovered, could pass theshold here.
-        rec1, rec2 = self.recovered()
-
+        if filterset == 0:
+            rec1, rec2 = self.recovered()
+        else:
+            _, _, rec1, rec2 = self.recovered()
         # make sure ast_bins are good to go
-        if not hasattr(self, 'ast_bins'):
-            self.bin_asts(binsize=binsize)
+        self.bin_asts(binsize=binsize, filterset=filterset)
 
         # gst uses both filters for recovery.
         if combined_filters is True:
-            rec1 = rec2 = self.rec
+            if filterset == 0:
+                rec1 = rec2 = self.rec
+            else:
+                rec1 = rec2 = self.rec2
+
+        if filterset == 0:
+            mag1 = self.mag1
+            mag2 = self.mag2
+            ast_bins = self.ast_bins
+            comp1_atr = 'comp1'
+            comp2_atr = 'comp2'
+        else:
+            mag1 = self.mag3
+            mag2 = self.mag4
+            ast_bins = self.ast_bins2
+            comp1_atr = 'comp3'
+            comp2_atr = 'comp4'
 
         # historgram of all artificial stars
-        qhist1 = np.array(np.histogram(self.mag1, bins=self.ast_bins)[0],
-                          dtype=float)
+        qhist1 = np.array(np.histogram(mag1, bins=ast_bins)[0], dtype=float)
 
         # histogram of recovered artificial stars
-        rhist1 = np.array(np.histogram(self.mag1[rec1], bins=self.ast_bins)[0],
+        rhist1 = np.array(np.histogram(mag1[rec1], bins=ast_bins)[0],
                           dtype=float)
 
         # completeness histogram
-        self.comp1 = rhist1 / qhist1
+        comp1 = rhist1 / qhist1
+        self.__setattr__(comp1_atr, comp1)
 
-        qhist2 = np.array(np.histogram(self.mag2, bins=self.ast_bins)[0],
+        qhist2 = np.array(np.histogram(mag2, bins=ast_bins)[0],
                           dtype=float)
-        rhist2 = np.array(np.histogram(self.mag2[rec2], bins=self.ast_bins)[0],
+        rhist2 = np.array(np.histogram(mag2[rec2], bins=ast_bins)[0],
                           dtype=float)
-        self.comp2 = rhist2 / qhist2
+
+        comp2 = rhist2 / qhist2
+        self.__setattr__(comp2_atr, comp2)
 
         if interpolate is True:
             # sometimes the histogram isn't as useful as the a spline
             # function... add the interp1d function to self.
-            self.fcomp1 = interp1d(self.ast_bins[1:], self.comp1,
-                                   bounds_error=False)
-            self.fcomp2 = interp1d(self.ast_bins[1:], self.comp2,
-                                   bounds_error=False)
+            self.__setattr__('f{0:s}'.format(comp1_atr),
+                             interp1d(ast_bins[1:], comp1, bounds_error=False))
+            self.__setattr__('f{0:s}'.format(comp2_atr),
+                             interp1d(ast_bins[1:], comp2, bounds_error=False))
         return
 
-    def get_completeness_fraction(self, frac, dmag=0.001, bright_lim=18):
+    def get_completeness_fraction(self, frac, dmag=0.001, bright_lim=18,
+                                  filterset=0):
         """Find the completeness magnitude at a given fraction"""
-        assert hasattr(self, 'fcomp1'), \
+        if filterset == 0:
+            fcomp1_atr = 'fcomp1'
+            fcomp2_atr = 'fcomp2'
+        else:
+            fcomp1_atr = 'fcomp3'
+            fcomp1_atr = 'fcomp4'
+
+        assert hasattr(self, fcomp1_atr), \
             'need to run completeness with interpolate=True'
 
+        fcomp1 = self.__getattribute__(fcomp1_atr)
+        fcomp2 = self.__getattribute__(fcomp2_atr)
         # set up array to evaluate interpolation
         # sometimes with few asts at bright mags the curve starts with low
         # completeness, reaches toward 1, and then declines as expected.
@@ -475,10 +624,10 @@ class ASTs(object):
 
         # completeness in each filter, and the finite vals
         # (frac - nan = frac)
-        cfrac1 = self.fcomp1(search_arr)
+        cfrac1 = fcomp1(search_arr)
         ifin1 = np.isfinite(cfrac1)
 
-        cfrac2 = self.fcomp2(search_arr)
+        cfrac2 = fcomp2(search_arr)
         ifin2 = np.isfinite(cfrac2)
 
         # closest completeness fraction to passed fraction
@@ -494,22 +643,28 @@ class ASTs(object):
                            'Try adjusting bright_lim')
         return comp1, comp2
 
-    def magdiff_plot(self, axs=None):
+    def magdiff_plot(self, axs=None, filterset=0):
         """Make a plot of input mag - output mag vs input mag"""
         if not hasattr(self, 'rec'):
-            self.completeness(combined_filters=True)
+            self.completeness(combined_filters=True, filterset=filterset)
+        xlab = r'${{\rm Input}}\ {}$'
         if axs is None:
             fig, axs = plt.subplots(ncols=2, figsize=(12, 6))
 
-        axs[0].plot(self.mag1[self.rec], self.mag1diff[self.rec], '.',
-                    color='k', alpha=0.5)
-        axs[1].plot(self.mag2[self.rec], self.mag2diff[self.rec], '.',
-                    color='k', alpha=0.5)
-
-        xlab = r'${{\rm Input}}\ {}$'
-
-        axs[0].set_xlabel(xlab.format(self.filter1), fontsize=20)
-        axs[1].set_xlabel(xlab.format(self.filter2), fontsize=20)
+        if filterset == 0:
+            axs[0].plot(self.mag1[self.rec], self.mag1diff[self.rec], '.',
+                        color='k', alpha=0.5)
+            axs[1].plot(self.mag2[self.rec], self.mag2diff[self.rec], '.',
+                        color='k', alpha=0.5)
+            axs[0].set_xlabel(xlab.format(self.filter1), fontsize=20)
+            axs[1].set_xlabel(xlab.format(self.filter2), fontsize=20)
+        else:
+            axs[0].plot(self.mag3[self.rec], self.mag3diff[self.rec], '.',
+                        color='k', alpha=0.5)
+            axs[1].plot(self.mag4[self.rec2], self.mag4diff[self.rec2], '.',
+                        color='k', alpha=0.5)
+            axs[0].set_xlabel(xlab.format(self.filter3), fontsize=20)
+            axs[1].set_xlabel(xlab.format(self.filter4), fontsize=20)
 
         axs[0].set_ylabel(r'${{\rm Input}} - {{\rm Ouput}}$', fontsize=20)
         return axs
@@ -574,7 +729,7 @@ def main(argv):
         comp1, comp2 = ast.get_completeness_fraction(args.comp_frac,
                                                      bright_lim=args.bright_mag)
         print('{} {} completeness fraction:'.format(fake, args.comp_frac))
-        print('{0:20s} {1:.4f} {2:.4f}'.format(ast.target, comp1, comp2))
+        print('{0:20s} {1:.4f} {2:.4f}'.format(ast.name, comp1, comp2))
 
         if args.makeplots:
             comp_name = os.path.join(ast.base, ast.name + '_comp.png')

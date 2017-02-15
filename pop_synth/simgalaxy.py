@@ -5,6 +5,7 @@ import os
 import sys
 
 from astropy.table import Table
+from astropy.io import fits
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import interp1d
@@ -68,7 +69,7 @@ class SimGalaxy(StarPop):
     '''
     A class for trilegal catalogs (simulated stellar population)
     '''
-    def __init__(self, trilegal_catalog):
+    def __init__(self, trilegal_catalog, mode='readonly'):
         StarPop.__init__(self)
         self.base, self.name = os.path.split(trilegal_catalog)
         #data = fileio.readfile(trilegal_catalog, only_keys=only_keys)
@@ -80,8 +81,13 @@ class SimGalaxy(StarPop):
                 data = Table.read(trilegal_catalog, format='ascii.commented_header',
                                 guess=False)
             except:
-                print("Can't read {}: {}".format(trilegal_catalog, sys.exc_info()[0]))
-                return
+                try:
+                    hdu = fits.open(trilegal_catalog, mode=mode)
+                    data = hdu[1].data
+                    self.hdu = hdu
+                except:
+                    print("Can't read {}: {}".format(trilegal_catalog, sys.exc_info()[0]))
+                    return
 
         self.key_dict = dict(zip(list(data.dtype.names),
                                  range(len(list(data.dtype.names)))))
