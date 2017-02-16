@@ -235,7 +235,7 @@ def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots()
 
-    kw = {'alpha': 0.3, 'mec': 'none'}
+    kw = {'alpha': 0.3, 'mec': 'none', 'rasterized': True}
     ax.plot(sgal.data[f1] - sgal.data[f2],
             sgal.data[f2], '.', label=numlabel(sgal.data[f2], 'no exclude'),
             **kw)
@@ -246,6 +246,7 @@ def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
     mag1, mag2 = load_observation(args.observation, col1, col2,
                                   match_param=args.match_param,
                                   filterset=filterset)
+    
     ax.plot(mag1 - mag2, mag2, '.', label=numlabel(mag1, 'data'), **kw)
 
     ind = narratio_dict['idx_norm']
@@ -256,7 +257,7 @@ def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
     ax.plot(sgal.data[f1][inds][ind] - sgal.data[f2][inds][ind],
             sgal.data[f2][inds][ind], '.', label=numlabel(inds[ind], 'sim rgb'), **kw)
 
-    ax.set_ylim(mag2.max() + 0.2, mag2.min() - 0.2)
+    ax.set_ylim(mag2[mag2<40.].max() + 0.2, mag2[mag2<40.].min() - 0.2)
     ax.set_xlim(-0.5, np.max(mag1 - mag2) + 0.1)
 
     plt.legend(loc='best', numpoints=1)
