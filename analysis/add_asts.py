@@ -89,7 +89,7 @@ def main(argv):
     parser.add_argument('filters', type=str,
                         help='comma separated list of filters in trilegal catalog')
 
-    parser.add_argument('name', type=str, help='trilegal catalog')
+    parser.add_argument('name', type=str, nargs=*, help='trilegal catalogs')
 
     args = parser.parse_args(argv)
 

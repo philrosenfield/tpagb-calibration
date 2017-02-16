@@ -39,7 +39,7 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
             sgal.data['F814W'] += sgal.apply_dAv(dAv, 'F814W', 'phat', Av=Av)
 
     if match_param is not None:
-        target, (f1, f2) = parse_pipeline(match_param)
+        _, (f1, f2) = parse_pipeline(match_param)
         logger.info('using exclude gates on simulation')
         m1 = sgal.data[f1]
         m2 = sgal.data[f2]
@@ -56,8 +56,8 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
     # select rgb and agb regions
     sgal_rgb, sgal_agb = rgb_agb_regions(ymag, **regions_kw)
 
-    if 'IR' in filter2 in filter2 or '160' in filter2 and not '110' in filter1:
-        target = os.path.split(tricat)[1].split('_')[1]
+    if 'IR' in filter2 or '160' in filter2 and not '110' in filter1:
+        target = 'sim'
         ir_mtrgb = get_trgb(target, filter2='F160W', filter1=None)
         opt_mtrgb = get_trgb(target, filter2='F814W')
         trgb_color = opt_mtrgb - ir_mtrgb
@@ -134,13 +134,12 @@ def tpagb_lf(sgal, narratio_dict, inds, filt1, filt2, lf_line=''):
 def narratio(target, nrgb, nagb, filt1, filt2, narratio_line=''):
     """format numbers of stars for the narratio table"""
     # N agb/rgb ratio file
-    narratio_fmt = '%(target)s %(filter1)s %(filter2)s %(nrgb)i %(nagb)i %(ar_ratio).3f %(ar_ratio_err).3f\n'
+    narratio_fmt = 'galaxy %(filter1)s %(filter2)s %(nrgb)i %(nagb)i %(ar_ratio).3f %(ar_ratio_err).3f\n'
     try:
        ar_ratio = nagb / nrgb
     except ZeroDivisionError:
         ar_ratio = np.nan
-    out_dict = {'target': target,
-                'filter1': filt1,
+    out_dict = {'filter1': filt1,
                 'filter2': filt2,
                 'ar_ratio': ar_ratio,
                 'ar_ratio_err': count_uncert_ratio(nagb, nrgb),
@@ -164,7 +163,7 @@ def gather_results(sgal, target, inds, filter1=None, filter2=None,
     nrgb = float(len(rgb))
     nagb = float(len(agb))
 
-    narratio_line = narratio(target, nrgb, nagb, filter1, filter2,
+    narratio_line = narratio('sim', nrgb, nagb, filter1, filter2,
                              narratio_line=narratio_line)
 
     return lf_line, narratio_line
@@ -210,10 +209,10 @@ def write_results(res_dict, target, filter1, filter2, outfile_loc, agb_mod, extr
 
 
 def count_rgb_agb(filename, col1=None, col2=None, yfilter='V', regions_kw={},
-                  match_param=None):
-    target, _ = parse_pipeline(filename)
+                  match_param=None, filterset=0):
 
-    mag1, mag2 = load_observation(filename, col1, col2, match_param=match_param)
+    mag1, mag2 = load_observation(filename, col1, col2, match_param=match_param,
+                                  filterset=filterset)
     ymag = mag2
     if yfilter == 'V':
         ymag = mag1
@@ -225,6 +224,7 @@ def count_rgb_agb(filename, col1=None, col2=None, yfilter='V', regions_kw={},
     gal_rgb, gal_agb = rgb_agb_regions(ymag, **regions_kw)
 
     if col2 is not None and 'IR' in col2:
+        target, _ = parse_pipeline(filename)
         ir_mtrgb = get_trgb(target, filter2='F160W', filter1=None)
         opt_mtrgb = get_trgb(target, filter2='F814W')
         trgb_color = opt_mtrgb - ir_mtrgb
@@ -266,10 +266,10 @@ def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
     ax.set_xlim(-0.5, np.max(mag1 - mag2) + 0.1)
 
     plt.legend(loc='best', numpoints=1)
-    ax.set_xlabel('{}-{}'.format(f1,f2))
-    ax.set_ylabel('{}'.format(f2))
+    ax.set_xlabel((r'${}-{}$'.format(f1, f2)).replace('_', '\_'))
+    ax.set_ylabel((r'${}$'.format(f2)).replace('_', '\_'))
     plotting.add_lines_to_plot(ax, lf=False, **regions_kw)
-    plt.savefig(sgal.name.replace('.dat', '_diag{}'.format(EXT)))
+    plt.savefig('{0:s}_diag{1:s}'.format(os.path.splitext(sgal.name)[0], EXT))
     plt.close()
     if multi_plot:
         ind = list(set(np.nonzero(sgal.data[f1][inds] < 30)[0]) &
@@ -326,7 +326,8 @@ For the mag limits either:
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=description,
-                                     formatter_class=RawTextHelpFormatter)
+                                     formatter_class=RawTextHelpFormatter,
+                                     fromfile_prefix_chars='@')
 
     parser.add_argument('-a', '--ast_cor', action='store_true',
                         help='use ast corrected mags already in trilegal catalog')
@@ -346,6 +347,8 @@ def parse_args(argv=None):
     parser.add_argument('-e', '--trgbexclude', type=float, default=0.1,
                         help='region around trgb mag to also exclude')
 
+    parser.add_argument('-f', '--fake', type=str, help='fake file name')
+
     parser.add_argument('-g', '--trgboffset', type=float, default=1.,
                         help='trgb offset, mags below trgb for lower maglimit')
 
@@ -358,14 +361,14 @@ def parse_args(argv=None):
     parser.add_argument('-o', '--output', type=str, default=None,
                         help='create a trilegal catalog with only normalized selection')
 
-    parser.add_argument('-p', '--lfplot', action='store_true',
-                        help='plot the resulting scaled lf function against data')
-
-    parser.add_argument('-q', '--colnames', type=str, default='MAG2_ACS,MAG4_IR',
+    parser.add_argument('-q', '--colnames', type=str,
                         help='comma separated V,I names in observation data')
 
-    parser.add_argument('-s', '--scolnames', type=str, default='V,I',
+    parser.add_argument('--filters', type=str, default='V,I',
                         help='comma separated V,I names in trilegal catalog')
+
+    parser.add_argument('-s', '--filterset', type=int, default=0,
+                        help='if 2 filters, and the fake file has 4, provide which filters to use 0: first two or 1: second two')
 
     parser.add_argument('-t', '--trgb', type=float, default=None,
                         help='trgb mag (will not attempt to find it)')
@@ -379,11 +382,10 @@ def parse_args(argv=None):
     parser.add_argument('-z', '--match_param', type=str, default=None,
                         help='overplot exclude gates from calcsfh parameter file')
 
-    parser.add_argument('observation', type=str,
+    parser.add_argument('--observation', type=str,
                         help='photometry to normalize against')
 
-    parser.add_argument('simpop', nargs='*',
-                        help='trilegal catalog(s) to normalize')
+    parser.add_argument('--simpop', help='trilegal catalog to normalize')
 
     return parser.parse_args(argv)
 
@@ -405,9 +407,8 @@ def main(argv=None):
     logger.debug('command: {0!s}'.format(argv))
 
     # parse the CMD region
-    args.target = args.simpop[0].split('_')[1]  # maybe this should be command line?
     regions_kw = parse_regions(args)
-
+    args.target, _ = parse_pipeline(args.simpop)
     # grab data nrgb and nagb and get ready to write to narratio file
     try:
         col1, col2 = args.colnames.split(',')
@@ -420,7 +421,7 @@ def main(argv=None):
                                          regions_kw=regions_kw,
                                          match_param=args.match_param)
 
-    filter1, filter2 = args.scolnames.upper().split(',')
+    filter1, filter2 = args.filters.split(',')
     narratio_line = narratio('data', obs_nrgbs, obs_nagbs, filter1, filter2)
 
     # allow for ast corrections instead of trilegal catalog
@@ -435,50 +436,38 @@ def main(argv=None):
         f2 = filter2
 
     kws = {'filter1': f1, 'filter2': f2}
+    tricat = args.simpop
+    logger.debug('normalizing: {}'.format(tricat))
 
-    for tricat in args.simpop:
-        logger.debug('normalizing: {}'.format(tricat))
+    sgal, narratio_dict, inds = \
+        do_normalization(yfilter=args.yfilter, Av=args.Av, tricat=tricat,
+                         nrgbs=obs_nrgbs, regions_kw=regions_kw, tol=1000,
+                         norm=args.norm, match_param=args.match_param,
+                         **kws)
 
-        sgal, narratio_dict, inds = \
-            do_normalization(yfilter=args.yfilter, Av=args.Av, tricat=tricat,
-                             nrgbs=obs_nrgbs, regions_kw=regions_kw, tol=1000,
-                             norm=args.norm, match_param=args.match_param,
-                             **kws)
+    if args.diag:
+        args.multi = False  # do I need another arg flag?!
+        norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2,
+                   regions_kw, multi_plot=args.multi)
 
-        if len(inds) == 0:
-            # normalization > tolorance
-            continue
-
+    if args.output is not None:
+        sgal.write_data(args.output, overwrite=True,
+                        slice_inds=narratio_dict['idx_norm'])
+    else:
         lf_line, narratio_line = gather_results(sgal, args.target, inds,
                                                 narratio_dict=narratio_dict,
                                                 narratio_line=narratio_line,
                                                 lf_line=lf_line, **kws)
 
-        if args.diag:
-            args.multi = False  # do I need another arg flag?!
-            norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2,
-                       regions_kw, multi_plot=args.multi)
 
-        if args.output is not None:
-            sgal.write_data(args.output, overwrite=True,
-                            slice_inds=narratio_dict['idx_norm'])
-        del sgal  # does this save time?
+        result_dict = {'lf_line': lf_line, 'narratio_line': narratio_line}
+        #result_dict['contam_line'] = contamination_by_phases(sgal, sgal_rgb,
+        #                                                     sgal_agb, filter2)
 
-    result_dict = {'lf_line': lf_line, 'narratio_line': narratio_line}
-    #result_dict['contam_line'] = contamination_by_phases(sgal, sgal_rgb,
-    #                                                     sgal_agb, filter2)
-
-    # write the output files
-    agb_mod = tricat.split('_')[6]
-    fdict = write_results(result_dict, args.target, f1, f2, outfile_loc, agb_mod,
-                          extra_str=extra_str)
-
-    if args.lfplot:
-        plotting.compare_to_gal(fdict['lf_file'], args.observation,
-                       narratio_file=fdict['narratio_file'], filter1=f1,
-                       agb_mod=agb_mod, regions_kw=regions_kw,
-                       filter2=f2, mtrgb=args.trgb,
-                       col1=col1, col2=col2, match_param=args.match_param)
+        # write the output files
+        agb_mod = 'agb model'
+        write_results(result_dict, args.target, f1, f2, outfile_loc, agb_mod,
+                      extra_str=extra_str)
 
     return
 

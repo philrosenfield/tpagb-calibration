@@ -222,7 +222,7 @@ def readfile(filename, col_key_line=0, comment_char='#', string_column=None,
 
 
 def load_observation(filename, colname1=None, colname2=None, match_param=None,
-                     exclude_gates=None):
+                     exclude_gates=None, filterset=0):
     """
     Convienince routine for loading mags from a fits file or photometry file
 
@@ -266,7 +266,13 @@ def load_observation(filename, colname1=None, colname2=None, match_param=None,
             mag2 = m2[inds]
             logger.info('using exclude gates')
     else:
-        mag1, mag2 = np.loadtxt(filename, unpack=True)
+        try:
+            mag1, mag2 = np.loadtxt(filename, unpack=True)
+        except:
+            mag1, mag2, mag3, mag4 = np.loadtxt(filename, unpack=True)
+            if filterset != 0:
+                mag1 = mag3
+                mag2 = mag4
         if match_param is not None:
             inds = exclude_gate_inds(mag1, mag2, match_param=match_param)
             mag1 = mag1[inds]

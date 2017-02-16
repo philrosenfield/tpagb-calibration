@@ -54,13 +54,10 @@ def get_trgb(target, filter2='F160W', filter1=None):
 def parse_regions(args):
     """
     """
-
-    if not hasattr(args, 'table'):
-        args.table = None
     # need the following in opt and nir
     colmin, colmax = None, None
     magfaint, magbright = None, None
-    filter1, filter2 = args.scolnames.upper().split(',')
+    filter1, filter2 = args.filters.upper().split(',')
     logger.info('filter1: {} filter2: {}'.format(filter1,filter2))
 
     opt = True
@@ -68,76 +65,38 @@ def parse_regions(args):
         opt = False
 
     trgb = args.trgb
-    if args.trgb is None:
-        try:
-            trgb = get_trgb(args.target, filter2=filter2, filter1=filter1)
-        except:
-            trgb = np.nan
 
-    if args.table is not None:
-        # depreciated
-        row = load_table(args.table, args.target, optfilter1=args.optfilter1,
-                         opt=opt)
-        if args.offset is None or row['mag_by_eye'] != 0:
-            logger.debug('mags to norm to rgb are set by eye from table')
-            magbright = row['magbright']
-            magfaint = row['magfaint']
-        else:
-            magbright = trgb + trgbexclude
-            if row['comp90mag2'] < trgb + args.trgboffset:
-                msg = '0.9 completeness fraction'
-                opt_magfaint = row['comp90mag2']
-            else:
-                msg = 'trgb + offset'
-                magfaint = trgb + offset
-            logger.debug('faint mag limit for rgb norm set to {}'.format(msg))
+    if args.colorlimits is not None:
+        colmin, colmax = np.array(args.colorlimits.split(','), dtype=float)
+        if colmax < colmin:
+            colmax = colmin + colmax
+            logger.info('colmax was less than colmin, assuming it is dcol, colmax is set to colmin + dcol')
 
-        colmin = row['colmin']
-        colmax = row['colmax']
+    if args.maglimits is not None:
+        magfaint, magbright = np.array(args.maglimits.split(','), dtype=float)
+        msg = 'maglimits'
     else:
-        if args.colorlimits is not None:
-            colmin, colmax = np.array(args.colorlimits.split(','), dtype=float)
-            if colmax < colmin:
-                colmax = colmin + colmax
-                logger.info('colmax was less than colmin, assuming it is dcol, colmax is set to colmin + dcol')
+        magbright = trgb + args.trgbexclude
+        magfaint = trgb + args.trgboffset
+        msg = 'trgb + offset'
 
-        if args.maglimits is not None:
-            magfaint, magbright = np.array(args.maglimits.split(','), dtype=float)
-            msg = 'maglimits'
+    if args.comp_frac is not None:
+        fake = args.fake
+        if fake is not None:
+            logger.info('using fake: {}'.format(fake))
+            _, comp_mag2 = limiting_mag(fake, args.comp_frac)
+            #comp_mag1, comp_mag2 = limiting_mag(args.fake_file,
+            #                                    args.comp_frac)
+            if comp_mag2 < trgb + args.trgboffset:
+                msg = '{} completeness fraction: {}'.format(args.comp_frac,
+                                                            comp_mag2)
+                magfaint = comp_mag2
+            else:
+                logger.info('magfaint: {} comp_mag2: {} using magfaint'.format(magfaint, comp_mag2))
         else:
-            magbright = trgb + args.trgbexclude
-            magfaint = trgb + args.trgboffset
-            msg = 'trgb + offset'
+            logger.warning('comp_frac requested, no fake file passed')
 
-            if args.comp_frac is not None:
-                skip = False
-                search_str = '*{}*.matchfake'.format(args.target.upper())
-                fakes = fileio.get_files(matchfake_loc, search_str)
-                logger.info('found fakes {}'.format(fakes))
-
-                if len(fakes) > 1:
-                    try:
-                        fake = [f for f in fakes if filter1 in f][0]
-                    except:
-                        try:
-                            fake = [f for f in fakes if filter2 in f][0]
-                        except:
-                            logger.warning('uncertain which fake file to to use')
-                            skip = True
-                else:
-                    fake, = fake
-                if not skip:
-                    logger.info('using fake: {}'.format(fake))
-                    _, comp_mag2 = limiting_mag(fake, args.comp_frac)
-                    #comp_mag1, comp_mag2 = limiting_mag(args.fake_file,
-                    #                                    args.comp_frac)
-                    if comp_mag2 < trgb + args.trgboffset:
-                        msg = '{} completeness fraction: {}'.format(args.comp_frac,
-                                                                    comp_mag2)
-                        magfaint = comp_mag2
-                    else:
-                        logger.info('magfaint: {} comp_mag2: {} using magfaint'.format(magfaint, comp_mag2))
-            logger.info('faint mag limit for rgb norm set to {}'.format(msg))
+    logger.info('faint mag limit for rgb norm set to {}'.format(msg))
 
     regions_kw = {'offset': args.trgboffset,
                   'trgb_exclude': args.trgbexclude,
@@ -177,20 +136,10 @@ def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
     # careful! get_snap assumes F160W
     if '160' in col or '110' in col or 'IR' in col:
         if mtrgb is None:
-            try:
-                mtrgb, Av, dmod = angst_data.get_snap_trgb_av_dmod(target.upper())
-            except:
-                logger.error('Target not found: get_snap_trgb_av_dmod {}'.format(target))
-                return [np.nan] * 2
-            if absmag:
-                mtrgb =  astronomy_utils.mag2Mag(mtrgb, 'F160W', 'wfc3ir',
-                                                     dmod=dmod, Av=Av)
-                dmod = 0.
-                Av = 0.
+            print('must pass mtrgb')
         cs = tpagb_rheb_line(mag, dmod=dmod, Av=Av, off=off)
         redward_of_rheb, = np.nonzero(color > cs)
         blueward_of_rheb, = np.nonzero(color < cs)
-
     else:
         logger.warning('Not using TP-AGB RHeB line')
         if mtrgb is None:
