@@ -7,14 +7,12 @@ import numpy as np
 import os
 import sys
 
-from ..TPAGBparams import EXT, snap_src, matchfake_loc
+from ..TPAGBparams import EXT
 from .analyze import get_itpagb, parse_regions, get_trgb
 from ..pop_synth.stellar_pops import (normalize_simulation, rgb_agb_regions,
-    limiting_mag, exclude_gate_inds)
+                                      exclude_gate_inds)
 from ..pop_synth import SimGalaxy
-
-from ..sfhs.star_formation_histories import StarFormationHistories
-from ..fileio import load_observation, load_table
+from ..fileio import load_observation
 from ..plotting import plotting
 from ..utils import count_uncert_ratio, parse_pipeline
 
@@ -32,11 +30,6 @@ def do_normalization(yfilter=None, filter1=None, filter2=None, ast_cor=False,
         sgal = SimGalaxy(tricat)
         if sgal is None:
             return None, {}, []
-        if 'dav' in tricat.lower():
-            logger.info('applying dav to F475W and F814W at M31 distance')
-            dAv = float('.'.join(sgal.name.split('dav')[1].split('.')[:2]).replace('_',''))
-            sgal.data['F475W'] += sgal.apply_dAv(dAv, 'F475W', 'phat', Av=Av)
-            sgal.data['F814W'] += sgal.apply_dAv(dAv, 'F814W', 'phat', Av=Av)
 
     if match_param is not None:
         _, (f1, f2) = parse_pipeline(match_param)
@@ -235,7 +228,7 @@ def count_rgb_agb(filename, col1=None, col2=None, yfilter='V', regions_kw={},
 
 
 def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
-             multi_plot=False):
+             multi_plot=False, filterset=0):
     def numlabel(n, string):
         return '{} {}'.format(len(n), string)
 
@@ -251,7 +244,8 @@ def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
             sgal.data[f2][inds], '.', label=numlabel(inds, 'sim'), **kw)
 
     mag1, mag2 = load_observation(args.observation, col1, col2,
-                                  match_param=args.match_param)
+                                  match_param=args.match_param,
+                                  filterset=filterset)
     ax.plot(mag1 - mag2, mag2, '.', label=numlabel(mag1, 'data'), **kw)
 
     ind = narratio_dict['idx_norm']
@@ -419,7 +413,8 @@ def main(argv=None):
     obs_nrgbs, obs_nagbs = count_rgb_agb(args.observation, col1=col1, col2=col2,
                                          yfilter=args.yfilter,
                                          regions_kw=regions_kw,
-                                         match_param=args.match_param)
+                                         match_param=args.match_param,
+                                         filterset=args.filterset)
 
     filter1, filter2 = args.filters.split(',')
     narratio_line = narratio('data', obs_nrgbs, obs_nagbs, filter1, filter2)
@@ -448,7 +443,7 @@ def main(argv=None):
     if args.diag:
         args.multi = False  # do I need another arg flag?!
         norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2,
-                   regions_kw, multi_plot=args.multi)
+                   regions_kw, multi_plot=args.multi, filterset=args.filterset)
 
     if args.output is not None:
         sgal.write_data(args.output, overwrite=True,

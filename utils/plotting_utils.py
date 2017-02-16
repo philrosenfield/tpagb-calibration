@@ -14,6 +14,58 @@ __all__ = ['colorify', 'colorplot_by_stage', 'crazy_histogram2d',
            'scatter_contour', 'setup_multiplot', 'setup_plot_by_stage',
            'stitch_cmap']
 
+
+def emboss(fg='w', lw=3):
+    from matplotlib.patheffects import withStroke
+    myeffect = withStroke(foreground=fg, linewidth=lw, alpha=0.5)
+    return dict(path_effects=[myeffect])
+
+
+def outside_labels(axs, fig=None, xlabel=None, ylabel=None, rows=True,
+                   text_kw={}, ylabel_xval=0.06):
+    """
+    make an ndarray of axes only have lables on the outside of the grid
+    also add common x and y label if fig, xlabel, ylabel passed.
+    Returns
+        np.ravel(axs)
+    """
+    ndim = len(np.shape(axs))
+    #print(ndim)
+    text_kw = dict({'ha': 'center', 'va': 'center', 'fontsize': 24}.items() + text_kw.items())
+    if ndim == 1:
+        if rows:
+            bottom = axs[-1]
+            [ax.tick_params(labelbottom=False, direction='in', which='both')
+             for ax in np.ravel(axs)]
+            bottom.tick_params(labelbottom=True)
+        else:
+            left = axs[0]
+            [ax.tick_params(labelleft=False, direction='in', which='both')
+             for ax in np.ravel(axs)]
+            left.tick_params(labelleft=True)
+    else:
+        top = axs[0, :]
+        bottom = axs[-1, :]
+        left = axs[:, 0]
+        right = axs[:, -1]
+
+        [ax.tick_params(labelbottom=False, labelleft=False, direction='in',
+                        which='both') for ax in np.ravel(axs)]
+        [ax.tick_params(labeltop=True) for ax in top]
+        [ax.tick_params(labelleft=True) for ax in left]
+        [ax.tick_params(labelright=True) for ax in right]
+        [ax.tick_params(labelbottom=True) for ax in bottom]
+
+    axs = np.ravel(axs)
+
+    if xlabel is not None:
+        fig.text(0.5, 0.04, xlabel, **text_kw)
+
+    if ylabel is not None:
+        fig.text(ylabel_xval, 0.5, ylabel, rotation='vertical', **text_kw)
+    return axs
+
+
 def forceAspect(ax, aspect=1):
     '''
     forces the aspect ratio of a given axis

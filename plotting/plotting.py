@@ -24,13 +24,12 @@ from ..sfhs import star_formation_histories
 from ..angst_tables import angst_data
 from .. import utils
 from ..utils import astronomy_utils
+from ..utils.plotting_utils import emboss
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 tpagb_model_default_color = '#156692'
-#data_tpagb_default_color = '#E1999E'
-#data_default_color = '#853E43'
 model_default_color = '#01141F'
 data_tpagb_default_color = '#bc0003'
 data_default_color = '#5e5e5e'
@@ -39,57 +38,6 @@ nar_text_fontsize = 18
 gal_fontsize = 22
 label_fontsize = 28
 ticklabel_fontsize = 24
-
-
-def emboss(fg='w', lw=3):
-    from matplotlib.patheffects import withStroke
-    myeffect = withStroke(foreground=fg, linewidth=lw, alpha=0.5)
-    return dict(path_effects=[myeffect])
-
-
-def outside_labels(axs, fig=None, xlabel=None, ylabel=None, rows=True,
-                   text_kw={}, ylabel_xval=0.06):
-    """
-    make an ndarray of axes only have lables on the outside of the grid
-    also add common x and y label if fig, xlabel, ylabel passed.
-    Returns
-        np.ravel(axs)
-    """
-    ndim = len(np.shape(axs))
-    #print(ndim)
-    text_kw = dict({'ha': 'center', 'va': 'center', 'fontsize': 24}.items() + text_kw.items())
-    if ndim == 1:
-        if rows:
-            bottom = axs[-1]
-            [ax.tick_params(labelbottom=False, direction='in', which='both')
-             for ax in np.ravel(axs)]
-            bottom.tick_params(labelbottom=True)
-        else:
-            left = axs[0]
-            [ax.tick_params(labelleft=False, direction='in', which='both')
-             for ax in np.ravel(axs)]
-            left.tick_params(labelleft=True)
-    else:
-        top = axs[0, :]
-        bottom = axs[-1, :]
-        left = axs[:, 0]
-        right = axs[:, -1]
-
-        [ax.tick_params(labelbottom=False, labelleft=False, direction='in',
-                        which='both') for ax in np.ravel(axs)]
-        [ax.tick_params(labeltop=True) for ax in top]
-        [ax.tick_params(labelleft=True) for ax in left]
-        [ax.tick_params(labelright=True) for ax in right]
-        [ax.tick_params(labelbottom=True) for ax in bottom]
-
-    axs = np.ravel(axs)
-
-    if xlabel is not None:
-        fig.text(0.5, 0.04, xlabel, **text_kw)
-
-    if ylabel is not None:
-        fig.text(ylabel_xval, 0.5, ylabel, rotation='vertical', **text_kw)
-    return axs
 
 
 def add_narratio_to_plot(ax, target, ratio_data, mid_txt='RGB'):
@@ -284,130 +232,13 @@ def plot_models(lfd, bins, filt, maglimit=None, ax=None, plt_kw=None,
     return ax, ml, mlt, y
 
 
-def mag2Mag(mag2, target, filter2):
-    angst_target = \
-        difflib.get_close_matches(target.upper(),
-                                  angst_data.targets)[0].replace('-', '_')
-
-    if 'F160W' in filter2:
-        _, av, dmod = angst_data.get_snap_trgb_av_dmod(angst_target)
-    if 'F814W' in filter2:
-        target_row = angst_data.__getattribute__(angst_target)
-        try:
-            key, = [k for k in target_row.keys() if ',' in k]
-        except:
-            #print target_row
-            key = [k for k in target_row.keys() if ',' in k][0]
-        av = target_row[key]['Av']
-        dmod = target_row[key]['dmod']
-
-    mag = astronomy_utils.mag2Mag(mag2, filter2, 'wfc3snap', Av=av,
-                                      dmod=dmod)
-    return mag
-
-
-def compare_lfs(lf_files, filter1='F814W_cor', filter2='F160W_cor',
-                col1='MAG2_ACS', col2='MAG4_IR', dmag=0.1, extra_str='',
-                match_param=None):
-    """
-    3 panel plot of LF, (data-model)/model, data-model
-    doesn't work on lf files with many runs...
-    """
-    # for opt, and nir...
-    # hist data, with completeness corrections
-    # do something around trgb, 90% completeness, norm region?
-    # hist model -- if more than one, average/mediad
-    # model - data / data
-    # model - data
-    # plot all three
-    galaxies = fileio.get_files(data_loc, '*fits')
-
-    fig1, opt_axs = plt.subplots(nrows=3, sharex=True, figsize=(6, 9))
-    fig2, nir_axs = plt.subplots(nrows=3, sharex=True, figsize=(6, 9))
-
-    bins = np.arange(16, 27, dmag)
-
-    for i, lf_file in enumerate(lf_files):
-        lfd = fileio.load_lf_file(lf_file)
-        target = os.path.split(lf_file)[1].split('_')[0]
-        observation, = [g for g in galaxies if target.upper() in g]
-        mag1, mag2 = fileio.load_observation(observation, col1, col2,
-                                      match_param=match_param)
-        color = mag1 - mag2
-
-        search_str = '*{}*.matchfake'.format(target.upper())
-        fakes = fileio.get_files(matchfake_loc, search_str)
-        nirfake, = [f for f in fakes if 'IR' in f]
-        optfake = [f for f in fakes if not 'IR' in f][0]
-
-        for i, filt in enumerate([filter1, filter2]):
-            if i == 0:
-                axs = opt_axs
-                mag = mag1
-                fake_file = optfake
-            else:
-                axs = nir_axs
-                mag = mag2
-                fake_file = nirfake
-
-            Mbins = mag2Mag(bins, target, filt.replace('_cor', ''))
-            #ax.errorbar(bins[1:], hist, yerr=err, **plot_kw)
-
-
-            comp_corr = stellar_pops.completeness_corrections(fake_file,
-                                                              bins)
-            data = np.array(np.histogram(mag2, bins=bins)[0], dtype=float)
-            # mask 0s or they will be turned to Abs Mag
-            data[data == 0] = np.nan
-            data /= comp_corr[1:]
-
-            data = mag2Mag(data, target, filt.replace('_cor', ''))
-            err = np.sqrt(data)
-
-            smag = np.concatenate(lfd[filt])
-            inorm = np.concatenate(lfd['idx_norm'])
-            smag_scaled = smag[inorm]
-
-            model = np.array(np.histogram(smag_scaled, bins=bins)[0],
-                             dtype=float)
-            # mask 0s or they will be turned to Abs Mag
-            model[model == 0] = np.nan
-
-            model = mag2Mag(model, target, filt.replace('_cor', ''))
-
-            dmdiff = data - model
-            sdiff = dmdiff / data
-
-            axs[0].errorbar(Mbins[1:], model, yerr=np.sqrt(err),
-                            linestyle='steps')
-            axs[1].plot(Mbins[1:], dmdiff, drawstyle='steps')
-            axs[2].plot(Mbins[1:], sdiff, drawstyle='steps')
-
-    for axs in [opt_axs, nir_axs]:
-        axs[0].set_yscale('log')
-        axs[0].set_ylabel('$\#$')
-        axs[1].set_ylabel(r'($N_{data} - N_{model}) / N_{data}$')
-        axs[2].set_ylabel(r'$N_{data} - N_{model}$')
-
-    opt_axs[2].set_xlabel(r'${}$'.format(filter1.replace('_cor', '')))
-    nir_axs[2].set_xlabel(r'${}$'.format(filter2.replace('_cor', '')))
-
-    [opt_axs[i].set_xlim(-10, 3) for i in range(3)]
-    [nir_axs[i].set_xlim(-10, -1) for i in range(3)]
-    [opt_axs[i].set_ylim(-500, 500) for i in [1,2]]
-    [nir_axs[i].set_ylim(-500, 500) for i in [1,2]]
-
-    fig1.savefig('{}_{}_comp_lfs{}'.format(extra_str, filter1, EXT))
-    fig2.savefig('{}_{}_comp_lfs{}'.format(extra_str, filter2, EXT))
-    return opt_axs, nir_axs
-
-
 def compare_to_gal(lf_file, observation, filter1='F814W_cor',
                    filter2='F160W_cor', col1='MAG2_ACS', col2='MAG4_IR',
                    dmag=0.1, narratio_file=None, make_plot=True,
                    regions_kw=None, xlims=[None, None], ylims=[None, None], extra_str='',
                    agb_mod=None, mplt_kw={}, dplot_kw={},
-                   match_param=None, mtrgb=None):
+                   match_param=None, mtrgb=None, filterset=0,
+                   mtrgb_mag2=None, fake=None):
     '''
     Plot the LFs and galaxy LF.
 
@@ -419,32 +250,15 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
     ax1, ax2: axes instances created for the plot.
 
     '''
-    agb_mod = translate_agbmod(agb_mod)
-    target = os.path.split(lf_file)[1].split('_')[0]
     trgb_color = 0.
-    if mtrgb is None:
-        ir_mtrgb = get_trgb(target, filter2='F160W', filter1=None)
-        opt_mtrgb = get_trgb(target, filter2='F814W')
-        trgb_color = opt_mtrgb - ir_mtrgb
-
+    if mtrgb_mag2 is not None:
+        trgb_color = mtrgb - mtrgb_mag2
 
     mag1, mag2 = fileio.load_observation(observation, col1, col2,
-                                  match_param=match_param)
+                                  match_param=match_param, filterset=filterset)
 
-    data_tpagb = get_itpagb(target, mag1 - mag2, mag2, col2,
-                            off=trgb_color, mtrgb=mtrgb)
-
-    search_str = '*{}*.matchfake'.format(target.upper())
-    fakes = fileio.get_files(matchfake_loc, search_str)
-
-    try:
-        nirfake, = [f for f in fakes if 'IR' in f]
-    except:
-        nirfake = None
-    optfake = [f for f in fakes if not 'IR' in f][0]
-
-    if narratio_file is not None:
-        ratio_data = fileio.readfile(narratio_file, string_column=[0, 1, 2])
+    data_tpagb = get_itpagb(mag1 - mag2, mag2, col2, off=trgb_color,
+                            mtrgb=mtrgb)
 
     if 'cor' in filter1:
         if not '_ast_cor' in extra_str:
@@ -456,19 +270,10 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
         if filt == filter1:
             mag = mag1
             xlim = xlims[0]
-            try:
-                xlim[-1] = angst_data.get_50compmag(target.replace('-', '_').upper(),
-                                                    'F814W')
-            except:
-                pass
             ylim = ylims[0]
         else:
             mag = mag2
             xlim = xlims[1]
-            try:
-                xlim[-1] = angst_data.get_snap_50compmag(target.upper(), 'F160W')
-            except:
-                pass
             ylim = ylims[1]
 
         bins = np.arange(mag.min(), mag.max(), step=dmag)
@@ -515,36 +320,16 @@ def compare_to_gal(lf_file, observation, filter1='F814W_cor',
 
 
 def add_trgb(ax, target, band, lf=True, regions_kw=None):
-    offset = 1.
-    #opt_fake, nir_fake = fileio.find_fakes(target)
-    #comp1, comp2 = stellar_pops.limiting_mag(nir_fake, 0.9)
     faint_color = 'k'
-
-    if regions_kw is None:
-        if not 'ir' in band.lower():
-            trgb = angst_data.get_tab5_trgb_av_dmod(target.upper())[0]
-            trgb_exclude = 0.1
-            magbright = trgb + trgb_exclude
-            magfaint = trgb + offset
-            regions_kw = {'offset': offset,
-                          'trgb_exclude': trgb_exclude,
-                          'trgb': trgb,
-                          'mag_bright': magbright,
-                          'mag_faint': magfaint}
-
-
     ax = add_lines_to_plot(ax, faint_color=faint_color, lf=lf,
                            **regions_kw)
     return ax
+
 
 def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=0.,
                       trgb=None, trgb_exclude=0., lf=True, col_min=None,
                       col_max=None, faint_color=None, **kwargs):
 
-    #if mag_bright is not None:
-    #    mid = mag_bright
-    #else:
-    #    mid = trgb + trgb_exclude
     faint_color = faint_color or 'black'
 
     if mag_faint is not None:
@@ -553,35 +338,25 @@ def add_lines_to_plot(ax, mag_bright=None, mag_faint=None, offset=0.,
         low = trgb + offset
 
     yarr = np.linspace(*ax.get_ylim())
+
     if lf:
         # vertical lines around the trgb exclude region
-        if trgb_exclude > 0:
-            ax.fill_betweenx(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
-                             color='black', alpha=0.1)
-        ax.vlines(trgb, *ax.get_ylim(), color='black', linestyle='--')
-        if offset > 0 or mag_faint is not None:
-            ax.vlines(low, *ax.get_ylim(), color=faint_color, linestyle='--')
-        #ax.fill_betweenx(yarr, mid, low, color='black', alpha=0.1)
-        #if mag_limit_val is not None:
-        #    ax.fill_betweenx(yarr, mag_limit_val, ax.get_xlim()[-1],
-        #                     color='black', alpha=0.5)
+        fill_between = ax.fill_betweenx
+        axline = ax.axvline
     else:
-        xarr = np.linspace(*ax.get_xlim())
-
-        # vertical lines around the trgb exclude region
-        if trgb_exclude > 0:
-            ax.fill_between(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
-                             color='black', alpha=0.1)
-        ax.axhline(trgb, color='black', linestyle='--')
-        if offset > 0 or mag_faint is not None:
-            ax.axhline(low, color='black', linestyle='--')
-        #ax.fill_betweenx(yarr, mid, low, color='black', alpha=0.1)
-        #if mag_limit_val is not None:
-        #    ax.fill_betweenx(yarr, mag_limit_val, ax.get_xlim()[-1],
-        #                     color='black', alpha=0.5)
+        fill_between = ax.fill_between
+        axline = ax.axhline
         if not None in [col_min, col_max]:
-            ax.vlines(col_min, *ax.get_ylim(), color='black')
-            ax.vlines(col_max, *ax.get_ylim(), color='black')
+            ax.axvline(col_min, color='black')
+            ax.axvline(col_max, color='black')
+
+    if trgb_exclude > 0:
+        fill_between(yarr, trgb - trgb_exclude, trgb + trgb_exclude,
+                     color='black', alpha=0.1)
+    axline(trgb, color='black', linestyle='--')
+    if offset > 0 or mag_faint is not None:
+        axline(low, color=faint_color, linestyle='--')
+
     return ax
 
 
@@ -697,12 +472,8 @@ def diag_cmd(trilegal_catalog, lf_file, regions_kw={}, Av=0.,
         logger.info('wrote {}'.format(outfile))
     return
 
-def translate_agbmod(agb_mod):
-    if 'm36' in agb_mod:
-        agb_mod = 'R14'
-    return agb_mod
 
-def main(argv):
+def main(argv=None):
     from ..analysis.normalize import parse_regions
     parser = argparse.ArgumentParser(description="Plot LFs against galaxy data")
 
@@ -782,4 +553,4 @@ def main(argv):
                        col1=col1, col2=col2, match_param=args.match_param)
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    sys.exit(main())

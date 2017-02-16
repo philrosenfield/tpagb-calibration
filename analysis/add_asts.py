@@ -39,8 +39,7 @@ def make_ast_corrections(trilegal_catalogs, filters, outfiles=None,
         sys.exit(1)
 
     trilegal_catalogs = np.atleast_1d(trilegal_catalogs)
-    fakes = np.atleast_1d(fake)
-    asts = [ASTs(f, filters=filters, filterset=filterset) for f in fakes]
+    ast = ASTs(fake, filters=filters, filterset=filterset)
 
     logger.debug('{}'.format(trilegal_catalogs))
 
@@ -54,12 +53,9 @@ def make_ast_corrections(trilegal_catalogs, filters, outfiles=None,
         else:
             outfile = outfiles[i]
         # do the ast corrections
-        msg = '{0:s}_cor and already in header'
-        for ast in asts:
-            ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
-                                outfile=outfile, diag_plot=diag_plot,
-                                hdf5=hdf5, correct=correct,
-                                filterset=filterset)
+        ast_correct_starpop(sgal, asts_obj=ast, overwrite=overwrite,
+                            outfile=outfile, diag_plot=diag_plot, hdf5=hdf5,
+                            correct=correct, filterset=filterset)
     return
 
 
@@ -77,7 +73,7 @@ def main(argv):
                                                   trilegal catalog")
 
     parser.add_argument('-v', '--verbose', action='store_true',
-                        help='verbose mode')
+                        help='verbose mode (debug level logs)')
 
     parser.add_argument('-o', '--outfile', type=str, help='outfile name')
 
@@ -89,7 +85,7 @@ def main(argv):
     parser.add_argument('filters', type=str,
                         help='comma separated list of filters in trilegal catalog')
 
-    parser.add_argument('name', type=str, nargs=*, help='trilegal catalogs')
+    parser.add_argument('name', type=str, nargs='*', help='trilegal catalogs')
 
     args = parser.parse_args(argv)
 

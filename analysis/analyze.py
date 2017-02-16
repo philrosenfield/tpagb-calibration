@@ -131,31 +131,23 @@ def tpagb_rheb_line(mag, b=-7, m=-9.03226, dmod=0., Av=0.0, off=0.0):
     return (mag - b - dmod - c * Av) / m + off
 
 
-def get_itpagb(target, color, mag, col, blue_cut=-99, absmag=False,
+def get_itpagb(color, mag, col, blue_cut=-99, absmag=False,
                mtrgb=None, dmod=0.0, Av=0.0, off=0):
     # careful! get_snap assumes F160W
     if '160' in col or '110' in col or 'IR' in col:
-        if mtrgb is None:
-            print('must pass mtrgb')
         cs = tpagb_rheb_line(mag, dmod=dmod, Av=Av, off=off)
         redward_of_rheb, = np.nonzero(color > cs)
-        blueward_of_rheb, = np.nonzero(color < cs)
+        # blueward_of_rheb, = np.nonzero(color < cs)
     else:
         logger.warning('Not using TP-AGB RHeB line')
-        if mtrgb is None:
-            mtrgb, Av, dmod = angst_data.get_tab5_trgb_av_dmod(target.upper(),
-                                                               filters=col)
-            if absmag:
-                mtrgb = astronomy_utils.mag2Mag(mtrgb, col, 'acs_wfc',
-                                                    dmod=dmod, Av=Av)
         redward_of_rheb = np.arange(len(color))
-        blueward_of_rheb = np.arange(len(color))
+        # blueward_of_rheb = np.arange(len(color))
 
-    redward_of_bluecut, = np.nonzero(color > blue_cut)
+    # redward_of_bluecut, = np.nonzero(color > blue_cut)
     brighter_than_trgb, = np.nonzero(mag < mtrgb)
     itpagb = list(set(redward_of_rheb) & set(brighter_than_trgb))
-    irheb = list(set(brighter_than_trgb) & set(redward_of_bluecut) & set(blueward_of_rheb))
-    return itpagb #, irheb
+    # irheb = list(set(brighter_than_trgb) & set(redward_of_bluecut) & set(blueward_of_rheb))
+    return itpagb
 
 
 def main(argv):

@@ -158,6 +158,7 @@ def find_match_param(target, optfilter1=''):
 def load_lf_file(lf_file):
     """
     Read a strange formatted file... basically, the rows are transformed.
+    OR -- just pass a trilegal catalog -- 
 
     Each data row of the file corresponds to a header key.
 
@@ -168,18 +169,22 @@ def load_lf_file(lf_file):
     It was done this way because some header keys correspond to a float,
     some correspond to an array of variable length.
     """
-    header = open(lf_file).readline().replace('#', '').split()
-    ncols = len(header)
-    lfd = {}
-    with open(lf_file, 'r') as lf:
-        lines = [l.strip() for l in lf.readlines() if not l.startswith('#')]
+    if lf_file.endswith('.fits'):
+        # it's really a trilegal catalogs
+        lfd = SimGalaxy(lf_file)
+    else:
+        header = open(lf_file).readline().replace('#', '').split()
+        ncols = len(header)
+        lfd = {}
+        with open(lf_file, 'r') as lf:
+            lines = [l.strip() for l in lf.readlines() if not l.startswith('#')]
 
-    dtypes = [float, float, float, float, int, int, int, int, int, float, str]
-    assert len(dtypes) == ncols, 'lf file format is not recognized'
+        dtypes = [float, float, float, float, int, int, int, int, int, float, str]
+        assert len(dtypes) == ncols, 'lf file format is not recognized'
 
-    for i, key in enumerate(header):
-        lfd[key] = [np.array(l.split(), dtype=dtypes[i])
-                    for l in lines[i::ncols] if len(l.split())>0]
+        for i, key in enumerate(header):
+            lfd[key] = [np.array(l.split(), dtype=dtypes[i])
+                        for l in lines[i::ncols] if len(l.split())>0]
     return lfd
 
 def remove_all(string, badchars):

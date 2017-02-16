@@ -86,11 +86,12 @@ def ast_correct_starpop(sgal, fake_file=None, outfile=None, overwrite=False,
     default = {'dxy': (0.2, 0.15)}
     default.update(correct_kw)
     correct_kw = default
-    if fmt.format(ast.filter1) in sgal.data.dtype.names:
-        correct = correct.replace('filter1', '')
-    if fmt.format(ast.filter2) in sgal.data.dtype.names:
-        correct = correct.replace('filter2', '')
-
+    if '1' in correct:
+        if fmt.format(ast.filter1) in sgal.data.dtype.names:
+            correct = correct.replace('filter1', '')
+    if '2' in correct:
+        if fmt.format(ast.filter2) in sgal.data.dtype.names:
+            correct = correct.replace('filter2', '')
     if '3' in correct:
         if fmt.format(ast.filter3) in sgal.data.dtype.names:
             correct = correct.replace('filter3', '')
@@ -101,8 +102,10 @@ def ast_correct_starpop(sgal, fake_file=None, outfile=None, overwrite=False,
     names = []
     data = []
     if 'filter1' in correct or 'filter2' in correct:
+        correct_kw['filterset'] = 0
         cor_mag1, cor_mag2 = ast.correct(sgal.data[ast.filter1],
-                                         sgal.data[ast.filter2], **correct_kw)
+                                         sgal.data[ast.filter2],
+                                         **correct_kw)
         if 'filter1' in correct:
             names.append(fmt.format(ast.filter1))
             data.append(cor_mag1)
@@ -112,7 +115,8 @@ def ast_correct_starpop(sgal, fake_file=None, outfile=None, overwrite=False,
     if 'filter3' in correct or 'filter4' in correct:
         correct_kw['filterset'] = 1
         cor_mag3, cor_mag4 = ast.correct(sgal.data[ast.filter3],
-                                         sgal.data[ast.filter4], **correct_kw)
+                                         sgal.data[ast.filter4],
+                                         **correct_kw)
         if 'filter3' in correct:
             names.append(fmt.format(ast.filter3))
             data.append(cor_mag3)
@@ -123,8 +127,8 @@ def ast_correct_starpop(sgal, fake_file=None, outfile=None, overwrite=False,
     if len(data) == 0:
         logger.info('no corrections to add')
         return
-    logger.info('adding corrections for {}'.format(correct))
 
+    logger.info('adding corrections for {}'.format(correct))
     sgal.add_data(names, data)
 
     if outfile is not None:
@@ -238,7 +242,8 @@ class ASTs(object):
         if filters is None:
             _, filters = parse_pipeline(filename)
             if len(filters) == 0:
-                filters = ['filter{0:d}'.format(i+1) for i in range(len(filters))]
+                filters = ['filter{0:d}'.format(i+1)
+                           for i in range(len(filters))]
 
         if len(filters) != nfilts:
             if filterset == 0:
@@ -253,6 +258,7 @@ class ASTs(object):
         for i in range(len(filters)):
             self.__setattr__('filter{0:d}'.format(i+1), filters[i])
         self.nfilters = nfilts
+        import pdb; pdb.set_trace()
 
     def write_matchfake(self, newfile, filterset=0):
         '''write matchfake file'''
