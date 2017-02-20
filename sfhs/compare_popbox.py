@@ -1,14 +1,14 @@
 import os
 import sys
-from match.scripts.popbox import PopBox, compare_popboxes
+from .popbox import PopBox, compare_popboxes
 
 dn = '/Users/rosenfield/Desktop/Leo/noAGB'
 dw = '/Users/rosenfield/Desktop/Leo/withAGB'
 
-pboxnoagbs = [os.path.join(d, l) for l in os.listdir(dn)
+pboxnoagbs = [os.path.join(dn, l) for l in os.listdir(dn)
               if l.endswith('popbox')]
 
-pboxwithagbs = [os.path.join(d, l) for l in os.listdir(dw)
+pboxwithagbs = [os.path.join(dw, l) for l in os.listdir(dw)
                 if l.endswith('popbox')]
 
 pbsnoagb = [PopBox(p) for p in pboxnoagbs]
@@ -22,5 +22,4 @@ for i in range(len(pbsnoagb)):
              '{0:s} without AGB'.format(reg),
              'with - without']
     outfig = 'compare_popbox_{0:s}.png'.format(reg)
-    compare_popboxes(pbswithagb[i], pbsnoagb[i], titles=titles, outfig=outfig,
-                     plot_pbkw={'lognorm': False, 'vmin': None, 'vmax': None})
+    compare_popboxes(pbswithagb[i], pbsnoagb[i], titles=titles, outfig=outfig)
