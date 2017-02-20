@@ -15,6 +15,33 @@ __all__ = ['colorify', 'colorplot_by_stage', 'crazy_histogram2d',
            'stitch_cmap']
 
 
+def add_inner_title(ax, title, loc, size=None):
+    '''
+    add a label to an axes as if it were a legend (loc must be 1-11)
+        'upper right'     1
+        'upper left'      2
+        'lower left'      3
+        'lower right'     4
+        'right'           5
+        'center left'     6
+        'center right'    7
+        'lower center'    8
+        'upper center'    9
+        'center'          10
+    '''
+    from matplotlib.patheffects import withStroke
+    from matplotlib.offsetbox import AnchoredText
+
+    if size is None:
+        size = dict(size=plt.rcParams['legend.fontsize'])
+    anct = AnchoredText(title, loc=loc, prop=size, pad=0., borderpad=0.5,
+                        frameon=False)
+    ax.add_artist(anct)
+    anct.txt._text.set_path_effects([withStroke(foreground="w", linewidth=3)])
+    anct.patch.set_alpha(0.5)
+    return anct
+
+
 def emboss(fg='w', lw=3):
     from matplotlib.patheffects import withStroke
     myeffect = withStroke(foreground=fg, linewidth=lw, alpha=0.5)

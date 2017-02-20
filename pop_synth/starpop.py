@@ -819,7 +819,7 @@ def color_by_arg(starpop, xdata, ydata, coldata, bins=None, cmap=None, ax=None,
                 ax.plot([999], [999], 'o', color=color, mec=color, label=label,
                         visible=False)
         ax.scatter(xdata[inds], ydata[inds], marker='o', s=15, edgecolors='none',
-                   color=colors[inds], alpha=0.3)
+                   color=colors[inds], alpha=0.3, rasterized=True)
 
         ax.legend(loc=0, numpoints=1, frameon=False)
 
@@ -834,7 +834,7 @@ def color_by_arg(starpop, xdata, ydata, coldata, bins=None, cmap=None, ax=None,
             cmap = cmap or plt.cm.Paired
 
         l = ax.scatter(xdata, ydata, c=coldata, marker='o', s=15,
-                       edgecolors='none', cmap=cmap, **skw)
+                       edgecolors='none', cmap=cmap, rasterized=True, **skw)
 
         c = plt.colorbar(l, ax=ax)
         if collabel is not None:

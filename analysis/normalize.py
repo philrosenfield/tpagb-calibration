@@ -246,7 +246,7 @@ def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
     mag1, mag2 = load_observation(args.observation, col1, col2,
                                   match_param=args.match_param,
                                   filterset=filterset)
-    
+
     ax.plot(mag1 - mag2, mag2, '.', label=numlabel(mag1, 'data'), **kw)
 
     ind = narratio_dict['idx_norm']
@@ -271,12 +271,12 @@ def norm_diags(sgal, narratio_dict, inds, col1, col2, args, f1, f2, regions_kw,
                    set(np.nonzero(sgal.data[f2][inds] < 30)[0]) &
                    set(narratio_dict['idx_norm']))
 
-        zdict = {'stage': [(0, 9), 10, (1, 8)],
+        zdict = {'label': [(0, 9), 10, (1, 8)],
                  'logAge': [(6, 10.1), 20, (6, 10.1)],
                  'm_ini':  [(0.9, 8.), 10, (0.9, 8.)],
-                 '[M/H]': [(-2, 2), 10, (-2, 2)],
-                 'C/O': [(0.48, 4), 10, (0.48, 4)],
-                 'logML': [(-11, -4), 10, (-11, -4)]}
+                 'M_H': [(-2, 2), 10, (-2, 2)],
+                 'C_O': [(0.48, 4), 10, (0.48, 4)],
+                 'MLoss': [(-11, -4), 10, (-11, -4)]}
 
         fig, (axs) = plt.subplots(ncols=4, nrows=2, sharex=True,
                                   sharey=True, figsize=(16, 12))
